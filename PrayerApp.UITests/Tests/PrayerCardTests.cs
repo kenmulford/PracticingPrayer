@@ -263,15 +263,22 @@ public class PrayerCardTests
         var driver = _setup.Driver;
         Thread.Sleep(TestConfig.DelayCollectionRender);
 
+        // Realize the always-seeded target into the tree first (#206). The larger
+        // namespaced-move seed sorts "Move *" cards ahead of "UITest *" and pushes
+        // this row further toward the fold; under CollectionView virtualization a bare
+        // IsTextDisplayed guard would then miss the row and silently skip the delete
+        // flow (a false-green). EnsureCardVisible scrolls/expands/searches it in.
+        driver.EnsureCardVisible(TestSeedFixtures.DeleteCard);
+        Assert.True(driver.IsTextDisplayed(TestSeedFixtures.DeleteCard, timeoutSeconds: 10),
+            $"Seeded '{TestSeedFixtures.DeleteCard}' must be locatable after EnsureCardVisible — " +
+            "a missing own-fixture is a harness failure, not a silent pass.");
+
         // Expand the card, tap inline Delete button
-        if (driver.IsTextDisplayed(TestSeedFixtures.DeleteCard, timeoutSeconds: 10))
-        {
-            driver.TapByText(TestSeedFixtures.DeleteCard);
-            Thread.Sleep(TestConfig.DelayAfterTap);
-            driver.WaitAndTap("Cards_Btn_Delete", timeoutSeconds: 10);
-            driver.DismissAlertIfPresent();
-            Thread.Sleep(TestConfig.DelayAfterNavigation);
-        }
+        driver.TapByText(TestSeedFixtures.DeleteCard);
+        Thread.Sleep(TestConfig.DelayAfterTap);
+        driver.WaitAndTap("Cards_Btn_Delete", timeoutSeconds: 10);
+        driver.DismissAlertIfPresent();
+        Thread.Sleep(TestConfig.DelayAfterNavigation);
 
         Assert.True(driver.IsDisplayed("Cards_List_Cards", timeoutSeconds: 10));
     }
@@ -687,7 +694,7 @@ public class PrayerCardTests
     // can exclude them via --filter 'Status!=FailingPreCommit2' until ready.
 
     /// <summary>
-    /// X-06 / TD-20: Moving a prayer from "Move Source Card" to "Move Target Card"
+    /// X-06 / TD-20: Moving a prayer from "Move Reflect Source Card" to "Move Reflect Target Card"
     /// is reflected in both card headers — source count decreases, target count increases.
     /// </summary>
     [Fact]
@@ -700,8 +707,8 @@ public class PrayerCardTests
         Thread.Sleep(TestConfig.DelayCollectionRender);
 
         // 1. Navigate to the source card and expand it.
-        driver.EnsureCardVisible("Move Source Card");
-        EnsureCardExpanded(driver, "Move Source Card");
+        driver.EnsureCardVisible(TestSeedFixtures.MoveReflectSourceCard);
+        EnsureCardExpanded(driver, TestSeedFixtures.MoveReflectSourceCard);
 
         // 2. Tap "Prayer One" to open PrayerDetailPage (view mode).
         if (TestConfig.IsIOS)
@@ -716,13 +723,13 @@ public class PrayerCardTests
         Assert.True(driver.IsDisplayed("Detail_Entry_Title", timeoutSeconds: 10),
             "Should be in edit mode on PrayerDetailPage");
 
-        // 4. Change PrayerCardId — tap the card picker and select "Move Target Card".
+        // 4. Change PrayerCardId — tap the card picker and select "Move Reflect Target Card".
         driver.WaitAndTap("Detail_Picker_Card", timeoutSeconds: 10);
         Thread.Sleep(TestConfig.DelayAfterTap);
         if (TestConfig.IsIOS)
-            driver.SelectIOSPickerValue("Move Target Card");
+            driver.SelectIOSPickerValue(TestSeedFixtures.MoveReflectTargetCard);
         else
-            driver.TapByText("Move Target Card");
+            driver.TapByText(TestSeedFixtures.MoveReflectTargetCard);
         Thread.Sleep(TestConfig.DelayAfterTap);
 
         // 5. Save and navigate back to the Cards tab.
@@ -732,34 +739,34 @@ public class PrayerCardTests
         Thread.Sleep(TestConfig.DelayCollectionRender);
 
         // 6a. Source card should show 3 prayers (one of its four seeded prayers moved out).
-        driver.EnsureCardVisible("Move Source Card");
+        driver.EnsureCardVisible(TestSeedFixtures.MoveReflectSourceCard);
         Assert.True(
             TestConfig.IsIOS
-                ? driver.IsTextContainsDisplayed("Move Source Card", timeoutSeconds: 5)
-                : driver.IsTextDisplayed("Move Source Card", timeoutSeconds: 5),
-            "Move Source Card should still be visible after move");
+                ? driver.IsTextContainsDisplayed(TestSeedFixtures.MoveReflectSourceCard, timeoutSeconds: 5)
+                : driver.IsTextDisplayed(TestSeedFixtures.MoveReflectSourceCard, timeoutSeconds: 5),
+            $"{TestSeedFixtures.MoveReflectSourceCard} should still be visible after move");
 
         // Expand source to verify prayer count dropped — "Prayer One" must be gone.
-        EnsureCardExpanded(driver, "Move Source Card");
+        EnsureCardExpanded(driver, TestSeedFixtures.MoveReflectSourceCard);
         Assert.False(
             TestConfig.IsIOS
                 ? driver.IsTextContainsDisplayed("Prayer One", timeoutSeconds: 3)
                 : driver.IsTextDisplayed("Prayer One", timeoutSeconds: 3),
-            "Prayer One should no longer appear in Move Source Card after the move");
+            $"Prayer One should no longer appear in {TestSeedFixtures.MoveReflectSourceCard} after the move");
 
         // 6b. Target card should now contain the moved prayer.
-        EnsureCardCollapsed(driver, "Move Source Card");
-        driver.EnsureCardVisible("Move Target Card");
-        EnsureCardExpanded(driver, "Move Target Card");
+        EnsureCardCollapsed(driver, TestSeedFixtures.MoveReflectSourceCard);
+        driver.EnsureCardVisible(TestSeedFixtures.MoveReflectTargetCard);
+        EnsureCardExpanded(driver, TestSeedFixtures.MoveReflectTargetCard);
         Assert.True(
             TestConfig.IsIOS
                 ? driver.IsTextContainsDisplayed("Prayer One", timeoutSeconds: 10)
                 : driver.IsTextDisplayed("Prayer One", timeoutSeconds: 10),
-            "Prayer One should be visible in Move Target Card after the move");
+            $"Prayer One should be visible in {TestSeedFixtures.MoveReflectTargetCard} after the move");
     }
 
     /// <summary>
-    /// D-07 / TD-20: After moving a prayer out of "Move Source Card", the originating
+    /// D-07 / TD-20: After moving a prayer out of "Move Margin Source Card", the originating
     /// card must NOT show a stuck expanded margin while its VM has IsExpanded=false.
     /// This is the regression test for the Border.Margin bug fixed in Commit 2.
     /// </summary>
@@ -773,8 +780,8 @@ public class PrayerCardTests
         Thread.Sleep(TestConfig.DelayCollectionRender);
 
         // 1. Expand source card.
-        driver.EnsureCardVisible("Move Source Card");
-        EnsureCardExpanded(driver, "Move Source Card");
+        driver.EnsureCardVisible(TestSeedFixtures.MoveMarginSourceCard);
+        EnsureCardExpanded(driver, TestSeedFixtures.MoveMarginSourceCard);
 
         // 2. Open "Prayer Two" (using Prayer Two here to keep fixtures independent
         //    from Cards_MovePrayerBetweenCards_BothCardsReflect which uses Prayer One).
@@ -794,9 +801,9 @@ public class PrayerCardTests
         driver.WaitAndTap("Detail_Picker_Card", timeoutSeconds: 10);
         Thread.Sleep(TestConfig.DelayAfterTap);
         if (TestConfig.IsIOS)
-            driver.SelectIOSPickerValue("Move Target Card");
+            driver.SelectIOSPickerValue(TestSeedFixtures.MoveMarginTargetCard);
         else
-            driver.TapByText("Move Target Card");
+            driver.TapByText(TestSeedFixtures.MoveMarginTargetCard);
         Thread.Sleep(TestConfig.DelayAfterTap);
 
         // 5. Save and return to Cards tab.
@@ -812,22 +819,22 @@ public class PrayerCardTests
         // while VM is collapsed — the accessibility label still reports ", Collapsed"
         // via the VM, but the visual border margin is wrong (the visual regression).
         // Post-fix the DataTrigger ensures the margin is also correct.
-        driver.EnsureCardVisible("Move Source Card");
+        driver.EnsureCardVisible(TestSeedFixtures.MoveMarginSourceCard);
         Assert.True(
-            IsCardExpanded(driver, "Move Source Card") == false,
-            "Move Source Card should be collapsed (IsExpanded=false) after moving a prayer out. " +
+            IsCardExpanded(driver, TestSeedFixtures.MoveMarginSourceCard) == false,
+            $"{TestSeedFixtures.MoveMarginSourceCard} should be collapsed (IsExpanded=false) after moving a prayer out. " +
             "If stuck expanded, the Border.Margin is not driven by the declarative DataTrigger.");
 
         // On iOS also verify via composed label that the platform sees it as Collapsed.
-        // The composed card label carries a prayer-count infix — "Move Source Card, 3 prayers,
-        // Collapsed" — so a contiguous "Move Source Card, Collapsed" substring never matches.
+        // The composed card label carries a prayer-count infix — "Move Margin Source Card, 3 prayers,
+        // Collapsed" — so a contiguous "Move Margin Source Card, Collapsed" substring never matches.
         // Assert count-agnostically (mirrors IsCardHeaderExpanded's AND-XPath) that one element's
         // label contains BOTH the card name AND the ", Collapsed" suffix; never hard-code the count.
         if (TestConfig.IsIOS)
             Assert.True(
                 driver.FindElements(By.XPath(
-                    "//*[contains(@label,'Move Source Card') and contains(@label,', Collapsed')]")).Count > 0,
-                "iOS a11y label should report the Move Source Card as Collapsed (no stale expanded " +
+                    $"//*[contains(@label,'{TestSeedFixtures.MoveMarginSourceCard}') and contains(@label,', Collapsed')]")).Count > 0,
+                $"iOS a11y label should report the {TestSeedFixtures.MoveMarginSourceCard} as Collapsed (no stale expanded " +
                 "margin); the composed label is '{Title}, {N prayers}, Collapsed'.");
     }
 
@@ -853,8 +860,8 @@ public class PrayerCardTests
         Thread.Sleep(TestConfig.DelayCollectionRender);
 
         // 1. Expand source card.
-        driver.EnsureCardVisible("Move Source Card");
-        EnsureCardExpanded(driver, "Move Source Card");
+        driver.EnsureCardVisible(TestSeedFixtures.MoveSystemSourceCard);
+        EnsureCardExpanded(driver, TestSeedFixtures.MoveSystemSourceCard);
 
         // 2. Open "Prayer Four" (dedicated fixture prayer for the system-target test).
         if (TestConfig.IsIOS)

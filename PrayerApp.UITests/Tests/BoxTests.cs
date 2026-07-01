@@ -338,14 +338,22 @@ public class BoxTests
         driver.EnsureOnTab("Prayer Cards", _setup);
         Thread.Sleep(TestConfig.DelayCollectionRender);
 
-        // Long-press to enter multi-select mode
-        if (!driver.IsTextDisplayed("UITest Card", timeoutSeconds: 10))
-        {
-            Assert.True(driver.IsDisplayed("Cards_List_Cards", timeoutSeconds: 10));
-            return; // Skip if no card available
-        }
+        // Realize this test's OWN always-seeded card into the tree first (#206). The
+        // larger namespaced-move seed sorts "Move *" cards ahead of "UITest *" and
+        // pushes this row further toward the fold; under CollectionView virtualization
+        // a bare IsTextDisplayed guard would then miss the row and silently skip
+        // (a false-green). Only genuinely-unavailable platform state (long-press /
+        // multi-select support, below) is skippable — a missing seeded card is not.
+        driver.EnsureCardVisible(TestSeedFixtures.MultiSelectMoveCard);
 
-        var cardElement = driver.FindByTextContains("UITest Card");
+        // Long-press to enter multi-select mode. Uses this test's OWN expendable
+        // card (isolation Principle 1) so the shared read-only "UITest Card" is
+        // never moved off the top level — that would break the tests that read it.
+        Assert.True(driver.IsTextDisplayed(TestSeedFixtures.MultiSelectMoveCard, timeoutSeconds: 10),
+            $"Seeded '{TestSeedFixtures.MultiSelectMoveCard}' must be locatable after EnsureCardVisible — " +
+            "a missing own-fixture is a harness failure, not a skip.");
+
+        var cardElement = driver.FindByTextContains(TestSeedFixtures.MultiSelectMoveCard);
         try
         {
             driver.LongPress(cardElement);
