@@ -315,4 +315,25 @@ public class BoxesViewModelTests
 
         await _boxService.Received(2).GetBoxesAsync();
     }
+
+    // ── Delete gated by IsSystem (E2E-cull conversion) ────────────────
+    // Replaces the deleted Boxes_SystemCollections_NoDeleteAction E2E (BoxTests.cs).
+    // BoxItemViewModel wires DeleteCommand with canExecute () => !_box.IsSystem
+    // (BoxesViewModel.cs:192): a system box's delete is disabled, a normal box's enabled.
+
+    [Fact]
+    public async Task DeleteCommand_SystemBox_CannotExecute_NonSystemBox_CanExecute()
+    {
+        SetupBoxes(
+            new CardBox { Id = 1, Name = "System", IsSystem = true },
+            new CardBox { Id = 2, Name = "Family", IsSystem = false });
+        var sut = CreateSut();
+        await sut.SyncAsync();
+
+        var systemBox = sut.Boxes.First(b => b.IsSystem);
+        var normalBox = sut.Boxes.First(b => !b.IsSystem);
+
+        Assert.False(((AsyncRelayCommand)systemBox.DeleteCommand).CanExecute(null));
+        Assert.True(((AsyncRelayCommand)normalBox.DeleteCommand).CanExecute(null));
+    }
 }

@@ -145,51 +145,6 @@ public class PrayerListTests
         Assert.True(driver.IsDisplayed("List_Filter_Active", timeoutSeconds: 10));
     }
 
-    /// <summary>4.8: Mark prayer as answered.</summary>
-    [Fact]
-    public void Prayers_MarkAnswered()
-    {
-        _setup.Driver.ResetAppUIState(_setup);
-        // Create a prayer specifically to mark answered
-        _setup.Driver.NavigateToNewPrayer(_setup);
-        var driver = _setup.Driver;
-
-        driver.EnterText("Detail_Entry_Title", "Mark Answered UITest");
-        driver.TapToolbarItemById("Save");
-        Thread.Sleep(TestConfig.DelayAfterSave);
-
-        // Find it and open it. #72a: was an if (IsTextDisplayed) guard that skipped the
-        // mark-answered flow when the just-created prayer wasn't visible (false green).
-        // Wait for the list to rebuild after Save's GoToAsync("..") round-trip before
-        // scrolling — the removed guard's timeoutSeconds:10 used to absorb that latency.
-        driver.WaitForElement("List_Filter_Active", timeoutSeconds: 10);
-        driver.ScrollToPrayerAndTap("Mark Answered UITest");
-
-        // #72a fail-loud: the seeded-then-saved prayer is unanswered, so the Mark Answered
-        // button must be present in view mode — assert rather than silently skip.
-        Assert.True(driver.IsDisplayed("Detail_Btn_MarkAnswered", timeoutSeconds: 10),
-            "Mark Answered button should be present in view mode for an unanswered prayer");
-        driver.Tap("Detail_Btn_MarkAnswered");
-        Thread.Sleep(TestConfig.DelayAfterNavigation);
-        driver.DismissAlertIfPresent();
-        Thread.Sleep(TestConfig.DelayAfterNavigation);
-
-        driver.GoBack();
-
-        // Ensure we're back on the Prayers list
-        driver.NavigateToTab("Prayers");
-
-        // Verify Answered filter still works
-        if (driver.IsDisplayed("List_Filter_Answered", timeoutSeconds: 10))
-            driver.Tap("List_Filter_Answered");
-
-        Assert.True(driver.IsDisplayed("List_Filter_Answered", timeoutSeconds: 10));
-
-        // Restore Active filter for subsequent tests
-        if (driver.IsDisplayed("List_Filter_Active", timeoutSeconds: 2))
-            driver.Tap("List_Filter_Active");
-    }
-
     /// <summary>4.9: Delete prayer from edit mode.</summary>
     [Fact]
     public void Prayers_DeletePrayer()

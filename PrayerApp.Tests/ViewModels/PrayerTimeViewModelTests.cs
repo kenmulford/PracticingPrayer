@@ -321,4 +321,32 @@ public class PrayerTimeViewModelTests
         Assert.Single(realEntries);
         Assert.Equal(100, realEntries[0].PrayerId);
     }
+
+    // ── CycleIntervalCommand (E2E-cull conversion) ────────────────────
+    // Replaces the interval half of the deleted PrayerTime_AutoMode_CyclesInterval
+    // E2E (PrayerTimeTests.cs). CycleInterval (PrayerTimeViewModel.cs:450) steps
+    // SelectedIntervalSeconds through the {30,60,120} options (:30) and wraps,
+    // writing each choice back to ISettings.AutoModeIntervalSeconds via the
+    // setter (:41).
+
+    [Fact]
+    public void CycleIntervalCommand_CyclesThroughOptions()
+    {
+        var sut = CreateSut();
+        Assert.Equal(30, sut.SelectedIntervalSeconds);
+
+        sut.CycleIntervalCommand.Execute(null);
+        Assert.Equal(60, sut.SelectedIntervalSeconds);
+
+        sut.CycleIntervalCommand.Execute(null);
+        Assert.Equal(120, sut.SelectedIntervalSeconds);
+
+        sut.CycleIntervalCommand.Execute(null);
+        Assert.Equal(30, sut.SelectedIntervalSeconds); // wraps back to the first option
+
+        // Each distinct interval is persisted to settings exactly once.
+        _settings.Received(1).AutoModeIntervalSeconds = 60;
+        _settings.Received(1).AutoModeIntervalSeconds = 120;
+        _settings.Received(1).AutoModeIntervalSeconds = 30;
+    }
 }

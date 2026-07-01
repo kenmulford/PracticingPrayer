@@ -842,4 +842,58 @@ public class PrayerRequestDetailViewModelTests
         Assert.Contains(nameof(PrayerRequestDetailViewModel.ShowDayOfWeek), raised);
         Assert.Contains(nameof(PrayerRequestDetailViewModel.ShowDayOfMonth), raised);
     }
+
+    // ── MarkAnsweredCommand (E2E-cull conversion) ─────────────────────
+    // Sole unit coverage for the deleted Prayers_MarkAnswered E2E
+    // (PrayerListTests.cs). Characterizes MarkAnsweredAsync
+    // (PrayerRequestDetailViewModel.cs:651): flip IsAnswered → persist via
+    // SavePrayerAsync → announce "Prayer marked as answered" → pop back (GoToAsync "..").
+
+    [Fact]
+    public async Task MarkAnsweredCommand_MarksAnswered_SavesAnnouncesAndNavigatesBack()
+    {
+        var sut = CreateSut();
+        sut.Title = "Answered prayer";
+        Assert.False(sut.IsAnswered);
+
+        await ((IAsyncRelayCommand)sut.MarkAnsweredCommand).ExecuteAsync(null);
+
+        Assert.True(sut.IsAnswered);
+        await _prayerService.Received(1).SavePrayerAsync(Arg.Any<Prayer>());
+        _accessibilityService.Received(1).Announce("Prayer marked as answered");
+        await _navigationService.Received(1).GoToAsync(Arg.Is<string>(s => s.StartsWith("..")));
+    }
+
+    // ── Move prayer between cards (E2E-cull conversion) ───────────────
+    // SOLE unit coverage for the three deleted move E2Es in PrayerCardTests.cs
+    // (Cards_MovePrayerBetweenCards_BothCardsReflect and the two stale-margin /
+    // target-expand regressions). The card picker's SelectedCard setter
+    // (PrayerRequestDetailViewModel.cs:412) reassigns PrayerCardId and dirties the
+    // form (IsDirty clause at :121); SaveAsync then persists the prayer under its
+    // new PrayerCardId — the reparent the E2Es exercised on-screen.
+
+    [Fact]
+    public async Task SelectedCard_Reparents_MarksDirty_AndSavePersistsNewCard()
+    {
+        var sut = CreateSut();
+        var source = new PrayerCard { Id = 3, Title = "Family" };
+        var target = new PrayerCard { Id = 7, Title = "Work" };
+        sut.AvailableCards.Add(source);
+        sut.AvailableCards.Add(target);
+        sut.Title = "Move me";
+
+        sut.SelectedCard = target;
+
+        Assert.Equal(7, sut.PrayerCardId);
+        Assert.True(sut.IsDirty);
+
+        Prayer? saved = null;
+        _prayerService.SavePrayerAsync(Arg.Do<Prayer>(p => saved = p))
+            .Returns(call => Task.FromResult((Prayer)call[0]));
+
+        await ((IAsyncRelayCommand)sut.SaveCommand).ExecuteAsync(null);
+
+        await _prayerService.Received(1).SavePrayerAsync(Arg.Is<Prayer>(p => p.PrayerCardId == 7));
+        Assert.Equal(7, saved!.PrayerCardId);
+    }
 }
