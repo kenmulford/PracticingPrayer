@@ -230,7 +230,7 @@ internal static class TestDataSeed
             ("Throwaway prayer B", "Deleted by Boxes_DeleteCollection_UnassignCards.", false),
         });
 
-        // Standalone throwaway card for Cards_DeleteCard_RemovesFromList.
+        // Standalone throwaway "UITest Delete Target Card" fixture (retained for the seed-consistency guard).
         // Lives at top level (BoxId = 0, "Loose Cards") so it's always visible —
         // user boxes render as collapsed accordion sections on first load and
         // would hide the card from the UI tree.
@@ -248,17 +248,6 @@ internal static class TestDataSeed
         // live at BoxId = 0
         // (Loose Cards) so they render flat and are always visible.
         // See Lessons/uitest-per-test-disposable-fixtures.md.
-        await SeedCardWithPrayersAsync(boxId: 0, "UITest AddPrayer Card",
-            Array.Empty<(string, string, bool)>());
-
-        await SeedCardWithPrayersAsync(boxId: 0, "UITest EditPrayer Card", new[]
-        {
-            ("UITest Edit Prayer",
-             "Prayer tapped + edited by Cards_EditPrayerFromCard.", false),
-        });
-
-        await SeedCardWithPrayersAsync(boxId: 0, "UITest Expanded Card",
-            Array.Empty<(string, string, bool)>());
 
         // Build-95 fallout: recycled-cell BindingContext-stale fixture.
         // "Recycle Big Card" is expanded + deleted by the test; "Recycle
@@ -284,42 +273,6 @@ internal static class TestDataSeed
             ("Recycle Small Survivor",
              "Should still be the only prayer visible after Big is deleted.", false),
         });
-
-        // Move-prayer fixtures (TD-20 / #42) — one Source card PER consuming test
-        // (isolation Principle 1). Previously all three move tests drained a prayer
-        // from ONE shared "Move Source Card", so whichever ran second found it
-        // already mutated — the order-dependent flake behind #214. Each test now
-        // owns its Source (and, for the two user-target moves, its own empty
-        // Target); the system-target test moves into the shared system "Quick Add"
-        // card, so it needs no Target here.
-        //
-        // Every Source carries the SAME 4-prayer shape the tests assume. Each test
-        // taps a DISTINCT prayer — One → Reflect, Two → Margin, Four → System — and
-        // only its own expanded card's prayers are ever in the UI tree (collapsed
-        // cards' subtrees are IsVisible=false), so cloning the identical prayer set
-        // into three cards never cross-matches. Prayer Three is unused but kept to
-        // preserve the original starting shape. All live at BoxId 0 (Loose Cards)
-        // so they render flat and always-visible.
-        var movePrayers = new (string Title, string Details, bool Answered)[]
-        {
-            ("Prayer One",   "First prayer in the move-prayer fixture.", false),
-            ("Prayer Two",   "Second prayer in the move-prayer fixture.", false),
-            ("Prayer Three", "Third prayer in the move-prayer fixture.", false),
-            ("Prayer Four",  "Fourth prayer — moved to a system card in issue #42 test.", false),
-        };
-
-        // Cards_MovePrayerBetweenCards_BothCardsReflect: taps Prayer One → its own Target.
-        await SeedCardWithPrayersAsync(boxId: 0, TestSeedFixtures.MoveReflectSourceCard, movePrayers);
-        await SeedCardWithPrayersAsync(boxId: 0, TestSeedFixtures.MoveReflectTargetCard,
-            Array.Empty<(string, string, bool)>());
-
-        // Cards_MovePrayer_DoesNotLeaveSourceCardWithStaleExpandedMargin: taps Prayer Two → its own Target.
-        await SeedCardWithPrayersAsync(boxId: 0, TestSeedFixtures.MoveMarginSourceCard, movePrayers);
-        await SeedCardWithPrayersAsync(boxId: 0, TestSeedFixtures.MoveMarginTargetCard,
-            Array.Empty<(string, string, bool)>());
-
-        // Cards_MovePrayer_ToSystemCard_TargetExpandsAndShowsMovedPrayer: taps Prayer Four → system "Quick Add".
-        await SeedCardWithPrayersAsync(boxId: 0, TestSeedFixtures.MoveSystemSourceCard, movePrayers);
     }
 
     private static async Task SeedCardWithPrayersAsync(int boxId, string cardTitle,
