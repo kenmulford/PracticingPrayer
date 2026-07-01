@@ -37,11 +37,4 @@ public static class TestSeedFixtures
     public const string MoveMarginSourceCard = "Move Margin Source Card";   // Cards_MovePrayer_DoesNotLeaveSourceCardWithStaleExpandedMargin
     public const string MoveMarginTargetCard = "Move Margin Target Card";   // Cards_MovePrayer_DoesNotLeaveSourceCardWithStaleExpandedMargin
     public const string MoveSystemSourceCard = "Move System Source Card";   // Cards_MovePrayer_ToSystemCard_... (target is the system "Quick Add" card)
-
-    // Multi-select move fixture (isolation Principle 1).
-    // Cards_MultiSelect_MoveToCollection long-presses THIS card into
-    // multi-select and MOVES it into "UITest Collection" — so the shared,
-    // read-only "UITest Card" stays pristine at top level for the tests that
-    // read it (e.g. Cards_Search_ExpandsMatchingSections). Seeded at BoxId 0.
-    public const string MultiSelectMoveCard = "UITest MultiSelectMove Card";
 }
