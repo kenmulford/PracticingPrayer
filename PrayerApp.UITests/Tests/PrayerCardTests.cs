@@ -19,6 +19,14 @@ public class PrayerCardTests
     public PrayerCardTests(AppiumSetup setup) => _setup = setup;
 
     /// <summary>
+    /// Bounded number of expand-tap attempts in <see cref="EnsureCardExpanded"/>. Small on
+    /// purpose (#207): in the aged shared session an expand tap can fail to register — header
+    /// present but the inner subtree never realizes — so up to 3 expand-tap attempts (two
+    /// retries) cover the drift while a genuinely stuck card still fails fast rather than spinning.
+    /// </summary>
+    private const int CardExpandAttempts = 3;
+
+    /// <summary>
     /// Idempotently expand the "Quick Add" system card and confirm it settled into its
     /// expanded state. Cross-platform and order-independent.
     /// <para>
@@ -348,12 +356,30 @@ public class PrayerCardTests
         TapCardHeader(driver, cardName);
     }
 
-    /// <summary>Idempotent counterpart to EnsureCardCollapsed.</summary>
+    /// <summary>
+    /// Idempotent counterpart to EnsureCardCollapsed. Expands the card AND confirms the expand
+    /// took, re-tapping a bounded number of times when the first tap didn't register — header
+    /// present but the inner subtree never realized (shared-session aging, #207) — so a caller
+    /// that immediately asserts on the realized chips/prayers doesn't fail on a dropped tap.
+    /// Re-reads the <see cref="IsCardExpanded"/> state proxy per attempt (a fresh lookup, so a
+    /// reflow can't hand back a stale ref — mirrors <see cref="CollapseAnyExpandedCards"/> /
+    /// EnsureAllSectionsExpanded). After each tap it CONFIRMS the expand via
+    /// <see cref="WaitForCardExpanded"/>'s bool return and returns immediately on success — so
+    /// a tap that DID take is never undone by a premature re-tap: a detection flake on the next
+    /// iteration can't fall through and toggle an already-expanded card back to collapsed. It
+    /// only re-taps when the wait genuinely reports still-not-expanded (for a user card
+    /// IsCardHeaderExpanded and IsCardExpanded agree). No-op cost when already expanded: the
+    /// first proxy check returns before any tap.
+    /// </summary>
     private static void EnsureCardExpanded(OpenQA.Selenium.Appium.AppiumDriver driver, string cardName)
     {
         driver.EnsureCardVisible(cardName);
-        if (IsCardExpanded(driver, cardName)) return;
-        TapCardHeader(driver, cardName);
+        for (int attempt = 0; attempt < CardExpandAttempts; attempt++)
+        {
+            if (IsCardExpanded(driver, cardName)) return;
+            TapCardHeader(driver, cardName);
+            if (WaitForCardExpanded(driver, cardName, timeoutSeconds: 5)) return;
+        }
     }
 
     /// <summary>

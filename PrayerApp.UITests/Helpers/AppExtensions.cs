@@ -20,6 +20,16 @@ public static class AppExtensions
     /// <summary>iOS swipe velocity in pixels/sec. Moderate speed to reliably trigger SwipeView.</summary>
     private const int IOSSwipeVelocity = 1500;
 
+    /// <summary>
+    /// Bounded number of extra realize-retry passes for the drift-sensitive element paths
+    /// (#207): after the first full-budget attempt, a present-but-not-yet-realized element
+    /// gets this many quick re-find + short-settle retries before the path gives up. Small
+    /// on purpose — the shared session ages across the ~82-min suite so a target can lag the
+    /// automation tree by a beat, but a genuine miss must still fail fast. Miss-path only:
+    /// the already-realized case returns before any retry, so the happy path pays nothing.
+    /// </summary>
+    private const int RealizeRetryAttempts = 2;
+
     /// <summary>Dismiss the software keyboard if showing on iOS. No-op on Android.</summary>
     /// <remarks>
     /// Catches every exception: Appium 2 returns "resource not found" for HideKeyboard
@@ -73,12 +83,68 @@ public static class AppExtensions
         => (AppiumElement)driver.FindElement(AutomationIdLocator(automationId));
 
     /// <summary>Wait for an element with the given AutomationId to appear.</summary>
+    /// <remarks>
+    /// Realize-retry (#207): the shared Appium session ages across the ~82-min suite, so a
+    /// target can sit in the page source yet not be realized in the automation tree for a
+    /// beat after it "should" exist. This polls FindElement AND <c>Displayed</c>, re-finding
+    /// on every poll (a fresh lookup, so a CollectionView reflow can't hand back a stale ref —
+    /// mirrors <see cref="EnsureAllSectionsExpanded"/>) with a short settle between polls, so a
+    /// not-yet-realized element is re-queried within the timeout budget instead of failing on
+    /// the first miss. The already-realized element resolves on the first poll with no added
+    /// sleep. On timeout it falls back to a plain find, preserving the pre-#207 presence-only
+    /// contract: return the element if it is in the tree at all, and throw
+    /// <see cref="NoSuchElementException"/> only when it is truly absent — the change only ever
+    /// PREFERS a realized element, it never regresses a caller to a harder failure.
+    /// </remarks>
     public static AppiumElement WaitForElement(this AppiumDriver driver, string automationId,
         int timeoutSeconds = 15)
+        => WaitForRealizedElement(driver, AutomationIdLocator(automationId), timeoutSeconds);
+
+    /// <summary>
+    /// Poll for a present AND realized (<c>Displayed</c>) element matching <paramref name="locator"/>,
+    /// re-finding per poll with a short settle. Shared by <see cref="WaitForElement"/> and
+    /// <see cref="WaitAndTap"/>. See <see cref="WaitForElement"/> for the drift rationale.
+    /// </summary>
+    private static AppiumElement WaitForRealizedElement(AppiumDriver driver, By locator,
+        int timeoutSeconds)
     {
-        var wait = new WebDriverWait(driver, TimeSpan.FromSeconds(timeoutSeconds));
-        var locator = AutomationIdLocator(automationId);
-        return (AppiumElement)wait.Until(d => d.FindElement(locator));
+        var wait = new WebDriverWait(driver, TimeSpan.FromSeconds(timeoutSeconds))
+        {
+            // Short settle between polls (reused constant) so a just-missed realize is
+            // re-queried quickly rather than after the 500 ms default.
+            PollingInterval = TimeSpan.FromMilliseconds(TestConfig.DelayShortSettle),
+        };
+        // Ignore both so a poll landing before realize (NoSuchElement) or across a reflow
+        // (StaleElementReference) re-finds on the next poll rather than propagating. NotFound
+        // is already ignored by the WebDriverWait ctor; naming it is explicit and harmless.
+        wait.IgnoreExceptionTypes(typeof(NotFoundException), typeof(StaleElementReferenceException));
+        try
+        {
+            // Until keeps polling while the delegate returns null; a not-yet-Displayed element
+            // returns null → settle + re-find; a realized one resolves immediately.
+            return (AppiumElement)wait.Until(d =>
+            {
+                var el = d.FindElement(locator);
+                return el.Displayed ? el : null;
+            });
+        }
+        catch (WebDriverTimeoutException)
+        {
+            // Budget spent without a realized hit. Preserve the presence-only contract: hand
+            // back the element if it is in the tree at all (WaitAndTap's own tap-retry realizes
+            // it), else surface NoSuchElement on genuine absence. The pre-#207 wait.Until path
+            // threw WebDriverTimeoutException on genuine absence, not NoSuchElement — but that's
+            // behavior-compatible: every UITest caller treats absence via the WebDriverException
+            // base (which catches BOTH), so no caller regresses. ShortTimeout keeps this fallback
+            // from re-paying a full implicit wait on the already-degraded failure path.
+            var priorWait = driver.Manage().Timeouts().ImplicitWait;
+            try
+            {
+                driver.Manage().Timeouts().ImplicitWait = TestConfig.ShortTimeout;
+                return (AppiumElement)driver.FindElement(locator);
+            }
+            finally { driver.Manage().Timeouts().ImplicitWait = priorWait; }
+        }
     }
 
     /// <summary>Wait for an element to disappear from the screen.</summary>
@@ -108,9 +174,36 @@ public static class AppExtensions
     public static void Tap(this AppiumDriver driver, string automationId)
         => driver.FindByAutomationId(automationId).Click();
 
-    /// <summary>Tap an element by AutomationId, waiting for it first.</summary>
+    /// <summary>Tap an element by AutomationId, waiting for it to realize first.</summary>
+    /// <remarks>
+    /// Realize-retry (#207 — e.g. the drift-sensitive <c>Cards_Btn_Favorite</c> tap at
+    /// FeatureGapTests.cs). <see cref="WaitForRealizedElement"/> waits for the element to
+    /// realize, then we tap. A tap that still misses — the element realized into the tree but
+    /// isn't yet interactable, or went stale in a reflow between find and tap — gets a bounded
+    /// set of quick re-find + short-settle + retry passes instead of failing on that first
+    /// miss. Re-finds per attempt (a cached ref goes stale across a reflow — mirrors
+    /// <see cref="EnsureAllSectionsExpanded"/>). The already-realized case taps on the first
+    /// attempt with no added latency; only the miss path pays the settle. The terminal attempt
+    /// lets the raw click exception propagate, exactly as before this hardening.
+    /// </remarks>
     public static void WaitAndTap(this AppiumDriver driver, string automationId, int timeoutSeconds = 15)
-        => driver.WaitForElement(automationId, timeoutSeconds).Click();
+    {
+        var locator = AutomationIdLocator(automationId);
+        // Attempt 0 spends the full budget waiting for realize; retries are quick re-finds.
+        for (int attempt = 0; ; attempt++)
+        {
+            var element = WaitForRealizedElement(driver, locator, attempt == 0 ? timeoutSeconds : 1);
+            try
+            {
+                element.Click();
+                return;
+            }
+            catch (WebDriverException) when (attempt < RealizeRetryAttempts)
+            {
+                Thread.Sleep(TestConfig.DelayShortSettle);
+            }
+        }
+    }
 
     /// <summary>Clear an input and type new text.</summary>
     public static void EnterText(this AppiumDriver driver, string automationId, string text)
@@ -288,6 +381,21 @@ public static class AppExtensions
         // be collapsed. Expand all and retry.
         driver.EnsureAllSectionsExpanded();
         if (TryScroll()) return;
+
+        // Realize-retry (#207): after expanding sections the row can be present in the page
+        // source but not yet realized into the automation tree for a beat (shared-session
+        // aging), so both the visible-check and the scroll above miss it. Settle briefly and
+        // re-query before the costly search fallback, which mutates the page into a filtered
+        // state ResetAppUIState must later clear. Bounded and miss-path only — the already
+        // visible/scrolled cases returned above, and TryScroll keeps its #196 no-progress
+        // guard (ScrollDownUntil is unchanged) so a pinned list bails each pass rather than
+        // burning the scroll budget.
+        for (int attempt = 0; attempt < RealizeRetryAttempts; attempt++)
+        {
+            Thread.Sleep(TestConfig.DelayShortSettle);
+            if (IsVisible()) return;
+            if (TryScroll()) return;
+        }
 
         // Last resort (lesson: uitest-visibility-not-existence-under-virtualization.md):
         // type the card name into the in-page search to force MAUI to materialize the
