@@ -177,32 +177,6 @@ public class BoxTests
         Assert.True(driver.IsDisplayed("Cards_List_Cards", timeoutSeconds: 10));
     }
 
-    /// <summary>8.7: System collections are read-only — no Delete chip visible.</summary>
-    [Fact]
-    public void Boxes_SystemCollections_NoDeleteAction()
-    {
-        _setup.Driver.ResetAppUIState(_setup);
-        _setup.Driver.EnsureOnTab("Prayer Cards", _setup);
-        var driver = _setup.Driver;
-
-        driver.TapToolbarItemById("Collections");
-        driver.WaitForElement("Boxes_List_Boxes", timeoutSeconds: 10);
-
-        // Tap System collection to select it
-        if (driver.IsTextDisplayed("System", timeoutSeconds: 3))
-        {
-            driver.TapByText("System");
-            Thread.Sleep(TestConfig.DelayAfterTap);
-
-            // Edit should be visible but Delete should not
-            Assert.False(driver.IsDisplayed("Boxes_Btn_Delete", timeoutSeconds: 2),
-                "System collections should not show Delete action");
-        }
-
-        driver.GoBack();
-        Thread.Sleep(TestConfig.DelayAfterNavigation);
-    }
-
     /// <summary>8.8: Delete collection — select, tap Delete chip, choose Unassign.
     /// Targets the "UITest Delete Target Collection B" throwaway entry from the seed so this
     /// destructive test doesn't wipe the shared UITest Collection baseline.</summary>

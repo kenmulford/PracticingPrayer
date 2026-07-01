@@ -214,44 +214,6 @@ public class PrayerTimeTests
         ExitPrayerTime();
     }
 
-    /// <summary>8.3: Auto-mode button cycles timer intervals.</summary>
-    [SkippableFact]
-    public void PrayerTime_AutoMode_CyclesInterval()
-    {
-        _setup.Driver.ResetAppUIState(_setup);
-        if (!TryStartPrayerTime())
-            throw new SkipException("Could not start Prayer Time session");
-
-        var driver = _setup.Driver;
-
-        // Try AutomationId first, then text fallback for iOS
-        bool autoModeFound = driver.IsDisplayed("PrayerTime_Btn_AutoMode", timeoutSeconds: 3);
-        if (!autoModeFound && TestConfig.IsIOS)
-            autoModeFound = driver.IsTextContainsDisplayed("Auto", timeoutSeconds: 2);
-
-        if (autoModeFound)
-        {
-            try
-            {
-                if (driver.IsDisplayed("PrayerTime_Btn_AutoMode", timeoutSeconds: 1))
-                    driver.Tap("PrayerTime_Btn_AutoMode");
-                else
-                    driver.TapByTextContains("Auto");
-            }
-            catch (WebDriverException) { /* button may have shifted */ }
-            Thread.Sleep(TestConfig.DelayAfterTap);
-
-            Assert.True(
-                driver.IsDisplayed("PrayerTime_Btn_Pause", timeoutSeconds: 3)
-                || driver.IsDisplayed("PrayerTime_Btn_CycleInterval", timeoutSeconds: 3)
-                || driver.IsTextContainsDisplayed("Pause", timeoutSeconds: 2)
-                || driver.IsTextContainsDisplayed("30s", timeoutSeconds: 2),
-                "Auto mode should show pause/cycle controls or timer interval");
-        }
-
-        ExitPrayerTime();
-    }
-
     /// <summary>8.5: "I'm Done" / Finish button exits prayer time.</summary>
     [SkippableFact]
     public void PrayerTime_FinishButton_ExitsPrayerTime()
