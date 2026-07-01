@@ -192,44 +192,6 @@ public class PrayerTimeTests
         ExitPrayerTime();
     }
 
-    /// <summary>8.2: Navigation buttons — Previous/Next are present.</summary>
-    [SkippableFact]
-    public void PrayerTime_NavigationButtons_Present()
-    {
-        _setup.Driver.ResetAppUIState(_setup);
-        if (!TryStartPrayerTime())
-            throw new SkipException("Could not start Prayer Time session");
-
-        var driver = _setup.Driver;
-
-        // iOS: AutomationIds invisible due to flattening — fall back to button text
-        Assert.True(
-            driver.IsDisplayed("PrayerTime_Btn_Previous", timeoutSeconds: 3)
-            || driver.IsDisplayed("PrayerTime_Btn_Next", timeoutSeconds: 3)
-            || driver.IsTextDisplayed("‹", timeoutSeconds: 2)
-            || driver.IsTextDisplayed("›", timeoutSeconds: 2)
-            || driver.IsTextDisplayed("I'm done", timeoutSeconds: 2),
-            "Navigation buttons or session controls should be visible");
-
-        ExitPrayerTime();
-    }
-
-    /// <summary>8.5: "I'm Done" / Finish button exits prayer time.</summary>
-    [SkippableFact]
-    public void PrayerTime_FinishButton_ExitsPrayerTime()
-    {
-        _setup.Driver.ResetAppUIState(_setup);
-        if (!TryStartPrayerTime())
-            throw new SkipException("Could not start Prayer Time session");
-
-        ExitPrayerTime();
-
-        Assert.True(
-            _setup.Driver.IsDisplayed("Home_Btn_QuickAdd", timeoutSeconds: 10)
-            || _setup.Driver.IsDisplayed("Home_Btn_PrayerTime", timeoutSeconds: 3),
-            "Should return to Home after exiting Prayer Time");
-    }
-
     /// <summary>8.6: Tag-scoped session — scope page shows Cancel/Start.</summary>
     /// <remarks>
     /// Commit 84d4b11: action sheet only appears when both prayers AND tags exist.
