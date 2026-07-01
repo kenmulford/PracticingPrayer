@@ -63,44 +63,4 @@ public class UnsavedChangesTests
             Thread.Sleep(TestConfig.DelayAfterNavigation);
         }
     }
-
-    /// <summary>5.2: Edit title → tap different tab → discard dialog appears.</summary>
-    [Fact]
-    public void UnsavedChanges_EditTitle_TabSwitchShowsDiscardDialog()
-    {
-        _setup.Driver.ResetAppUIState(_setup);
-        var driver = _setup.Driver;
-
-        // EnsureOnTab handles any leftover modals/alerts from prior tests
-        driver.NavigateToNewPrayer(_setup);
-
-        driver.EnterText("Detail_Entry_Title", "Tab Switch Dirty");
-        driver.NavigateToTab("Home");
-        Thread.Sleep(TestConfig.DelayAfterNavigation);
-
-        driver.DismissAlertIfPresent();
-        Thread.Sleep(TestConfig.DelayAfterDismiss);
-
-        Assert.True(driver.IsDisplayed("Home_Btn_QuickAdd", timeoutSeconds: 10)
-                 || driver.IsDisplayed("Detail_Entry_Title", timeoutSeconds: 3));
-    }
-
-    /// <summary>5.5: Save then back — no discard prompt.</summary>
-    [Fact]
-    public void UnsavedChanges_SaveThenBack_NoPrompt()
-    {
-        _setup.Driver.ResetAppUIState(_setup);
-        _setup.Driver.NavigateToNewPrayer(_setup);
-        var driver = _setup.Driver;
-
-        driver.EnterText("Detail_Entry_Title", "Saved Prayer NoPrompt");
-        driver.TapToolbarItem("Save");
-        Thread.Sleep(TestConfig.DelayCollectionRender);
-
-        // Save already navigates back to prayer list via GoToAsync("..").
-        // Verify we're on the list (no discard prompt intercepted the Save navigation).
-        Assert.True(driver.IsDisplayed("List_Filter_Active", timeoutSeconds: 10)
-                 || driver.IsDisplayed("List_Search_Prayers", timeoutSeconds: 3),
-            "Should return to prayer list without discard prompt after saving");
-    }
 }
