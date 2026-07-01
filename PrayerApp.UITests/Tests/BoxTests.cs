@@ -357,45 +357,74 @@ public class BoxTests
                 $"Long-press not supported in this Appium config: {ex.Message}");
         }
 
-        if (!driver.IsDisplayed("Cards_Bar_MultiSelect", timeoutSeconds: 3))
+        // From here the test is in multi-select mode. Wrap the move flow in try/finally so
+        // that however it exits — a successful move, the early-return below, or a thrown
+        // assertion mid-flow — the finally force-exits multi-select and it can never leak to
+        // the next test (E2E isolation Principle 2 — every test starts on Home). This test is
+        // the suite's only intentional ≥500 ms long-press, so it is the sole leak source.
+        try
         {
-            Assert.True(driver.IsDisplayed("Cards_List_Cards", timeoutSeconds: 10));
-            return; // Multi-select didn't activate
-        }
+            if (!driver.IsDisplayed("Cards_Bar_MultiSelect", timeoutSeconds: 3))
+            {
+                Assert.True(driver.IsDisplayed("Cards_List_Cards", timeoutSeconds: 10));
+                return; // Multi-select didn't activate
+            }
 
-        // Tap "Move to…" button
-        driver.Tap("Cards_Btn_MoveToBox");
-        Thread.Sleep(TestConfig.DelayAfterTap);
-
-        // Action sheet should appear with collection names
-        if (driver.IsTextDisplayed("UITest Collection", timeoutSeconds: 3))
-        {
-            if (TestConfig.IsIOS)
-                driver.TapIOSActionSheetButton("UITest Collection");
-            else
-                driver.TapByText("UITest Collection");
-
-            Thread.Sleep(TestConfig.DelayAfterSave);
-        }
-        else
-        {
-            // Cancel if target collection not visible
-            if (TestConfig.IsIOS)
-                driver.TapIOSActionSheetButton("Cancel");
-            else
-                driver.TapByText("Cancel");
+            // Tap "Move to…" button
+            driver.Tap("Cards_Btn_MoveToBox");
             Thread.Sleep(TestConfig.DelayAfterTap);
 
-            // Exit multi-select — overflow button mutates to X in multi-select mode
-            // but keeps AutomationId="More" (MAUI enforces set-once on AutomationId).
-            if (driver.IsDisplayed("Cards_Bar_MultiSelect", timeoutSeconds: 2))
-                driver.Tap("More");
-        }
+            // Action sheet should appear with collection names
+            if (driver.IsTextDisplayed("UITest Collection", timeoutSeconds: 3))
+            {
+                if (TestConfig.IsIOS)
+                    driver.TapIOSActionSheetButton("UITest Collection");
+                else
+                    driver.TapByText("UITest Collection");
 
-        // Multi-select toolbar should be gone
-        Assert.False(driver.IsDisplayed("Cards_Bar_MultiSelect", timeoutSeconds: 2),
-            "Multi-select toolbar should be hidden after move");
-        Assert.True(driver.IsDisplayed("Cards_List_Cards", timeoutSeconds: 10));
+                Thread.Sleep(TestConfig.DelayAfterSave);
+            }
+            else
+            {
+                // Cancel if target collection not visible
+                if (TestConfig.IsIOS)
+                    driver.TapIOSActionSheetButton("Cancel");
+                else
+                    driver.TapByText("Cancel");
+                Thread.Sleep(TestConfig.DelayAfterTap);
+
+                // Exit multi-select — overflow button mutates to X in multi-select mode
+                // but keeps AutomationId="More" (MAUI enforces set-once on AutomationId).
+                if (driver.IsDisplayed("Cards_Bar_MultiSelect", timeoutSeconds: 2))
+                    driver.Tap("More");
+            }
+
+            // Multi-select toolbar should be gone
+            Assert.False(driver.IsDisplayed("Cards_Bar_MultiSelect", timeoutSeconds: 2),
+                "Multi-select toolbar should be hidden after move");
+            Assert.True(driver.IsDisplayed("Cards_List_Cards", timeoutSeconds: 10));
+        }
+        finally
+        {
+            // Safety net: if the move flow above threw before exiting multi-select, exit it
+            // here so the leak never reaches the next test. No-ops when the flow already
+            // exited (happy path auto-exits after the move; the else-branch taps "More"
+            // before its assertions). Overflow button keeps AutomationId="More" in
+            // multi-select mode (MAUI enforces set-once on AutomationId).
+            //
+            // Wrapped in try/catch — mirroring ResetAppUIState's multi-select clear — because
+            // driver.Tap is FindElement(...).Click(), which throws on not-found/stale. If the
+            // try body already threw (a real assertion failure) or the bar realized late on
+            // the skip-return path, an exception here would REPLACE the original failure (or
+            // flip a passing return to a failure). Pure best-effort: attempt the exit, never
+            // throw out of cleanup.
+            try
+            {
+                if (driver.IsDisplayed("Cards_Bar_MultiSelect", timeoutSeconds: 2))
+                    driver.Tap("More");
+            }
+            catch { /* best-effort cleanup — never mask the real failure */ }
+        }
     }
 
     /// <summary>8.13: Search auto-expands matching sections.</summary>

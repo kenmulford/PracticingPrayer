@@ -780,12 +780,19 @@ public static class AppExtensions
         // a tab root.
         ResetCardsListScroll(driver);
 
-        // Fast path: already at a tab root with no pending alert.
-        if (!driver.IsAlertPresent() && driver.IsDisplayed("Home", timeoutSeconds: 0))
-            return;
-
-        try { driver.DismissAlertIfPresent(); } catch { /* best effort */ }
-
+        // In-place recoveries that MUST run BEFORE the fast-path early-return below: clear a
+        // leaked multi-select AND a leaked search term. BOTH must run before the fast-path for
+        // the same reason — that check gates on "Home", which resolves to the always-visible
+        // Home tab-BAR button (AppShell.xaml Title="Home"), present even on the Prayer Cards
+        // page while in multi-select or with an active search — so either clear placed AFTER
+        // the fast-path never runs when a prior test leaked that state (the fast-path
+        // short-circuits and returns first, which is exactly the #205 defect this corrects).
+        // Keeping both here leaves the fast-path purely gating the back-out navigation below.
+        //
+        // Multi-select clear: strictly gated on Cards_Bar_MultiSelect presence so "More" is
+        // tapped only in multi-select; outside it "More" opens the overflow popup, which must
+        // not happen from this reset. timeoutSeconds:0 — a leaked bar is fully realized, so
+        // the instant check detects it at negligible per-reset cost and no-ops otherwise.
         try
         {
             if (driver.IsDisplayed("Cards_Bar_MultiSelect", timeoutSeconds: 0))
@@ -798,6 +805,7 @@ public static class AppExtensions
         }
         catch { /* not on Prayer Cards or not in multi-select */ }
 
+        // Search-term clear: same before-the-fast-path reason as the multi-select clear above.
         try
         {
             if (driver.IsDisplayed("Cards_Search", timeoutSeconds: 0) &&
@@ -808,6 +816,12 @@ public static class AppExtensions
             }
         }
         catch { /* not on Prayer Cards or search bar not rendered */ }
+
+        // Fast path: already at a tab root with no pending alert.
+        if (!driver.IsAlertPresent() && driver.IsDisplayed("Home", timeoutSeconds: 0))
+            return;
+
+        try { driver.DismissAlertIfPresent(); } catch { /* best effort */ }
 
         // Back out to a tab root, dismissing any alert each Back may raise (e.g.
         // "Discard changes?"). Bounded so a stuck page can't loop forever.
