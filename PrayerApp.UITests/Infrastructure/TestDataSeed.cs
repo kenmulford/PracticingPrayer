@@ -266,6 +266,16 @@ internal static class TestDataSeed
         await SeedCardWithPrayersAsync(boxId: 0, "UITest Favorite Card",
             Array.Empty<(string, string, bool)>());
 
+        // Cards_MultiSelect_MoveToCollection long-presses this card into
+        // multi-select and MOVES it into "UITest Collection". It owns its own
+        // expendable card so the shared read-only "UITest Card" stays pristine
+        // at top level for downstream readers (Cards_Search_ExpandsMatchingSections).
+        await SeedCardWithPrayersAsync(boxId: 0, TestSeedFixtures.MultiSelectMoveCard, new[]
+        {
+            ("MultiSelect Move Prayer",
+             "Card moved into a collection by Cards_MultiSelect_MoveToCollection.", false),
+        });
+
         // Build-95 fallout: recycled-cell BindingContext-stale fixture.
         // "Recycle Big Card" is expanded + deleted by the test; "Recycle
         // Small Card" is the survivor whose cell may be assigned the Big
@@ -291,23 +301,41 @@ internal static class TestDataSeed
              "Should still be the only prayer visible after Big is deleted.", false),
         });
 
-        // Move-prayer fixture (TD-20 / Commit 1 test prereqs).
-        // "Move Source Card" starts with 4 prayers; "Move Target Card" starts empty.
-        // Each move test consumes a distinct prayer so they stay order-independent:
-        // Prayer One/Two/Three feed the user-target move tests; Prayer Four feeds the
-        // issue #42 system-target move test (Cards_MovePrayer_ToSystemCard_...).
-        // Also used to verify no stuck Border.Margin on source after the move
-        // (regression for the declarative-margin fix in Commit 2).
-        await SeedCardWithPrayersAsync(boxId: 0, "Move Source Card", new[]
+        // Move-prayer fixtures (TD-20 / #42) — one Source card PER consuming test
+        // (isolation Principle 1). Previously all three move tests drained a prayer
+        // from ONE shared "Move Source Card", so whichever ran second found it
+        // already mutated — the order-dependent flake behind #214. Each test now
+        // owns its Source (and, for the two user-target moves, its own empty
+        // Target); the system-target test moves into the shared system "Quick Add"
+        // card, so it needs no Target here.
+        //
+        // Every Source carries the SAME 4-prayer shape the tests assume. Each test
+        // taps a DISTINCT prayer — One → Reflect, Two → Margin, Four → System — and
+        // only its own expanded card's prayers are ever in the UI tree (collapsed
+        // cards' subtrees are IsVisible=false), so cloning the identical prayer set
+        // into three cards never cross-matches. Prayer Three is unused but kept to
+        // preserve the original starting shape. All live at BoxId 0 (Loose Cards)
+        // so they render flat and always-visible.
+        var movePrayers = new (string Title, string Details, bool Answered)[]
         {
             ("Prayer One",   "First prayer in the move-prayer fixture.", false),
             ("Prayer Two",   "Second prayer in the move-prayer fixture.", false),
             ("Prayer Three", "Third prayer in the move-prayer fixture.", false),
             ("Prayer Four",  "Fourth prayer — moved to a system card in issue #42 test.", false),
-        });
+        };
 
-        await SeedCardWithPrayersAsync(boxId: 0, "Move Target Card",
+        // Cards_MovePrayerBetweenCards_BothCardsReflect: taps Prayer One → its own Target.
+        await SeedCardWithPrayersAsync(boxId: 0, TestSeedFixtures.MoveReflectSourceCard, movePrayers);
+        await SeedCardWithPrayersAsync(boxId: 0, TestSeedFixtures.MoveReflectTargetCard,
             Array.Empty<(string, string, bool)>());
+
+        // Cards_MovePrayer_DoesNotLeaveSourceCardWithStaleExpandedMargin: taps Prayer Two → its own Target.
+        await SeedCardWithPrayersAsync(boxId: 0, TestSeedFixtures.MoveMarginSourceCard, movePrayers);
+        await SeedCardWithPrayersAsync(boxId: 0, TestSeedFixtures.MoveMarginTargetCard,
+            Array.Empty<(string, string, bool)>());
+
+        // Cards_MovePrayer_ToSystemCard_TargetExpandsAndShowsMovedPrayer: taps Prayer Four → system "Quick Add".
+        await SeedCardWithPrayersAsync(boxId: 0, TestSeedFixtures.MoveSystemSourceCard, movePrayers);
     }
 
     private static async Task SeedCardWithPrayersAsync(int boxId, string cardTitle,
