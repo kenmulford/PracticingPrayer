@@ -56,6 +56,10 @@ platform :ios do
     ipa = Dir["#{ROOT}/PrayerApp/bin/Release/net10.0-ios/ios-arm64/publish/*.ipa"].first
     UI.user_error!("no IPA produced") unless ipa
 
-    upload_to_testflight(api_key: key, ipa: ipa, skip_waiting_for_build_processing: true)
+    # TestFlight "What to Test" notes for this build (mirrors the Android changelog).
+    notes_path = "#{ROOT}/fastlane/metadata/ios/en-US/release_notes.txt"
+    notes = File.exist?(notes_path) ? File.read(notes_path).strip : nil
+
+    upload_to_testflight(api_key: key, ipa: ipa, changelog: notes, skip_waiting_for_build_processing: true)
   end
 end
