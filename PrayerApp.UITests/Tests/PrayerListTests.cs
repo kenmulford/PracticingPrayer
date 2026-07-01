@@ -1,4 +1,3 @@
-using OpenQA.Selenium;
 using PrayerApp.UITests.Helpers;
 using PrayerApp.UITests.Infrastructure;
 using Xunit;
