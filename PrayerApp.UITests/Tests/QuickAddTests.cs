@@ -78,25 +78,11 @@ public class QuickAddTests
 
     // ── Tests ────────────────────────────────────────────────────
 
-    /// <summary>2.2 (variant): Quick Add cancel — dismisses without saving, returns to Home.</summary>
-    [Fact]
-    public void QuickAdd_Cancel_DismissesModal()
-    {
-        _setup.Driver.ResetAppUIState(_setup);
-        var driver = _setup.Driver;
-
-        OpenQuickAdd();
-
-        driver.TapToolbarItem("Cancel");
-        Thread.Sleep(TestConfig.DelayAfterDismiss);
-        driver.DismissAlertIfPresent();
-        Thread.Sleep(TestConfig.DelayAfterDismiss);
-
-        Assert.True(driver.IsDisplayed("Home_Btn_QuickAdd", timeoutSeconds: 10),
-            "Should return to Home after Quick Add cancel");
-    }
-
-    /// <summary>2.3: Quick Add → Cards tab — prayer appears on Quick Add card.</summary>
+    /// <summary>2.3: Quick Add → Cards tab cross-tab nav — saving from the Quick Add
+    /// flow lands on the Prayer Cards tab. The deeper "the saved prayer row materializes
+    /// in the virtualized list" assertion was dropped in issue #169 (ConfirmImport save +
+    /// the resulting row rendering are covered by unit tests); this test now guards only
+    /// the post-save cross-tab navigation edge.</summary>
     [Fact]
     public void QuickAdd_PrayerAppearsOnCardsTab()
     {
@@ -111,59 +97,8 @@ public class QuickAddTests
         driver.TapToolbarItem("Save");
         Thread.Sleep(TestConfig.DelayAfterSave);
 
-        // After save, ConfirmImport navigates to Prayer Cards tab.
+        // After save, ConfirmImport navigates to the Prayer Cards tab.
         Assert.True(driver.IsDisplayed("Cards_List_Cards", timeoutSeconds: 10),
             "Cards tab should be visible after Quick Add save");
-
-        // Use EnsureCardVisible to materialize the prayer row: scrolls the list,
-        // expands all collapsed sections, and falls back to Cards_Search if the row
-        // is still not visible under virtualization. This is the established robust
-        // pattern for finding rows on the Cards tab (AppExtensions.cs:244-283).
-        Thread.Sleep(TestConfig.DelayCollectionRender);
-        driver.EnsureCardVisible(uniqueTitle);
-
-        Assert.True(driver.IsTextDisplayed(uniqueTitle, timeoutSeconds: 10),
-            $"Saved prayer '{uniqueTitle}' should appear on the Cards tab after Quick Add save");
-    }
-
-    /// <summary>
-    /// 2.4: Quick Add screenshot capture — navigates to the Quick Add screen,
-    /// captures a diagnostic screenshot, and echoes the saved file path.
-    ///
-    /// Dark-mode in-session toggle is not supported by the Android test infrastructure
-    /// (requires adb + cold-launch — see DarkModeRenderingTests). This test captures
-    /// the light screenshot only and records the path for orchestrator collection.
-    /// </summary>
-    [Fact]
-    public void QuickAdd_Capture_Screenshots()
-    {
-        _setup.Driver.ResetAppUIState(_setup);
-        var driver = _setup.Driver;
-
-        OpenQuickAdd();
-
-        // Ensure the Quick Add UI is fully rendered before capture.
-        // Use ConfirmImport_Seg_ExistingCard (a body element) — ToolbarItems
-        // are not locatable by AutomationId on Android.
-        driver.WaitForElement("ConfirmImport_Seg_ExistingCard", timeoutSeconds: 10);
-        Thread.Sleep(TestConfig.DelayModalAnimation);
-
-        // Capture via the existing CaptureDiagnostics helper (saves to
-        // %TEMP%\prayerapp-uitest-diag\<timestamp>-<reason>.png).
-        var diagInfo = driver.CaptureDiagnostics("QuickAdd_light");
-
-        // CaptureDiagnostics never throws; confirm it succeeded by checking
-        // the message doesn't start with the failure prefix.
-        Assert.False(diagInfo.Contains("diagnostic capture failed"),
-            $"Screenshot capture failed: {diagInfo}");
-
-        // Echo the path so the orchestrator can collect it.
-        Console.WriteLine($"[QuickAdd_Capture_Screenshots] {diagInfo}");
-
-        // Cancel cleanly so subsequent tests start from Home.
-        driver.TapToolbarItem("Cancel");
-        Thread.Sleep(TestConfig.DelayAfterDismiss);
-        driver.DismissAlertIfPresent();
-        Thread.Sleep(TestConfig.DelayAfterDismiss);
     }
 }

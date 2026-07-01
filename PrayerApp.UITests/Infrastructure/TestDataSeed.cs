@@ -44,6 +44,45 @@ internal static class TestDataSeed
             $"spawn booted defaults write {TestConfig.IOSBundleId} OnboardingComplete -bool YES");
     }
 
+    /// <summary>
+    /// Android-only: uninstall the UiAutomator2 instrumentation server packages so the
+    /// NEXT Appium session redeploys them clean (issue #191, which also closes #192). On a
+    /// long Android run the shared UiAutomator2 instrumentation accumulates state and
+    /// eventually wedges ("instrumentation process is not running"), crashing the in-flight
+    /// test (#191 ArchiveTests.Archive_Capture_Screenshots) and the test that inherits the
+    /// wedged session right after it (#192 Cards_ArchiveChip_MovesCardToArchivedSection).
+    /// Folded into the existing session-recreate cadence (AppiumSetup.RecreateDriver) so it
+    /// bounds instrumentation drift the same way #164 bounds session drift — riding the one
+    /// SessionRecreateCadence counter, no second cadence. Uninstalling makes the fresh
+    /// CreateDriver reinstall a clean server.
+    /// <para>
+    /// These are Appium's OWN helper packages (io.appium.uiautomator2.server[.test]), NOT
+    /// the app under test, so this is distinct from the "never adb-uninstall the MAUI Debug
+    /// APK" rule — that would wipe the FastDev override assemblies; this only makes Appium
+    /// reinstall its instrumentation server on the next connect.
+    /// </para>
+    /// <para>
+    /// Best-effort (mirrors AppiumSetup.ApplyAndroidTreeReadSettings): a not-installed
+    /// server exits non-zero (allowFailure) and a missing adb throws — both are swallowed so
+    /// recovery NEVER aborts session creation; the session just keeps the wedged
+    /// instrumentation. No-op off Android.
+    /// </para>
+    /// </summary>
+    public static async Task RecoverAndroidInstrumentationAsync()
+    {
+        if (!TestConfig.IsAndroid) return;
+
+        try
+        {
+            await RunAdbAsync($"uninstall {TestConfig.UiAutomator2ServerPackage}", allowFailure: true);
+            await RunAdbAsync($"uninstall {TestConfig.UiAutomator2ServerTestPackage}", allowFailure: true);
+        }
+        catch
+        {
+            // adb missing/unreachable shouldn't abort the recreate — see summary.
+        }
+    }
+
     public static async Task SeedAndroidAsync()
     {
         if (!TestConfig.IsAndroid) return;
@@ -191,7 +230,7 @@ internal static class TestDataSeed
             ("Throwaway prayer B", "Deleted by Boxes_DeleteCollection_UnassignCards.", false),
         });
 
-        // Standalone throwaway card for Cards_DeleteCard_RemovesFromList.
+        // Standalone throwaway "UITest Delete Target Card" fixture (retained for the seed-consistency guard).
         // Lives at top level (BoxId = 0, "Loose Cards") so it's always visible —
         // user boxes render as collapsed accordion sections on first load and
         // would hide the card from the UI tree.
@@ -204,28 +243,11 @@ internal static class TestDataSeed
         // Convention: a test that taps, expands, mutates, or otherwise
         // depends on a specific card should OWN a dedicated seed fixture
         // named after the consuming test. Do NOT share "UITest Card" —
-        // it's a read-only canary; other destructive tests (e.g.
-        // Cards_MultiSelect_MoveToCollection) mutate it, which breaks
-        // anyone sharing it. All fixtures below live at BoxId = 0
+        // it's a read-only canary; other destructive tests (delete / move)
+        // can mutate it, which breaks anyone sharing it. All fixtures below
+        // live at BoxId = 0
         // (Loose Cards) so they render flat and are always visible.
         // See Lessons/uitest-per-test-disposable-fixtures.md.
-        await SeedCardWithPrayersAsync(boxId: 0, "UITest AddPrayer Card",
-            Array.Empty<(string, string, bool)>());
-
-        await SeedCardWithPrayersAsync(boxId: 0, "UITest EditPrayer Card", new[]
-        {
-            ("UITest Edit Prayer",
-             "Prayer tapped + edited by Cards_EditPrayerFromCard.", false),
-        });
-
-        await SeedCardWithPrayersAsync(boxId: 0, "UITest Expanded Card",
-            Array.Empty<(string, string, bool)>());
-
-        await SeedCardWithPrayersAsync(boxId: 0, "UITest EditButton Card",
-            Array.Empty<(string, string, bool)>());
-
-        await SeedCardWithPrayersAsync(boxId: 0, "UITest Favorite Card",
-            Array.Empty<(string, string, bool)>());
 
         // Build-95 fallout: recycled-cell BindingContext-stale fixture.
         // "Recycle Big Card" is expanded + deleted by the test; "Recycle
@@ -251,24 +273,6 @@ internal static class TestDataSeed
             ("Recycle Small Survivor",
              "Should still be the only prayer visible after Big is deleted.", false),
         });
-
-        // Move-prayer fixture (TD-20 / Commit 1 test prereqs).
-        // "Move Source Card" starts with 4 prayers; "Move Target Card" starts empty.
-        // Each move test consumes a distinct prayer so they stay order-independent:
-        // Prayer One/Two/Three feed the user-target move tests; Prayer Four feeds the
-        // issue #42 system-target move test (Cards_MovePrayer_ToSystemCard_...).
-        // Also used to verify no stuck Border.Margin on source after the move
-        // (regression for the declarative-margin fix in Commit 2).
-        await SeedCardWithPrayersAsync(boxId: 0, "Move Source Card", new[]
-        {
-            ("Prayer One",   "First prayer in the move-prayer fixture.", false),
-            ("Prayer Two",   "Second prayer in the move-prayer fixture.", false),
-            ("Prayer Three", "Third prayer in the move-prayer fixture.", false),
-            ("Prayer Four",  "Fourth prayer — moved to a system card in issue #42 test.", false),
-        });
-
-        await SeedCardWithPrayersAsync(boxId: 0, "Move Target Card",
-            Array.Empty<(string, string, bool)>());
     }
 
     private static async Task SeedCardWithPrayersAsync(int boxId, string cardTitle,

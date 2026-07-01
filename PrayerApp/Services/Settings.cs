@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -42,6 +42,17 @@ namespace PrayerApp.Services
         {
             get => Preferences.Get(nameof(OnboardingComplete), false);
             set => Preferences.Set(nameof(OnboardingComplete), value);
+        }
+
+        /// <summary>
+        /// Persisted onboarding step as the OnboardingStep enum's string name. The key string
+        /// ("OnboardingStep") is unchanged from when OnboardingService wrote it directly, so
+        /// existing installs migrate seamlessly. Default "None" for new installs.
+        /// </summary>
+        public static string OnboardingStep
+        {
+            get => Preferences.Get(nameof(OnboardingStep), nameof(PrayerApp.Models.OnboardingStep.None));
+            set => Preferences.Set(nameof(OnboardingStep), value);
         }
 
         public static int DefaultNotifyHour

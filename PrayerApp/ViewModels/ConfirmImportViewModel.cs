@@ -66,6 +66,14 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
     private bool _boxesLoaded;
     private bool _boxesLoading;
     private bool _hasNoAvailableCardsCached;
+    // #171: true only while LoadManualCardGroupsAsync runs the single
+    // authoritative card-group load. Gates the SelectedBox setter so the
+    // Picker's two-way binding pushing SelectedBox during that load cannot fire
+    // a racing LoadCardGroupsAsync that momentarily empties AvailableCardGroups
+    // and trips FlipToNewCardIfEmptyManualRealBox on a populated collection.
+    // Preselection is owned by the authoritative loader, not by every caller
+    // remembering to bypass the setter.
+    private bool _manualLoadInFlight;
     private CancellationTokenSource? _loadCardGroupsCts = new();
 
     private EntryMode _entryMode;
@@ -105,7 +113,12 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
                 // NewCard mode: picker drives the new card's BoxId; nothing
                 // to reload. ExistingCard mode: picker is a filter — refresh
                 // the grouped card list.
-                if (IsExistingCardMode)
+                // #171: but suppress the reload while the authoritative Manual
+                // load owns the population (see _manualLoadInFlight) — a Picker
+                // binding push during that load must not race a second
+                // LoadCardGroupsAsync. The Import path (and Manual after the
+                // authoritative load completes) still reload here as before.
+                if (IsExistingCardMode && !_manualLoadInFlight)
                     LoadCardGroupsAsync().SafeFireAndForget();
             }
         }
@@ -458,38 +471,51 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
     {
         if (EntryMode != EntryMode.Manual) return;
 
-        // #122: default to Loose Cards (BoxId 0) rather than the All-collections
-        // sentinel. LoadBoxesAsync already added the Loose Cards RealBoxPickerItem
-        // at index 0; reuse that instance so picker identity matches. Set via the
-        // backing field directly so the setter's LoadCardGroupsAsync fire-and-forget
-        // doesn't race the explicit await below.
-        var looseCards = AvailableBoxes
-            .OfType<RealBoxPickerItem>()
-            .FirstOrDefault(b => b.BoxId == 0);
-        if (looseCards is not null)
+        // #171: hold the gate for the whole authoritative load. While set, the
+        // SelectedBox setter skips its fire-and-forget reload (see the setter),
+        // so a Picker two-way-binding push during the await below cannot issue a
+        // racing LoadCardGroupsAsync that momentarily empties AvailableCardGroups
+        // and trips the empty->NewCard flip on a populated collection.
+        _manualLoadInFlight = true;
+        try
         {
-            _selectedBox = looseCards;
-            OnPropertyChanged(nameof(SelectedBox));
+            // #122: default to Loose Cards (BoxId 0) rather than the All-collections
+            // sentinel. LoadBoxesAsync already added the Loose Cards RealBoxPickerItem
+            // at index 0; reuse that instance so picker identity matches. Set via the
+            // backing field directly so the setter's LoadCardGroupsAsync fire-and-forget
+            // doesn't race the explicit await below.
+            var looseCards = AvailableBoxes
+                .OfType<RealBoxPickerItem>()
+                .FirstOrDefault(b => b.BoxId == 0);
+            if (looseCards is not null)
+            {
+                _selectedBox = looseCards;
+                OnPropertyChanged(nameof(SelectedBox));
+            }
+
+            // LoadCardGroupsAsync handles Manual mode: filters to the selected box
+            // (Loose Cards), preselecting a card only when one is present.
+            await LoadCardGroupsAsync();
+
+            // #122 + #119: with the default now a real box (Loose Cards) rather than
+            // the All-collections sentinel, an empty Loose Cards view must flip to
+            // NewCard so the Card Title field is shown and the user can type straight
+            // into a new card (the empty-collection Save dead-end #119 prevents).
+            // The reactive RaiseHasNoAvailableCardsIfChanged path cannot be relied on
+            // for THIS first load: InitializeManualEntry already set ImportMode to
+            // ExistingCard, which ran RaiseHasNoAvailableCardsIfChanged and cached
+            // _hasNoAvailableCardsCached = true (SelectedBox was still null then, so
+            // no flip fired). On this authoritative load HasNoAvailableCards is still
+            // true, so the reactive handler early-returns at its cache-equality check
+            // (current == _hasNoAvailableCardsCached, both true) BEFORE reaching the
+            // flip. Decide it explicitly here. Later user-driven box changes (which
+            // toggle the cached value) still flip reactively.
+            FlipToNewCardIfEmptyManualRealBox();
         }
-
-        // LoadCardGroupsAsync handles Manual mode: filters to the selected box
-        // (Loose Cards), preselecting a card only when one is present.
-        await LoadCardGroupsAsync();
-
-        // #122 + #119: with the default now a real box (Loose Cards) rather than
-        // the All-collections sentinel, an empty Loose Cards view must flip to
-        // NewCard so the Card Title field is shown and the user can type straight
-        // into a new card (the empty-collection Save dead-end #119 prevents).
-        // The reactive RaiseHasNoAvailableCardsIfChanged path cannot be relied on
-        // for THIS first load: InitializeManualEntry already set ImportMode to
-        // ExistingCard, which ran RaiseHasNoAvailableCardsIfChanged and cached
-        // _hasNoAvailableCardsCached = true (SelectedBox was still null then, so
-        // no flip fired). On this authoritative load HasNoAvailableCards is still
-        // true, so the reactive handler early-returns at its cache-equality check
-        // (current == _hasNoAvailableCardsCached, both true) BEFORE reaching the
-        // flip. Decide it explicitly here. Later user-driven box changes (which
-        // toggle the cached value) still flip reactively.
-        FlipToNewCardIfEmptyManualRealBox();
+        finally
+        {
+            _manualLoadInFlight = false;
+        }
     }
 
     /// <summary>
@@ -658,7 +684,14 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
                    // user can save with only a prayer typed. The Import flow still
                    // requires an explicit card title.
                    ? EntryMode == EntryMode.Manual || !string.IsNullOrWhiteSpace(CardTitle)
-                   : SelectedCard is not null);
+                   // #168: In Quick Add (Manual), ExistingCard mode with no card
+                   // selected must not dead-end Save — if the preselection race
+                   // leaves SelectedCard null while real cards exist (so #119 does
+                   // not flip to NewCard), SaveAsync falls through to create a new
+                   // card in the selected box. Gated to Manual the same way as the
+                   // #119/#122 empty→NewCard flip (FlipToNewCardIfEmptyManualRealBox),
+                   // so the Import flow still requires an explicitly chosen card.
+                   : EntryMode == EntryMode.Manual || SelectedCard is not null);
 
     private async Task SaveAsync()
     {

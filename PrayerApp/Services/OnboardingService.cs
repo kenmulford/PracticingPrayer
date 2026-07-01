@@ -15,6 +15,8 @@ public class OnboardingService : IOnboardingService
         OnboardingStep.Complete
     };
 
+    private readonly ISettings _settings;
+
     private OnboardingStep _currentStep;
 
     public OnboardingStep CurrentStep => _currentStep;
@@ -29,9 +31,11 @@ public class OnboardingService : IOnboardingService
 
     public event EventHandler? StepChanged;
 
-    public OnboardingService()
+    public OnboardingService(ISettings settings)
     {
-        var persisted = Preferences.Get(nameof(OnboardingStep), nameof(OnboardingStep.None));
+        _settings = settings;
+
+        var persisted = _settings.OnboardingStep;
         if (Enum.TryParse<OnboardingStep>(persisted, out var step))
             _currentStep = step;
 
@@ -41,7 +45,7 @@ public class OnboardingService : IOnboardingService
             _currentStep = OnboardingStep.PrayerTimeHighlight;
 
         // First install: no persisted step + onboarding not complete → start at Welcome
-        if (_currentStep == OnboardingStep.None && !Settings.OnboardingComplete)
+        if (_currentStep == OnboardingStep.None && !_settings.OnboardingComplete)
             _currentStep = OnboardingStep.Welcome;
     }
 
@@ -67,8 +71,8 @@ public class OnboardingService : IOnboardingService
 
     public void Reset()
     {
-        Preferences.Remove(nameof(OnboardingStep));
-        Settings.OnboardingComplete = false;
+        _settings.OnboardingStep = nameof(OnboardingStep.None);
+        _settings.OnboardingComplete = false;
         WelcomeShownThisSession = false;
         IsDeepLinkSession = false;
         _currentStep = OnboardingStep.Welcome;
@@ -87,6 +91,6 @@ public class OnboardingService : IOnboardingService
 
     private void Persist()
     {
-        Preferences.Set(nameof(OnboardingStep), _currentStep.ToString());
+        _settings.OnboardingStep = _currentStep.ToString();
     }
 }

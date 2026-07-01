@@ -27,6 +27,14 @@ The full branch model and contribution process are in [CONTRIBUTING.md](CONTRIBU
 - Domain knowledge lives in **project skills** under [`.claude/skills/`](.claude/skills/) (`prayer-app-*`: database, viewmodels, views, services, navigation, theming, accessibility, ui-testing, unit-testing, platform, models). They auto-discover in Claude Code — consult the relevant one before working in that area.
 - Source files are UTF-8 **without a BOM**. Some agent/editor file-write tooling injects a UTF-8 BOM into `.cs` files — byte-check changed files and strip any leading BOM before committing (the build and tests pass with a stray BOM, so nothing else catches it).
 
+## E2E test isolation (non-negotiable)
+
+The UITest suite shares one Appium session and one seeded SQLite database (seeded **once** in `TestDataSeed.SeedAsync`, `noReset=true`, never re-seeded — see the `AppiumSetup` #164 block). A test that passes alone but fails inside the full suite ("in-suite drift") is almost always one of these two rules being broken — and the fix is the rule, **not** a longer timeout:
+
+1. **Namespaced, self-owned test data.** A test that needs a pre-existing card, request, or collection must seed its **own uniquely-named** fixture (suffix it with the test's name) in `TestDataSeed`, and touch only that data. Never read data another test can mutate, and never let a destructive test (delete / move) operate on a shared fixture — a deleted or moved shared card silently breaks every test that runs after it. Keep the one-time seed; do **not** re-seed per test, which would trade away the suite's speed.
+
+2. **Every test starts on Home.** Begin each test from a known nav root (the Home tab) so a prior test's deep navigation is never a precondition for the next. `ResetAppUIState` + `EnsureOnTab` must reliably land on Home first; nav-state must never leak between tests.
+
 ## Solving a GitHub issue (milestone-driver)
 
 This repo is a [milestone-driver](https://github.com/kenmulford/milestone-driver) consumer; its profile is `.milestone-config/driver.json` (with `.milestone-config/feeder.json` and the standing project docs under `.project/`, provisioned by milestone-bootstrapper). Drive one issue with `/solve-issue <n>`, or a whole milestone in dependency order with `/solve-milestone <name>` (order comes from the milestone description's Wave list).

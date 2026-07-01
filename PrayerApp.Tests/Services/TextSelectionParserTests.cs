@@ -1,3 +1,4 @@
+using PrayerApp.Models;
 using PrayerApp.Services;
 
 namespace PrayerApp.Tests.Services;
@@ -141,6 +142,38 @@ public class TextSelectionParserTests
         var result = _sut.Parse("1. " + body);
 
         Assert.Equal(100, result.Prayers[0].Title.Length);
+        Assert.Null(result.Prayers[0].Details);
+    }
+
+    // ── Title cap boundary at Prayer.TitleMaxLength (issue #148 Phase 2, item 5) ──
+    // Real enforcement of the title length is in TextSelectionParser.CapTitle
+    // (TextSelectionParser.cs:243), keyed off Prayer.TitleMaxLength rather than a
+    // magic 100. These assert the exact boundary against the constant so a future
+    // change to TitleMaxLength keeps the test honest.
+
+    [Fact]
+    public void Parse_TitleOneOverMax_CapsAtTitleMaxLength_OverflowToDetails()
+    {
+        // A single over-limit token (no marker, no delimiter, one "word") takes the
+        // text.Length > TitleMaxLength branch: title is capped, the remainder is body.
+        var body = new string('a', Prayer.TitleMaxLength + 1);
+
+        var result = _sut.Parse(body);
+
+        Assert.Single(result.Prayers);
+        Assert.Equal(Prayer.TitleMaxLength, result.Prayers[0].Title.Length);
+        Assert.Equal(1, result.Prayers[0].Details!.Length); // the single overflow char
+    }
+
+    [Fact]
+    public void Parse_TitleAtMax_KeepsWholeTextAsTitle_NoOverflow()
+    {
+        var body = new string('a', Prayer.TitleMaxLength);
+
+        var result = _sut.Parse(body);
+
+        Assert.Single(result.Prayers);
+        Assert.Equal(Prayer.TitleMaxLength, result.Prayers[0].Title.Length);
         Assert.Null(result.Prayers[0].Details);
     }
 

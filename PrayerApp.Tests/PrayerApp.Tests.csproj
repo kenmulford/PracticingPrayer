@@ -35,9 +35,11 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="NSubstitute" Version="5.3.0" />
-    <!-- Required for SQLite attribute types used in model files ([Table], [Column], etc.) -->
-    <PackageReference Include="sqlite-net-pcl" Version="1.9.172" />
-    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.10" />
+    <!-- Required for SQLite attribute types used in model files ([Table], [Column], etc.).
+         sqlite-net-base (not -pcl) matches the main app: it omits the bundle_green 2.1.2
+         transitive that drags the vulnerable lib.e_sqlite3 2.1.x native libs (NU1903). -->
+    <PackageReference Include="sqlite-net-base" Version="1.9.172" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
   </ItemGroup>
 
@@ -155,7 +157,9 @@
     <Compile Include="../PrayerApp/Services/PrayerInteractionService.cs" />
     <Compile Include="../PrayerApp/Services/NotificationService.cs" />
     <Compile Include="../PrayerApp/Services/UserColorService.cs" />
-    <!-- OnboardingService.cs excluded: uses MAUI Preferences (same reason as Settings.cs) -->
+    <!-- OnboardingService.cs: persistence now goes through the injected ISettings
+         abstraction (no direct MAUI Preferences), so it links into the test project. -->
+    <Compile Include="../PrayerApp/Services/OnboardingService.cs" />
     <!-- LocalNotificationCenterWrapper.cs excluded: depends on Plugin.LocalNotification (MAUI) -->
     <!-- Settings.cs excluded: uses MAUI Preferences -->
   </ItemGroup>

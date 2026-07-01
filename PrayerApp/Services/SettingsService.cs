@@ -30,6 +30,12 @@ public class SettingsService : ISettings
         set => Settings.OnboardingComplete = value;
     }
 
+    public string OnboardingStep
+    {
+        get => Settings.OnboardingStep;
+        set => Settings.OnboardingStep = value;
+    }
+
     public int DefaultNotifyHour
     {
         get => Settings.DefaultNotifyHour;

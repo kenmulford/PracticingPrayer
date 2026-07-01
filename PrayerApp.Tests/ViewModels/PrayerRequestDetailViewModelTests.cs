@@ -679,6 +679,54 @@ public class PrayerRequestDetailViewModelTests
         Assert.Equal("Started Mar 3, 2026", sut.CreatedAtDisplay);
     }
 
+    // ── AccessibleSummary positive composition (issue #148 Phase 2, item 1b) ──
+    // Replaces the Cards_PrayerRow_HasAccessibleSummary E2E (AccessibilityTests.cs)
+    // with a deterministic unit assertion over the getter
+    // (PrayerRequestDetailViewModel.cs:382). The getter comma-joins up to three
+    // parts: CardTitle (when non-empty), Title (always), AnsweredAtDisplay (when
+    // answered). AnsweredAtDisplay is culture/date dependent ("✓ {MMM d}"), so the
+    // expected string is built from the VM's own AnsweredAtDisplay rather than a
+    // hardcoded date.
+
+    [Fact]
+    public void AccessibleSummary_AllThreeParts_JoinsCardTitleTitleAnsweredInOrder()
+    {
+        var sut = CreateSut();
+        sut.CardTitle = "Family";
+        sut.Title = "Healing";
+        sut.IsAnswered = true; // populates AnsweredAt = today ⇒ AnsweredAtDisplay non-empty
+
+        Assert.NotEmpty(sut.AnsweredAtDisplay);
+        Assert.Equal(
+            string.Join(", ", new[] { "Family", "Healing", sut.AnsweredAtDisplay }),
+            sut.AccessibleSummary);
+    }
+
+    [Fact]
+    public void AccessibleSummary_NoCardTitle_OmitsCardTitlePart()
+    {
+        var sut = CreateSut();
+        // CardTitle defaults to empty ⇒ excluded by the IsNullOrEmpty guard.
+        sut.Title = "Healing";
+        sut.IsAnswered = true;
+
+        Assert.Equal(
+            string.Join(", ", new[] { "Healing", sut.AnsweredAtDisplay }),
+            sut.AccessibleSummary);
+    }
+
+    [Fact]
+    public void AccessibleSummary_Unanswered_OmitsAnsweredPart()
+    {
+        var sut = CreateSut();
+        sut.CardTitle = "Family";
+        sut.Title = "Healing";
+        // IsAnswered defaults false ⇒ AnsweredAtDisplay empty ⇒ part excluded.
+
+        Assert.Empty(sut.AnsweredAtDisplay);
+        Assert.Equal("Family, Healing", sut.AccessibleSummary);
+    }
+
     [Fact]
     public async Task AccessibleSummary_ExcludesStartedDate()
     {
@@ -700,5 +748,152 @@ public class PrayerRequestDetailViewModelTests
             await Task.Yield();
 
         Assert.DoesNotContain("Started", sut.AccessibleSummary);
+    }
+
+    // ── FrequencyOptions (issue #169 convert) ─────────────────────────
+    // Replaces the Reminders_FrequencyPicker_HasOptions E2E (ReminderTests.cs)
+    // with a deterministic unit assertion over the picker's item source
+    // (PrayerRequestDetailViewModel.cs:395): the list is non-empty and exposes
+    // the headline Daily/Weekly cadences the E2E probed for on Android.
+
+    [Fact]
+    public void FrequencyOptions_IsNonEmpty_AndContainsDailyAndWeekly()
+    {
+        var sut = CreateSut();
+
+        Assert.NotEmpty(sut.FrequencyOptions);
+        Assert.Contains(PrayerFrequency.Daily, sut.FrequencyOptions);
+        Assert.Contains(PrayerFrequency.Weekly, sut.FrequencyOptions);
+    }
+
+    // ── Reminder picker visibility (issue #169 convert) ───────────────
+    // Replaces the Reminders_Toggle_ShowsThenHidesPickers E2E (ReminderTests.cs)
+    // with deterministic unit assertions over the derived visibility gates and
+    // their PropertyChanged edges: ShowNotifyTime == CanNotify;
+    // ShowDayOfWeek == CanNotify && Weekly; ShowDayOfMonth == CanNotify && Monthly
+    // (PrayerRequestDetailViewModel.cs:270-272). The CanNotify setter re-raises all
+    // three (:202-204) and the PrayerFrequency setter re-raises the two day pickers
+    // (:223-224), which is what drives the toggle show/hide on the form.
+
+    [Fact]
+    public void ReminderPickers_AllHidden_WhenCanNotifyFalse()
+    {
+        var sut = CreateSut();
+        // CanNotify defaults false.
+        Assert.False(sut.ShowNotifyTime);
+        Assert.False(sut.ShowDayOfWeek);
+        Assert.False(sut.ShowDayOfMonth);
+    }
+
+    [Fact]
+    public void ShowNotifyTime_FollowsCanNotify_AndRaisesPickerPropertyChanged()
+    {
+        var sut = CreateSut();
+        var raised = new List<string?>();
+        sut.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        sut.CanNotify = true;
+
+        Assert.True(sut.ShowNotifyTime);
+        Assert.Contains(nameof(PrayerRequestDetailViewModel.ShowNotifyTime), raised);
+        Assert.Contains(nameof(PrayerRequestDetailViewModel.ShowDayOfWeek), raised);
+        Assert.Contains(nameof(PrayerRequestDetailViewModel.ShowDayOfMonth), raised);
+    }
+
+    [Fact]
+    public void ShowDayOfWeek_VisibleOnly_WhenCanNotifyAndWeekly()
+    {
+        var sut = CreateSut();
+        sut.CanNotify = true;
+
+        sut.PrayerFrequency = PrayerFrequency.Weekly;
+        Assert.True(sut.ShowDayOfWeek);
+        Assert.False(sut.ShowDayOfMonth);
+
+        sut.PrayerFrequency = PrayerFrequency.Daily;
+        Assert.False(sut.ShowDayOfWeek);
+    }
+
+    [Fact]
+    public void ShowDayOfMonth_VisibleOnly_WhenCanNotifyAndMonthly()
+    {
+        var sut = CreateSut();
+        sut.CanNotify = true;
+
+        sut.PrayerFrequency = PrayerFrequency.Monthly;
+        Assert.True(sut.ShowDayOfMonth);
+        Assert.False(sut.ShowDayOfWeek);
+    }
+
+    [Fact]
+    public void PrayerFrequencyChange_RaisesDayPickerPropertyChanged()
+    {
+        var sut = CreateSut();
+        sut.CanNotify = true;
+        // A new Prayer defaults to Weekly (Prayer.cs:39); establish a different
+        // known baseline BEFORE subscribing so the Daily→Weekly transition below
+        // genuinely changes the value and fires the setter's notify chain.
+        sut.PrayerFrequency = PrayerFrequency.Daily;
+        var raised = new List<string?>();
+        sut.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        sut.PrayerFrequency = PrayerFrequency.Weekly;
+
+        Assert.Contains(nameof(PrayerRequestDetailViewModel.ShowDayOfWeek), raised);
+        Assert.Contains(nameof(PrayerRequestDetailViewModel.ShowDayOfMonth), raised);
+    }
+
+    // ── MarkAnsweredCommand (E2E-cull conversion) ─────────────────────
+    // Sole unit coverage for the deleted Prayers_MarkAnswered E2E
+    // (PrayerListTests.cs). Characterizes MarkAnsweredAsync
+    // (PrayerRequestDetailViewModel.cs:651): flip IsAnswered → persist via
+    // SavePrayerAsync → announce "Prayer marked as answered" → pop back (GoToAsync "..").
+
+    [Fact]
+    public async Task MarkAnsweredCommand_MarksAnswered_SavesAnnouncesAndNavigatesBack()
+    {
+        var sut = CreateSut();
+        sut.Title = "Answered prayer";
+        Assert.False(sut.IsAnswered);
+
+        await ((IAsyncRelayCommand)sut.MarkAnsweredCommand).ExecuteAsync(null);
+
+        Assert.True(sut.IsAnswered);
+        await _prayerService.Received(1).SavePrayerAsync(Arg.Any<Prayer>());
+        _accessibilityService.Received(1).Announce("Prayer marked as answered");
+        await _navigationService.Received(1).GoToAsync(Arg.Is<string>(s => s.StartsWith("..")));
+    }
+
+    // ── Move prayer between cards (E2E-cull conversion) ───────────────
+    // SOLE unit coverage for the three deleted move E2Es in PrayerCardTests.cs
+    // (Cards_MovePrayerBetweenCards_BothCardsReflect and the two stale-margin /
+    // target-expand regressions). The card picker's SelectedCard setter
+    // (PrayerRequestDetailViewModel.cs:412) reassigns PrayerCardId and dirties the
+    // form (IsDirty clause at :121); SaveAsync then persists the prayer under its
+    // new PrayerCardId — the reparent the E2Es exercised on-screen.
+
+    [Fact]
+    public async Task SelectedCard_Reparents_MarksDirty_AndSavePersistsNewCard()
+    {
+        var sut = CreateSut();
+        var source = new PrayerCard { Id = 3, Title = "Family" };
+        var target = new PrayerCard { Id = 7, Title = "Work" };
+        sut.AvailableCards.Add(source);
+        sut.AvailableCards.Add(target);
+        sut.Title = "Move me";
+
+        sut.SelectedCard = target;
+
+        Assert.Equal(7, sut.PrayerCardId);
+        Assert.True(sut.IsDirty);
+
+        Prayer? saved = null;
+        _prayerService.SavePrayerAsync(Arg.Do<Prayer>(p => saved = p))
+            .Returns(call => Task.FromResult((Prayer)call[0]));
+
+        await ((IAsyncRelayCommand)sut.SaveCommand).ExecuteAsync(null);
+
+        await _prayerService.Received(1).SavePrayerAsync(Arg.Is<Prayer>(p => p.PrayerCardId == 7));
+        Assert.Equal(7, saved!.PrayerCardId);
     }
 }

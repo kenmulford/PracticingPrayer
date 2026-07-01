@@ -1731,6 +1731,89 @@ public class ConfirmImportViewModelTests
         Assert.Contains(allCards, c => c.CardId == 1);        // Alpha present
     }
 
+    // ── Manual mode — SelectedBox preselection race (#171) ───────────────
+
+    [Fact]
+    public async Task Manual_LooseCardsHasCards_PreselectsCard_StaysExistingCardMode()
+    {
+        // #171 (designed-preselection invariant): when the default real box
+        // (Loose Cards, BoxId 0) holds a card the loader can preselect (the
+        // Quick Add card, modelled here in BoxId 0), the authoritative Manual
+        // load preselects it, stays in ExistingCard mode, and the grouped list
+        // is non-empty — no spurious flip to NewCard on a populated collection.
+        var quickAddCard = new PrayerCard { Id = 99, Title = "Quick Add", IsSystem = true, SystemKey = "quick_add", BoxId = 0 };
+        var looseCard = new PrayerCard { Id = 1, Title = "Stray", BoxId = 0, IsSystem = false };
+        _cardService.GetOrCreateQuickAddCardAsync().Returns(Task.FromResult(quickAddCard));
+        _cardService.GetCardsAsync().Returns(Task.FromResult<IReadOnlyList<PrayerCard>>(
+            new[] { quickAddCard, looseCard }));
+        _boxService.GetBoxesAsync().Returns(Task.FromResult<IReadOnlyList<CardBox>>(
+            Array.Empty<CardBox>()));
+        var sut = CreateSut();
+
+        sut.InitializeManualEntry();
+        await sut.LoadBoxesAsync();
+        await sut.LoadManualCardGroupsAsync();
+
+        Assert.NotNull(sut.SelectedCard);                       // a card IS preselected
+        Assert.Equal(ImportMode.ExistingCard, sut.ImportMode);  // no spurious flip
+        Assert.NotEmpty(sut.AvailableCardGroups.SelectMany(g => g.Cards));
+    }
+
+    [Fact]
+    public async Task Manual_SelectedBoxPushedDuringAuthoritativeLoad_SuppressesRacingReload()
+    {
+        // #171 (root-cause repro, red→green): on-device the Picker's two-way
+        // binding can push SelectedBox WHILE LoadManualCardGroupsAsync is mid
+        // flight. Before the fix, the setter's un-awaited LoadCardGroupsAsync
+        // interleaves with the authoritative load: a transient Clear() empties
+        // AvailableCardGroups and trips FlipToNewCardIfEmptyManualRealBox on a
+        // collection that actually has cards — flipping to NewCard. The fix
+        // gates the setter while the authoritative loader owns the population,
+        // so preselection survives and no racing reload fires.
+        //
+        // Determinism: the mocked services complete synchronously, so the
+        // "race" is forced by firing the setter from inside the awaited
+        // GetCardsAsync of the authoritative load (one-shot), mimicking the
+        // Picker pushing null then restoring Loose Cards.
+        var quickAddCard = new PrayerCard { Id = 99, Title = "Quick Add", IsSystem = true, SystemKey = "quick_add", BoxId = 0 };
+        var looseCard = new PrayerCard { Id = 1, Title = "Stray", BoxId = 0, IsSystem = false };
+        _cardService.GetOrCreateQuickAddCardAsync().Returns(Task.FromResult(quickAddCard));
+        _boxService.GetBoxesAsync().Returns(Task.FromResult<IReadOnlyList<CardBox>>(
+            Array.Empty<CardBox>()));
+
+        ConfirmImportViewModel sut = null!;
+        var injected = false;
+        _cardService.GetCardsAsync().Returns(_ =>
+        {
+            // Fire the Picker-style SelectedBox push exactly once, during the
+            // authoritative load. null differs from Loose Cards (Equals is by
+            // BoxId) so the setter's SetProperty returns true and — pre-fix —
+            // issues a racing reload; restoring Loose Cards mirrors the binding
+            // settling back to the authoritative selection.
+            if (!injected && sut is not null)
+            {
+                injected = true;
+                var loose = sut.AvailableBoxes.OfType<RealBoxPickerItem>().First(b => b.BoxId == 0);
+                sut.SelectedBox = null;
+                sut.SelectedBox = loose;
+            }
+            return Task.FromResult<IReadOnlyList<PrayerCard>>(new[] { quickAddCard, looseCard });
+        });
+
+        sut = CreateSut();
+        sut.InitializeManualEntry();
+        await sut.LoadBoxesAsync();
+        await sut.LoadManualCardGroupsAsync();
+
+        // The authoritative loader is the SINGLE card-group load; the setter's
+        // racing reload was suppressed (each LoadCardGroupsAsync fetches once).
+        await _cardService.Received(1).GetCardsAsync();
+        // Preselection survived and no spurious flip occurred.
+        Assert.Equal(ImportMode.ExistingCard, sut.ImportMode);
+        Assert.NotNull(sut.SelectedCard);
+        Assert.NotEmpty(sut.AvailableCardGroups.SelectMany(g => g.Cards));
+    }
+
     [Fact]
     public async Task Import_LoadCardGroups_ExcludesSystemCards_StillTrueAfterManualRefactor()
     {
@@ -1926,6 +2009,122 @@ public class ConfirmImportViewModelTests
         sut.SetNewCardModeCommand.Execute(null);
         sut.CardTitle = "   ";
 
+        Assert.False(sut.SaveCommand.CanExecute(null));
+    }
+
+    // ── Quick Add: ExistingCard with no card selected falls back to New-card (#168) ──
+
+    [Fact]
+    public void CanSave_Manual_ExistingCardMode_NullSelectedCard_WithPrayerTitle_ReturnsTrue()
+    {
+        // #168 repro: Quick Add (Manual) opens in ExistingCard mode. When the
+        // card-preselection race leaves SelectedCard null while real cards exist
+        // (so #119 does NOT flip to NewCard), the old gate (SelectedCard is not
+        // null) disabled Save → dead-end. Manual ExistingCard with a typed prayer
+        // must allow Save; SaveAsync falls through to create a new card. Gated to
+        // Manual the same way as #119's NewCard branch — Import still requires a
+        // chosen card (see the Import guard below).
+        var sut = CreateSut();
+        sut.InitializeManualEntry();        // EntryMode.Manual, ImportMode.ExistingCard
+        sut.Prayers[0].Title = "Trust God"; // SelectedCard stays null
+
+        Assert.Null(sut.SelectedCard);
+        Assert.Equal(ImportMode.ExistingCard, sut.ImportMode);
+        Assert.True(sut.SaveCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task Save_Manual_ExistingCardMode_NullSelectedCard_CreatesNewCardInSelectedBox_AndNavigates()
+    {
+        // #168 end-to-end: a real card exists in Loose Cards (so the page stays in
+        // ExistingCard mode — no #119 flip), but the Quick Add card lives in the
+        // System box and is filtered out, so nothing is preselected → SelectedCard
+        // is null. Saving must create ONE new card in the selected box (Loose
+        // Cards, BoxId 0) with the title derived from the prayer, attach the
+        // prayer (IsImported = false), and navigate to the Cards tab — no dead-end.
+        var quickAddCard = new PrayerCard { Id = 99, Title = "Quick Add", IsSystem = true, SystemKey = "quick_add", BoxId = 5 };
+        var looseCard = new PrayerCard { Id = 1, Title = "Stray", BoxId = 0, IsSystem = false };
+        _cardService.GetOrCreateQuickAddCardAsync().Returns(Task.FromResult(quickAddCard));
+        _cardService.GetCardsAsync().Returns(Task.FromResult<IReadOnlyList<PrayerCard>>(
+            new[] { quickAddCard, looseCard }));
+        _boxService.GetBoxesAsync().Returns(Task.FromResult<IReadOnlyList<CardBox>>(
+            Array.Empty<CardBox>()));
+        _cardService.SaveCardAsync(Arg.Any<PrayerCard>(), Arg.Any<bool>())
+            .Returns(ci =>
+            {
+                ((PrayerCard)ci[0]).Id = 123;
+                return Task.FromResult((PrayerCard)ci[0]);
+            });
+        var sut = CreateSut();
+        sut.InitializeManualEntry();
+        await sut.LoadBoxesAsync();
+        await sut.LoadManualCardGroupsAsync();
+
+        // Repro precondition: ExistingCard mode, real Loose Cards box selected,
+        // a user card visible (no flip), but nothing preselected.
+        Assert.Equal(ImportMode.ExistingCard, sut.ImportMode);
+        Assert.Null(sut.SelectedCard);
+        var selectedBox = Assert.IsType<RealBoxPickerItem>(sut.SelectedBox);
+        Assert.Equal(0, selectedBox.BoxId);
+
+        sut.Prayers[0].Title = "Trust God";
+        Assert.True(sut.SaveCommand.CanExecute(null)); // RED before the #168 fix
+
+        await sut.SaveCommand.ExecuteAsync(null);
+
+        await _cardService.Received(1).SaveCardAsync(
+            Arg.Is<PrayerCard>(c => c.BoxId == 0 && c.Title == "Trust God" && c.IsImported == false),
+            false);
+        await _prayerService.Received(1).SavePrayerAsync(
+            Arg.Is<Prayer>(p => p.Title == "Trust God" && p.PrayerCardId == 123 && p.IsImported == false),
+            false);
+        await _navigationService.Received(1).GoToAsync(Routes.PrayerCardsTabImported(123));
+    }
+
+    [Fact]
+    public async Task Save_Manual_ExistingCardMode_WithSelectedCard_SavesIntoThatCard_NoNewCard()
+    {
+        // #168 positive guard: when a card IS selected in Manual ExistingCard
+        // mode, the relaxation must not change behavior — the prayer saves into
+        // the selected card and no new card is created.
+        var sut = CreateSut();
+        sut.InitializeManualEntry();
+        sut.SelectedCard = new CardPickerItem { CardId = 42, Title = "Family" };
+        sut.Prayers[0].Title = "Trust God";
+
+        Assert.True(sut.SaveCommand.CanExecute(null));
+
+        await sut.SaveCommand.ExecuteAsync(null);
+
+        await _prayerService.Received(1).SavePrayerAsync(
+            Arg.Is<Prayer>(p => p.PrayerCardId == 42 && p.IsImported == false),
+            false);
+        await _cardService.DidNotReceive().SaveCardAsync(Arg.Any<PrayerCard>(), Arg.Any<bool>());
+    }
+
+    [Fact]
+    public async Task CanSave_ImportMode_ExistingCard_RealBoxWithCards_NullSelectedCard_StillFalse_Issue168Guard()
+    {
+        // #168 negative guard: the CanSave relaxation is Manual-only (gated the
+        // same way as #119/#122's FlipToNewCardIfEmptyManualRealBox). In the
+        // default Import flow — even with a real collection selected that HAS
+        // cards — an ExistingCard save with no card chosen must STILL be disabled.
+        // The fix must not let Import silently create a new card.
+        var alpha = new PrayerCard { Id = 1, Title = "Alpha", BoxId = 7, IsSystem = false };
+        _cardService.GetCardsAsync().Returns(Task.FromResult<IReadOnlyList<PrayerCard>>(new[] { alpha }));
+        _boxService.GetBoxesAsync().Returns(Task.FromResult<IReadOnlyList<CardBox>>(new[]
+        {
+            new CardBox { Id = 7, Name = "Family", IsSystem = false },
+        }));
+        var sut = SetupSutWithRows(("Mom", null)); // EntryMode defaults to Import
+        await sut.LoadBoxesAsync();
+        sut.SetExistingCardModeCommand.Execute(null);
+        await Task.Delay(50);
+        sut.SelectedBox = sut.AvailableBoxes.OfType<RealBoxPickerItem>().First(b => b.BoxId == 7);
+        await Task.Delay(50);
+
+        Assert.Equal(EntryMode.Import, sut.EntryMode);
+        Assert.Null(sut.SelectedCard);
         Assert.False(sut.SaveCommand.CanExecute(null));
     }
 }

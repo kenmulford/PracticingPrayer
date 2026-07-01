@@ -51,7 +51,7 @@ if (-not $SkipAppium) {
         Write-Host "`n=== Appium already running ===" -ForegroundColor Green
     } catch {
         Write-Host "`n=== Starting Appium server ===" -ForegroundColor Cyan
-        Start-Process appium -ArgumentList "--port", "4723", "--log-level", "warn" -WindowStyle Hidden
+        Start-Process appium -ArgumentList "--port", "4723", "--allow-insecure", "uiautomator2:adb_shell", "--log-level", "warn" -WindowStyle Hidden
         Start-Sleep -Seconds 3
     }
 }

@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<TargetFrameworks>net10.0-android;net10.0-ios</TargetFrameworks>
@@ -190,8 +190,14 @@
 		<PackageReference Include="Microsoft.Maui.Controls" Version="10.0.50" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.5" />
 		<PackageReference Include="Plugin.LocalNotification" Version="14.0.0" />
-		<PackageReference Include="sqlite-net-pcl" Version="1.9.172" />
-		<PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.10" />
+		<!-- sqlite-net-base (not -pcl): same library/author without the bundled SQLitePCLRaw
+		     dependency, so the explicit bundle_e_sqlite3 below is the only provider. The -pcl
+		     metapackage transitively pulls SQLitePCLRaw.bundle_green 2.1.2, which drags the
+		     vulnerable lib.e_sqlite3 2.1.x native libs (NU1903 / GHSA-2m69-gcr7-jv3q) even when
+		     3.x is referenced. Provider is registered explicitly via SQLitePCL.Batteries_V2.Init()
+		     in MauiProgram.cs. -->
+		<PackageReference Include="sqlite-net-base" Version="1.9.172" />
+		<PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
 	</ItemGroup>
 
 	<!-- Linker preservation rules — prevents iOS AOT "SQLite-net out of date" crash -->

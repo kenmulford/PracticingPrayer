@@ -20,6 +20,16 @@ public static class AppExtensions
     /// <summary>iOS swipe velocity in pixels/sec. Moderate speed to reliably trigger SwipeView.</summary>
     private const int IOSSwipeVelocity = 1500;
 
+    /// <summary>
+    /// Bounded number of extra realize-retry passes for the drift-sensitive element paths
+    /// (#207): after the first full-budget attempt, a present-but-not-yet-realized element
+    /// gets this many quick re-find + short-settle retries before the path gives up. Small
+    /// on purpose — the shared session ages across the ~82-min suite so a target can lag the
+    /// automation tree by a beat, but a genuine miss must still fail fast. Miss-path only:
+    /// the already-realized case returns before any retry, so the happy path pays nothing.
+    /// </summary>
+    private const int RealizeRetryAttempts = 2;
+
     /// <summary>Dismiss the software keyboard if showing on iOS. No-op on Android.</summary>
     /// <remarks>
     /// Catches every exception: Appium 2 returns "resource not found" for HideKeyboard
@@ -73,12 +83,68 @@ public static class AppExtensions
         => (AppiumElement)driver.FindElement(AutomationIdLocator(automationId));
 
     /// <summary>Wait for an element with the given AutomationId to appear.</summary>
+    /// <remarks>
+    /// Realize-retry (#207): the shared Appium session ages across the ~82-min suite, so a
+    /// target can sit in the page source yet not be realized in the automation tree for a
+    /// beat after it "should" exist. This polls FindElement AND <c>Displayed</c>, re-finding
+    /// on every poll (a fresh lookup, so a CollectionView reflow can't hand back a stale ref —
+    /// mirrors <see cref="EnsureAllSectionsExpanded"/>) with a short settle between polls, so a
+    /// not-yet-realized element is re-queried within the timeout budget instead of failing on
+    /// the first miss. The already-realized element resolves on the first poll with no added
+    /// sleep. On timeout it falls back to a plain find, preserving the pre-#207 presence-only
+    /// contract: return the element if it is in the tree at all, and throw
+    /// <see cref="NoSuchElementException"/> only when it is truly absent — the change only ever
+    /// PREFERS a realized element, it never regresses a caller to a harder failure.
+    /// </remarks>
     public static AppiumElement WaitForElement(this AppiumDriver driver, string automationId,
         int timeoutSeconds = 15)
+        => WaitForRealizedElement(driver, AutomationIdLocator(automationId), timeoutSeconds);
+
+    /// <summary>
+    /// Poll for a present AND realized (<c>Displayed</c>) element matching <paramref name="locator"/>,
+    /// re-finding per poll with a short settle. Shared by <see cref="WaitForElement"/> and
+    /// <see cref="WaitAndTap"/>. See <see cref="WaitForElement"/> for the drift rationale.
+    /// </summary>
+    private static AppiumElement WaitForRealizedElement(AppiumDriver driver, By locator,
+        int timeoutSeconds)
     {
-        var wait = new WebDriverWait(driver, TimeSpan.FromSeconds(timeoutSeconds));
-        var locator = AutomationIdLocator(automationId);
-        return (AppiumElement)wait.Until(d => d.FindElement(locator));
+        var wait = new WebDriverWait(driver, TimeSpan.FromSeconds(timeoutSeconds))
+        {
+            // Short settle between polls (reused constant) so a just-missed realize is
+            // re-queried quickly rather than after the 500 ms default.
+            PollingInterval = TimeSpan.FromMilliseconds(TestConfig.DelayShortSettle),
+        };
+        // Ignore both so a poll landing before realize (NoSuchElement) or across a reflow
+        // (StaleElementReference) re-finds on the next poll rather than propagating. NotFound
+        // is already ignored by the WebDriverWait ctor; naming it is explicit and harmless.
+        wait.IgnoreExceptionTypes(typeof(NotFoundException), typeof(StaleElementReferenceException));
+        try
+        {
+            // Until keeps polling while the delegate returns null; a not-yet-Displayed element
+            // returns null → settle + re-find; a realized one resolves immediately.
+            return (AppiumElement)wait.Until(d =>
+            {
+                var el = d.FindElement(locator);
+                return el.Displayed ? el : null;
+            });
+        }
+        catch (WebDriverTimeoutException)
+        {
+            // Budget spent without a realized hit. Preserve the presence-only contract: hand
+            // back the element if it is in the tree at all (WaitAndTap's own tap-retry realizes
+            // it), else surface NoSuchElement on genuine absence. The pre-#207 wait.Until path
+            // threw WebDriverTimeoutException on genuine absence, not NoSuchElement — but that's
+            // behavior-compatible: every UITest caller treats absence via the WebDriverException
+            // base (which catches BOTH), so no caller regresses. ShortTimeout keeps this fallback
+            // from re-paying a full implicit wait on the already-degraded failure path.
+            var priorWait = driver.Manage().Timeouts().ImplicitWait;
+            try
+            {
+                driver.Manage().Timeouts().ImplicitWait = TestConfig.ShortTimeout;
+                return (AppiumElement)driver.FindElement(locator);
+            }
+            finally { driver.Manage().Timeouts().ImplicitWait = priorWait; }
+        }
     }
 
     /// <summary>Wait for an element to disappear from the screen.</summary>
@@ -108,9 +174,36 @@ public static class AppExtensions
     public static void Tap(this AppiumDriver driver, string automationId)
         => driver.FindByAutomationId(automationId).Click();
 
-    /// <summary>Tap an element by AutomationId, waiting for it first.</summary>
+    /// <summary>Tap an element by AutomationId, waiting for it to realize first.</summary>
+    /// <remarks>
+    /// Realize-retry (#207 — e.g. the drift-sensitive <c>Cards_Btn_Favorite</c> tap at
+    /// FeatureGapTests.cs). <see cref="WaitForRealizedElement"/> waits for the element to
+    /// realize, then we tap. A tap that still misses — the element realized into the tree but
+    /// isn't yet interactable, or went stale in a reflow between find and tap — gets a bounded
+    /// set of quick re-find + short-settle + retry passes instead of failing on that first
+    /// miss. Re-finds per attempt (a cached ref goes stale across a reflow — mirrors
+    /// <see cref="EnsureAllSectionsExpanded"/>). The already-realized case taps on the first
+    /// attempt with no added latency; only the miss path pays the settle. The terminal attempt
+    /// lets the raw click exception propagate, exactly as before this hardening.
+    /// </remarks>
     public static void WaitAndTap(this AppiumDriver driver, string automationId, int timeoutSeconds = 15)
-        => driver.WaitForElement(automationId, timeoutSeconds).Click();
+    {
+        var locator = AutomationIdLocator(automationId);
+        // Attempt 0 spends the full budget waiting for realize; retries are quick re-finds.
+        for (int attempt = 0; ; attempt++)
+        {
+            var element = WaitForRealizedElement(driver, locator, attempt == 0 ? timeoutSeconds : 1);
+            try
+            {
+                element.Click();
+                return;
+            }
+            catch (WebDriverException) when (attempt < RealizeRetryAttempts)
+            {
+                Thread.Sleep(TestConfig.DelayShortSettle);
+            }
+        }
+    }
 
     /// <summary>Clear an input and type new text.</summary>
     public static void EnterText(this AppiumDriver driver, string automationId, string text)
@@ -207,8 +300,31 @@ public static class AppExtensions
     {
         bool scrolledOnIOS = false;
         if (TestConfig.IsIOS)
+        {
+            // A freshly-created prayer is card-less (PrayerCardId 0 → CardTitle "") and the
+            // list sorts by CardTitle then Title (PrayerListViewModel.cs:425-426), so an empty
+            // CardTitle sorts it to the TOP. Every scroll path below moves DOWN only — and the
+            // iOS predicate-scroll moves further down — so a top-anchored row can never be
+            // realized from a list a prior navigation left mid-scrolled; the down-scroll just
+            // moves away from it (#183/#184 fail; the #183 dump caught the list at 67% with the
+            // target above the realized window). Reset to the top first so the target is at or
+            // below the current position: a top row is then on screen (tapped directly below),
+            // and a below-fold seeded row (e.g. "UI Test Prayer" under "UITest Card", #182) is
+            // still reachable by the down-scroll that follows.
+            ResetIOSListScrollToTop(driver, scrollableAutomationId);
+
+            // Top-anchored target is now on screen — tap it directly, before the down-only
+            // predicate scroll can move the list past it. Returns before ScrollDownUntil, so
+            // the #196 no-progress guard is never involved for this case.
+            if (driver.IsTextContainsDisplayed(text, timeoutSeconds: 2))
+            {
+                driver.TapByTextContains(text, timeoutSeconds: 10);
+                return;
+            }
+
             scrolledOnIOS = driver.IOSScrollToPredicateInContainer(
                 scrollableAutomationId, $"label CONTAINS '{text}'");
+        }
 
         try
         {
@@ -266,6 +382,21 @@ public static class AppExtensions
         driver.EnsureAllSectionsExpanded();
         if (TryScroll()) return;
 
+        // Realize-retry (#207): after expanding sections the row can be present in the page
+        // source but not yet realized into the automation tree for a beat (shared-session
+        // aging), so both the visible-check and the scroll above miss it. Settle briefly and
+        // re-query before the costly search fallback, which mutates the page into a filtered
+        // state ResetAppUIState must later clear. Bounded and miss-path only — the already
+        // visible/scrolled cases returned above, and TryScroll keeps its #196 no-progress
+        // guard (ScrollDownUntil is unchanged) so a pinned list bails each pass rather than
+        // burning the scroll budget.
+        for (int attempt = 0; attempt < RealizeRetryAttempts; attempt++)
+        {
+            Thread.Sleep(TestConfig.DelayShortSettle);
+            if (IsVisible()) return;
+            if (TryScroll()) return;
+        }
+
         // Last resort (lesson: uitest-visibility-not-existence-under-virtualization.md):
         // type the card name into the in-page search to force MAUI to materialize the
         // matching row. TD-19 validated this pattern for freshly-created cards on iOS.
@@ -297,6 +428,18 @@ public static class AppExtensions
         }
         var size = TestConfig.IsAndroid ? driver.Manage().Window.Size : default;
 
+        // No-progress guard (#196): mobile: scroll / swipe / swipeGesture expose no scroll
+        // offset, so the cheapest cross-platform "did the view actually move" signal is the
+        // page source. When a scroll leaves it byte-for-byte unchanged the list is pinned at
+        // an edge — already at the bottom, or too short to scroll at all — and every remaining
+        // iteration is a wasted no-op sitting behind a ShortTimeout find-miss (a scan that
+        // begins at the top of a short list otherwise burns the whole maxScrolls budget). Reuse
+        // the post-scroll source as the next pre-scroll baseline so each iteration costs at most
+        // one extra PageSource read, and only on iterations that miss (the already-visible case
+        // returns before any read). Bailing is safe: the per-iteration find runs BEFORE the
+        // scroll, so a genuinely-present element is still realized; we only stop scrolling once
+        // the view can no longer change.
+        string? sourceBeforeScroll = null;
         try
         {
             driver.Manage().Timeouts().ImplicitWait = TestConfig.ShortTimeout;
@@ -310,7 +453,12 @@ public static class AppExtensions
                 }
                 catch (NoSuchElementException) { }
 
+                sourceBeforeScroll ??= driver.PageSource;
                 ScrollDown(driver, size, containerId);
+                var sourceAfterScroll = driver.PageSource;
+                if (sourceAfterScroll == sourceBeforeScroll)
+                    break; // scroll moved nothing — list is at an edge, stop burning the budget
+                sourceBeforeScroll = sourceAfterScroll;
             }
         }
         finally
@@ -415,6 +563,41 @@ public static class AppExtensions
                 { "percent", 0.5 }
             });
         }
+    }
+
+    /// <summary>
+    /// iOS-only: scroll a CollectionView container back to its top via repeated
+    /// <c>mobile: scroll direction=up</c> (the inverse of <see cref="ScrollDown"/>).
+    /// Mirrors the iOS branch of <see cref="ResetCardsListScroll"/>, parameterised for any
+    /// container so <see cref="ScrollToPrayerAndTap"/> can land on a known top position before
+    /// its down-only search. Best-effort: silently no-ops if the container isn't on screen.
+    /// Iterating from an already-top list is a harmless no-op (a list can't scroll past its top).
+    /// </summary>
+    private static void ResetIOSListScrollToTop(AppiumDriver driver, string containerAutomationId)
+    {
+        const int MaxIterations = 8;
+
+        string listId;
+        try { listId = driver.FindElement(MobileBy.AccessibilityId(containerAutomationId)).Id; }
+        catch (WebDriverException) { return; }
+
+        // Save/restore the implicit wait so this pre-scroll reset doesn't clobber the
+        // caller's wait window; 0s keeps each no-op scroll cheap.
+        var priorWait = driver.Manage().Timeouts().ImplicitWait;
+        try
+        {
+            driver.Manage().Timeouts().ImplicitWait = TimeSpan.FromSeconds(0);
+            for (int i = 0; i < MaxIterations; i++)
+            {
+                driver.ExecuteScript("mobile: scroll", new Dictionary<string, object>
+                {
+                    { "elementId", listId },
+                    { "direction", "up" }
+                });
+            }
+        }
+        catch (WebDriverException) { /* container went off-page mid-loop */ }
+        finally { driver.Manage().Timeouts().ImplicitWait = priorWait; }
     }
 
     // ── Navigation ───────────────────────────────────────────────
@@ -567,6 +750,10 @@ public static class AppExtensions
     public static void EnsureOnTab(this AppiumDriver driver, string tabTitle, AppiumSetup setup)
     {
         setup.EnsureSessionAlive();
+        // EnsureSessionAlive recreates the session (new setup.Driver) when it finds a dead
+        // one, so re-fetch before using `driver` — same recreate-then-stale-param hazard as
+        // ResetAppUIState/RecycleSessionIfDue (#164).
+        driver = setup.Driver;
         // iOS: the software keyboard persists across navigations and can cover the
         // tab bar / toolbar items. Dismiss before attempting tab navigation.
         // See Lessons/maui-ios-appium-locators.md. No-op on Android.
@@ -677,6 +864,19 @@ public static class AppExtensions
     /// </summary>
     public static void ResetAppUIState(this AppiumDriver driver, AppiumSetup setup)
     {
+        // Per-test session isolation (#164). This runs at the very TOP of the per-test
+        // reset — before any navigation or UI inspection — so when the cadence fires and
+        // the driver is recreated, no in-progress test state is lost. On a recreate the
+        // app relaunches to its landing page (Home); the reset steps below are then no-ops
+        // (ResetCardsListScroll gates off the Cards page, the Home fast-path returns), and
+        // the caller's following EnsureOnTab navigates to the wanted tab. noReset=true
+        // preserves the once-seeded DB, so NO re-seed happens. See AppiumSetup #164 block.
+        setup.RecycleSessionIfDue();
+        // RecycleSessionIfDue may have torn down the session and assigned a NEW driver to
+        // setup.Driver (Quit + new AndroidDriver/IOSDriver). Re-fetch so the reset steps
+        // below run against the live session, not the just-quit `driver` param (#164).
+        driver = setup.Driver;
+
         // Cards list scroll position is preserved across tab navigation. A
         // prior test (e.g. Slice 6g auto-reveal-after-save in
         // EmptyCardExpand) can leave the list mid-scrolled, putting the next
@@ -688,12 +888,19 @@ public static class AppExtensions
         // a tab root.
         ResetCardsListScroll(driver);
 
-        // Fast path: already at a tab root with no pending alert.
-        if (!driver.IsAlertPresent() && driver.IsDisplayed("Home", timeoutSeconds: 0))
-            return;
-
-        try { driver.DismissAlertIfPresent(); } catch { /* best effort */ }
-
+        // In-place recoveries that MUST run BEFORE the fast-path early-return below: clear a
+        // leaked multi-select AND a leaked search term. BOTH must run before the fast-path for
+        // the same reason — that check gates on "Home", which resolves to the always-visible
+        // Home tab-BAR button (AppShell.xaml Title="Home"), present even on the Prayer Cards
+        // page while in multi-select or with an active search — so either clear placed AFTER
+        // the fast-path never runs when a prior test leaked that state (the fast-path
+        // short-circuits and returns first, which is exactly the #205 defect this corrects).
+        // Keeping both here leaves the fast-path purely gating the back-out navigation below.
+        //
+        // Multi-select clear: strictly gated on Cards_Bar_MultiSelect presence so "More" is
+        // tapped only in multi-select; outside it "More" opens the overflow popup, which must
+        // not happen from this reset. timeoutSeconds:0 — a leaked bar is fully realized, so
+        // the instant check detects it at negligible per-reset cost and no-ops otherwise.
         try
         {
             if (driver.IsDisplayed("Cards_Bar_MultiSelect", timeoutSeconds: 0))
@@ -706,6 +913,7 @@ public static class AppExtensions
         }
         catch { /* not on Prayer Cards or not in multi-select */ }
 
+        // Search-term clear: same before-the-fast-path reason as the multi-select clear above.
         try
         {
             if (driver.IsDisplayed("Cards_Search", timeoutSeconds: 0) &&
@@ -717,13 +925,49 @@ public static class AppExtensions
         }
         catch { /* not on Prayer Cards or search bar not rendered */ }
 
+        // Fast path: already at a tab root with no pending alert.
+        if (!driver.IsAlertPresent() && driver.IsDisplayed("Home", timeoutSeconds: 0))
+            return;
+
+        try { driver.DismissAlertIfPresent(); } catch { /* best effort */ }
+
         // Back out to a tab root, dismissing any alert each Back may raise (e.g.
-        // "Discard changes?"). Bounded so tab-bar-hidden states (Prayer Time) don't stall.
-        for (int i = 0; i < 5; i++)
+        // "Discard changes?"). Bounded so a stuck page can't loop forever.
+        void BackOutToHome()
         {
-            try { driver.DismissAlertIfPresent(); } catch { /* best effort */ }
+            for (int i = 0; i < 5; i++)
+            {
+                try { driver.DismissAlertIfPresent(); } catch { /* best effort */ }
+                if (driver.IsDisplayed("Home", timeoutSeconds: 0)) break;
+                try { driver.Navigate().Back(); Thread.Sleep(TestConfig.DelayShortSettle); } catch (WebDriverException) { break; }
+            }
+        }
+
+        BackOutToHome();
+
+        // The Prayer Time session page hides the tab bar and swallows Back, so the
+        // back-out above can't reach Home from there. A prior test left on Prayer
+        // Time would otherwise break the next test's tab/toolbar lookups (#180, #181;
+        // isolation Principle 2 — every test starts on Home). Escape it with the same
+        // exit-button helper NavigateToTab Stage 3 uses — but ONLY when actually on
+        // Prayer Time, confirmed by the PrayerTime_Btn_Done/_Finish AutomationId other
+        // Prayer Time tests already probe (reliable on both platforms). TryEscapePrayerTime
+        // has a broad last-resort "done" substring tap that would mis-fire on any
+        // unrelated stuck page whose text/content-desc merely contains "done", so it
+        // must never run unguarded from this every-test reset path (#205, finding #1).
+        // "Done"/"Finish" pops only one level via GoToAsync(".."), which may land on a
+        // nested Prayer Time launched from a scope/card page rather than Home; loop
+        // (bounded, so a persistent stuck state can't spin forever) — re-confirm Prayer
+        // Time, escape, back out — until Home is reached or no Prayer Time level remains
+        // (#180, #181, finding #2).
+        for (int i = 0; i < 3; i++)
+        {
             if (driver.IsDisplayed("Home", timeoutSeconds: 0)) break;
-            try { driver.Navigate().Back(); Thread.Sleep(TestConfig.DelayShortSettle); } catch (WebDriverException) { break; }
+            if (!driver.IsDisplayed("PrayerTime_Btn_Done", timeoutSeconds: 0) &&
+                !driver.IsDisplayed("PrayerTime_Btn_Finish", timeoutSeconds: 0)) break;
+            if (!TryEscapePrayerTime(driver)) break;
+            Thread.Sleep(TestConfig.DelayAfterNavigation);
+            BackOutToHome();
         }
     }
 
@@ -1125,6 +1369,63 @@ public static class AppExtensions
     {
         driver.FindByTextContains(text, timeoutSeconds).Click();
         Thread.Sleep(TestConfig.DelayAfterTap);
+    }
+
+    /// <summary>
+    /// iOS-only: select <paramref name="value"/> in a MAUI <c>Picker</c> that is already open.
+    /// Call AFTER tapping the Picker open. No-op on Android (whose Picker opens a dialog of
+    /// tappable rows, so the Android call sites keep using <see cref="TapByText"/>).
+    /// </summary>
+    /// <remarks>
+    /// On iOS a MAUI Picker presents a native <c>UIPickerView</c> spinning wheel — Microsoft's
+    /// Picker docs describe it as "a picker interface instead of a keyboard". A picker wheel's
+    /// options are NOT individual accessibility elements — only the single
+    /// <c>XCUIElementTypePickerWheel</c> exposes a settable value — so the Android pattern of
+    /// tapping the option by its text (<see cref="TapByText"/> / <see cref="TapByTextContains"/>)
+    /// can never match on iOS and dies with a NoSuchElement timeout. Instead set the wheel's value
+    /// (Appium's picker-wheel pattern, which maps to XCUITest <c>adjustToPickerWheelValue:</c>) and
+    /// return — there is no "Done" affordance to tap (page-source dump of the open picker on this
+    /// MAUI 10 / iOS 26.4 build shows the inline wheel and a page toolbar, but no Done button) and
+    /// none is needed: the iOS Picker's default <c>UpdateMode</c> is <c>Immediately</c> (Microsoft
+    /// docs: "item selection occurs as the user browses items … the default behavior in .NET MAUI";
+    /// <c>Detail_Picker_Card</c> sets no override), so settling the wheel fires the handler's
+    /// <c>didSelectRow</c> and writes <c>SelectedItem</c> back live. The caller's own
+    /// <c>TapToolbarItem("Save")</c> then persists the committed selection.
+    /// </remarks>
+    /// <param name="value">Exact option text to select — for the card picker this is the card Title.</param>
+    public static void SelectIOSPickerValue(this AppiumDriver driver, string value, int maxAttempts = 6)
+    {
+        if (!TestConfig.IsIOS) return;
+
+        // The open picker exposes exactly one spinning wheel (the card picker is single-column).
+        // Locate it by XPath element type, not By.ClassName — in this Selenium version
+        // By.ClassName emits a CSS selector ('.XCUIElementTypePickerWheel'), which Appium's
+        // iOS driver rejects (InvalidSelectorException). XPath is the iOS-native strategy used
+        // elsewhere in this file (e.g. IOSButtonByNameOrLabel).
+        var wheelBy = By.XPath("//XCUIElementTypePickerWheel");
+        var wait = new WebDriverWait(driver, TimeSpan.FromSeconds(10));
+        wait.Until(d => d.FindElement(wheelBy));
+
+        // RE-FIND the wheel every pass — never cache it across a SendKeys. SendKeys maps to
+        // XCUITest adjustToPickerWheelValue:, which re-renders the wheel and invalidates the
+        // prior element's fb_uid, so a cached reference throws StaleElementReferenceException on
+        // the next read. This mirrors the codebase's re-find-per-iteration idiom (ScrollDownUntil /
+        // EnsureAllSectionsExpanded). adjustToPickerWheelValue rotates toward the value; some
+        // XCUITest builds advance only one row per call, so retry (bounded) until the wheel's
+        // reported value reaches the target rather than assuming a single hop suffices. Each settle
+        // fires didSelectRow, committing SelectedItem live (Immediately mode) — no Done tap needed.
+        for (int attempt = 0; attempt < maxAttempts; attempt++)
+        {
+            try
+            {
+                var wheel = (AppiumElement)driver.FindElement(wheelBy);
+                if ((wheel.Text ?? string.Empty).Contains(value, StringComparison.Ordinal))
+                    break;
+                wheel.SendKeys(value);
+            }
+            catch (StaleElementReferenceException) { /* wheel re-rendered mid-pass; re-find next loop */ }
+            Thread.Sleep(TestConfig.DelayAfterTap);
+        }
     }
 
     /// <summary>Check if an element with the given text is displayed.</summary>

@@ -41,7 +41,7 @@
     Ref: https://learn.microsoft.com/dotnet/android/building-apps/build-process#build-extension-points
   -->
   <PropertyGroup>
-    <ApplicationDisplayVersion>1.5.2</ApplicationDisplayVersion>
+    <ApplicationDisplayVersion>1.5.3</ApplicationDisplayVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">

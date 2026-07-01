@@ -94,6 +94,17 @@ public static class TestConfig
     /// <summary>Staging path on Android used when pushing a seed DB (writable by adb).</summary>
     public const string AndroidTmpSeedPath = "/data/local/tmp/prayer_app_seed.db";
 
+    /// <summary>UiAutomator2 instrumentation server package Appium installs on the device.
+    /// Uninstalling it (with <see cref="UiAutomator2ServerTestPackage"/>) forces Appium to
+    /// redeploy fresh instrumentation on the next session — the #191/#192 wedge recovery.
+    /// Fixed package id from the appium-uiautomator2-driver; NOT the app under test
+    /// (<see cref="AndroidPackage"/>), so uninstalling it does not touch the MAUI APK.</summary>
+    public const string UiAutomator2ServerPackage = "io.appium.uiautomator2.server";
+
+    /// <summary>UiAutomator2 instrumentation *test* server package (the companion to
+    /// <see cref="UiAutomator2ServerPackage"/>). Appium reinstalls both on the next connect.</summary>
+    public const string UiAutomator2ServerTestPackage = "io.appium.uiautomator2.server.test";
+
     /// <summary>The iOS bundle identifier.</summary>
     public const string IOSBundleId = "com.multithreadedllc.prayercards";
 

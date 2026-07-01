@@ -10,6 +10,13 @@ public interface ISettings
     int AutoModeIntervalSeconds { get; set; }
     int OverdueDayThreshold { get; set; }
     bool OnboardingComplete { get; set; }
+
+    /// <summary>
+    /// Persisted onboarding step, stored as the <c>OnboardingStep</c> enum's string name
+    /// (e.g. "None", "Welcome", "Complete"). "None" is the default for new installs.
+    /// OnboardingService owns the parse/format and legacy-step migration.
+    /// </summary>
+    string OnboardingStep { get; set; }
     int DefaultNotifyHour { get; set; }
     int DefaultNotifyMinute { get; set; }
     bool AllowNotifications { get; set; }
