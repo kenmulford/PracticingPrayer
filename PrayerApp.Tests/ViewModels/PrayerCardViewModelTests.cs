@@ -1036,4 +1036,33 @@ public class PrayerCardViewModelTests
         Assert.True(sut.IsExpanded);
         Assert.False(sut.ShowActionChips);
     }
+
+    // ── ToggleFavoriteCommand (E2E coverage triage) ────────────────────
+    // Characterization coverage for the favorite toggle. Replaces the
+    // Cards_FavoriteToggle_ChangesState E2E (FeatureGapTests.cs) with a
+    // deterministic unit assertion over ToggleFavoriteAsync
+    // (PrayerCardViewModel.cs:320, :457): invoking the command flips
+    // IsFavorite (false→true, true→false) and persists each toggle via
+    // the card service.
+
+    [Fact]
+    public async Task ToggleFavoriteCommand_TogglesIsFavorite_AndPersistsEachToggle()
+    {
+        var card = new PrayerCard { Id = 7, Title = "Family" };
+        var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+        Assert.False(sut.IsFavorite);
+
+        // false → true
+        await ((IAsyncRelayCommand)sut.ToggleFavoriteCommand).ExecuteAsync(null);
+        Assert.True(sut.IsFavorite);
+
+        // true → false
+        await ((IAsyncRelayCommand)sut.ToggleFavoriteCommand).ExecuteAsync(null);
+        Assert.False(sut.IsFavorite);
+
+        // The save path is exercised on each toggle (the VM is the same
+        // PrayerCard reference passed to the service).
+        await _cardService.Received(2).SaveCardAsync(card);
+    }
 }

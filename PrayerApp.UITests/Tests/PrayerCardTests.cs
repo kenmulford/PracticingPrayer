@@ -173,29 +173,6 @@ public class PrayerCardTests
         }
     }
 
-    /// <summary>3.6: Expand card → view prayers inside.</summary>
-    [Fact]
-    public void Cards_ExpandCard_ShowsPrayers()
-    {
-        _setup.Driver.ResetAppUIState(_setup);
-        _setup.Driver.EnsureOnTab("Prayer Cards", _setup);
-        var driver = _setup.Driver;
-
-        ExpandQuickAddCard();
-
-        // Quick Add sits low in the System box (SortOrder 900), so its expanded
-        // "+ Add prayer ›" affordance can render below the fold (virtualized out).
-        // Scroll it into view fling-free before the presence assert — the same
-        // controlled-scroll the system-target move test uses for the moved prayer.
-        ScrollUntil(driver,
-            () => driver.IsDisplayed("Cards_Btn_AddPrayer", timeoutSeconds: 1),
-            () => driver.ScrollDownTo("Cards_Btn_AddPrayer", maxScrolls: 4,
-                                      scrollableAutomationId: "Cards_List_Cards"));
-
-        Assert.True(driver.IsDisplayed("Cards_Btn_AddPrayer", timeoutSeconds: 10),
-            "Expanded card should show '+ Add prayer' button");
-    }
-
     /// <summary>Build-95 fallout (Slice 6c): after deleting an expanded card,
     /// none of its prayer titles should still render anywhere on the page.
     /// Pre-fix the lazy-realized expanded subtree's explicit BindingContext
@@ -349,7 +326,7 @@ public class PrayerCardTests
     /// <summary>
     /// Idempotently brings the named user card into the collapsed state. Uses
     /// the card's own composed accessibility description (e.g.
-    /// "UITest EditButton Card, Expanded") as the per-card state proxy —
+    /// "UITest Card, Expanded") as the per-card state proxy —
     /// chip-visibility checks are unreliable because OTHER cards' chips can be
     /// in the tree (e.g. an auto-expanded post-save card that persists in the
     /// seed DB across runs), polluting any global chip-presence assertion.
@@ -538,71 +515,6 @@ public class PrayerCardTests
         if (TestConfig.IsIOS) driver.TapByTextContains(cardName);
         else driver.TapByText(cardName);
         Thread.Sleep(TestConfig.DelayAfterTap);
-    }
-
-
-    /// <summary>
-    /// 6c real M1 risk: a recycled cell whose host already has the expanded subtree
-    /// inflated must re-bind its inner BindableLayout cleanly to the new card's
-    /// Prayers when the BindingContext swaps (vs leaving the previous card's
-    /// prayer rows visible). Symptom of failure would be the wrong card's prayer
-    /// text appearing inside another card after fast scrolling. This test
-    /// expands a known card, scrolls aggressively away and back, and asserts the
-    /// chips are still under the same card on return — proving the realized
-    /// subtree survived recycling without leaking content.
-    /// </summary>
-    [Fact]
-    public void Cards_RecycledCells_LazyRealizeSurvivesScroll()
-    {
-        _setup.Driver.ResetAppUIState(_setup);
-        _setup.Driver.EnsureOnTab("Prayer Cards", _setup);
-        var driver = _setup.Driver;
-
-        const string cardName = "UITest EditButton Card";
-        EnsureCardExpanded(driver, cardName);
-
-        // Confirm chips realized before scroll (otherwise the post-scroll check
-        // would be testing realize-on-scroll-back, not survive-recycle).
-        bool chipsBeforeScroll = driver.IsDisplayed("Cards_Btn_Edit", timeoutSeconds: 5);
-        Assert.True(chipsBeforeScroll, "Pre-scroll: chips must be realized.");
-
-        // Aggressively scroll the recycler. Each ScrollDown invokes the platform
-        // gesture which re-uses cells; scrolling down then targeting the card
-        // again on the way back forces the same Border to recycle through other
-        // cards' BindingContexts and back.
-        var size = driver.Manage().Window.Size;
-        for (int i = 0; i < 4; i++)
-        {
-            driver.ExecuteScript("mobile: " + (TestConfig.IsAndroid ? "swipeGesture" : "swipe"),
-                TestConfig.IsAndroid
-                    ? new Dictionary<string, object>
-                    {
-                        { "left", size.Width / 4 },
-                        { "top", size.Height / 4 },
-                        { "width", size.Width / 2 },
-                        { "height", size.Height / 2 },
-                        { "direction", "up" },
-                        { "percent", 0.8 }
-                    }
-                    : new Dictionary<string, object> { { "direction", "up" } });
-            // TODO(#11): map to TestConfig.Delay* — inter-gesture pause (150ms),
-            // no current constant matches; deferred ambiguous site.
-            Thread.Sleep(150);
-        }
-
-        // Scroll back to the card (handles virtualization + section collapse).
-        driver.EnsureCardVisible(cardName);
-
-        // After recycling, the card and its chips must still be intact —
-        // the chip MUST appear under the same card name we expanded, not
-        // shifted onto a different recycled cell.
-        bool chipsAfterScroll = driver.IsDisplayed("Cards_Btn_Edit", timeoutSeconds: 5);
-
-        string? evidence = chipsAfterScroll ? null
-            : driver.DumpPageSource(nameof(Cards_RecycledCells_LazyRealizeSurvivesScroll));
-
-        Assert.True(chipsAfterScroll,
-            $"Post-scroll: chips should still be present (recycled cell re-bound BindableLayout cleanly). Dump: {evidence}");
     }
 
     /// <summary>

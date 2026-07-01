@@ -243,9 +243,9 @@ internal static class TestDataSeed
         // Convention: a test that taps, expands, mutates, or otherwise
         // depends on a specific card should OWN a dedicated seed fixture
         // named after the consuming test. Do NOT share "UITest Card" —
-        // it's a read-only canary; other destructive tests (e.g.
-        // Cards_MultiSelect_MoveToCollection) mutate it, which breaks
-        // anyone sharing it. All fixtures below live at BoxId = 0
+        // it's a read-only canary; other destructive tests (delete / move)
+        // can mutate it, which breaks anyone sharing it. All fixtures below
+        // live at BoxId = 0
         // (Loose Cards) so they render flat and are always visible.
         // See Lessons/uitest-per-test-disposable-fixtures.md.
         await SeedCardWithPrayersAsync(boxId: 0, "UITest AddPrayer Card",
@@ -259,22 +259,6 @@ internal static class TestDataSeed
 
         await SeedCardWithPrayersAsync(boxId: 0, "UITest Expanded Card",
             Array.Empty<(string, string, bool)>());
-
-        await SeedCardWithPrayersAsync(boxId: 0, "UITest EditButton Card",
-            Array.Empty<(string, string, bool)>());
-
-        await SeedCardWithPrayersAsync(boxId: 0, "UITest Favorite Card",
-            Array.Empty<(string, string, bool)>());
-
-        // Cards_MultiSelect_MoveToCollection long-presses this card into
-        // multi-select and MOVES it into "UITest Collection". It owns its own
-        // expendable card so the shared read-only "UITest Card" stays pristine
-        // at top level for downstream readers (Cards_Search_ExpandsMatchingSections).
-        await SeedCardWithPrayersAsync(boxId: 0, TestSeedFixtures.MultiSelectMoveCard, new[]
-        {
-            ("MultiSelect Move Prayer",
-             "Card moved into a collection by Cards_MultiSelect_MoveToCollection.", false),
-        });
 
         // Build-95 fallout: recycled-cell BindingContext-stale fixture.
         // "Recycle Big Card" is expanded + deleted by the test; "Recycle
