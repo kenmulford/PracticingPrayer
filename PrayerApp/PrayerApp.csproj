@@ -214,8 +214,21 @@
 	  <ProjectReference Include="..\PrayerApp.Shared\PrayerApp.Shared.csproj" />
 	</ItemGroup>
 
-	<!-- Embed the iOS Action Extension as an .appex inside the main app bundle. iOS-only. -->
-	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
+	<!-- Embed the iOS Action Extension as an .appex inside the main app bundle. iOS-only.
+
+	     The host-OS guard ($([MSBuild]::IsOSPlatform('OSX'))) is load-bearing, not
+	     redundant with the iOS TargetPlatform check. NuGet restore is NOT scoped by the
+	     `dotnet publish -f net10.0-android` target framework: its implicit restore
+	     evaluates the project across ALL of $(TargetFrameworks) and takes the union of
+	     ProjectReferences, so the net10.0-ios leg pulls this reference into the restore
+	     graph even for an Android-only publish. On the Linux Android CI runner — which
+	     has the Android workload but cannot have the macOS-only iOS SDK — restoring this
+	     standalone Microsoft.NET.Sdk extension then fails with NETSDK1178
+	     (Microsoft.iOS.Sdk absent). Unlike $(TargetFramework) (empty at the outer restore
+	     eval), the host OS is invariant across every restore/build leg, so gating on it
+	     keeps the extension out of the Android runner's restore graph while still
+	     embedding it for every iOS build on a Mac. -->
+	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios' AND $([MSBuild]::IsOSPlatform('OSX'))">
 	  <ProjectReference Include="..\PrayerApp.ActionExtension\PrayerApp.ActionExtension.csproj">
 	    <IsAppExtension>true</IsAppExtension>
 	  </ProjectReference>
