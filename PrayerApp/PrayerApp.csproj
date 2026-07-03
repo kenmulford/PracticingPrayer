@@ -1,7 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFrameworks>net10.0-android;net10.0-ios</TargetFrameworks>
+		<!-- Host-gate the iOS TFM: iOS can only be built on macOS. On a non-macOS host
+		     (the Linux Android CI runner) the project is Android-only, so NuGet's implicit
+		     restore — which evaluates ALL of $(TargetFrameworks) regardless of `-f net10.0-android`
+		     — never sees the net10.0-ios leg and never tries to restore the macOS-only iOS
+		     workload (Microsoft.iOS.Sdk), which fixes NETSDK1178 on Linux. On macOS both TFMs
+		     stay, so the iOS build path is unaffected. -->
+		<TargetFrameworks>net10.0-android</TargetFrameworks>
+		<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('OSX'))">net10.0-android;net10.0-ios</TargetFrameworks>
 
 		<MauiEnableXamlCBindingWithSourceCompilation>true</MauiEnableXamlCBindingWithSourceCompilation>
 

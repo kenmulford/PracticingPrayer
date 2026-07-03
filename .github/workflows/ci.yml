@@ -35,3 +35,25 @@ jobs:
         with:
           name: test-results
           path: PrayerApp.Tests/TestResults/
+
+  android-build:
+    name: Android Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # Directory.Build.props stamps ApplicationVersion from `git rev-list --count HEAD`
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Install MAUI Android workload
+        run: dotnet workload restore PrayerApp/PrayerApp.csproj
+
+      # Builds the Android head on Linux — catches app build/restore breaks (e.g. the
+      # iOS workload leaking into the Android restore) on every push/PR, not just at release.
+      - name: Build Android head
+        run: dotnet build PrayerApp/PrayerApp.csproj -f net10.0-android -c Release
