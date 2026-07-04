@@ -1,2 +1,2 @@
-• Fixed a couple of Quick Add issues — saving a prayer to an existing card, and choosing a collection during a manual add.
-• Security and reliability improvements behind the scenes.
+• Accessibility: at large text sizes, the Home dashboard now reflows to a single column so the summary counts stay fully visible instead of getting cut off.
+• Reliability improvements behind the scenes.
