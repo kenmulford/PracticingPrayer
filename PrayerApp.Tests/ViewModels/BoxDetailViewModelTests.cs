@@ -212,4 +212,87 @@ public class BoxDetailViewModelTests
 
         await _boxService.Received(1).SaveBoxAsync(Arg.Any<CardBox>());
     }
+
+    // ── Protection cascade (issue #252) ──────────────────────────────────
+    // Pure get/set wrappers over CardBox.ProtectAllCards / CardProtectionMode,
+    // mirroring the Name property pattern above. IsCascadeModeEnabled is a
+    // derived, unit-testable property gating the mode picker's Disabled
+    // state (design-system.md#Required states) — no auth gating here.
+
+    [Fact]
+    public void ProtectAllCards_DefaultsToFalse()
+    {
+        var sut = CreateSut();
+        Assert.False(sut.ProtectAllCards);
+    }
+
+    [Fact]
+    public void ProtectAllCards_Set_UpdatesValue()
+    {
+        var sut = CreateSut();
+
+        sut.ProtectAllCards = true;
+
+        Assert.True(sut.ProtectAllCards);
+    }
+
+    [Fact]
+    public void CardProtectionMode_DefaultsToNone()
+    {
+        var sut = CreateSut();
+        Assert.Equal(CardProtectionMode.None, sut.CardProtectionMode);
+    }
+
+    [Fact]
+    public void CardProtectionMode_Set_UpdatesValue()
+    {
+        var sut = CreateSut();
+
+        sut.CardProtectionMode = CardProtectionMode.LockedVisible;
+
+        Assert.Equal(CardProtectionMode.LockedVisible, sut.CardProtectionMode);
+    }
+
+    [Fact]
+    public void IsCascadeModeEnabled_ProtectAllCardsFalse_False()
+    {
+        var sut = CreateSut();
+        sut.ProtectAllCards = false;
+
+        Assert.False(sut.IsCascadeModeEnabled);
+    }
+
+    [Fact]
+    public void IsCascadeModeEnabled_ProtectAllCardsTrue_True()
+    {
+        var sut = CreateSut();
+        sut.ProtectAllCards = true;
+
+        Assert.True(sut.IsCascadeModeEnabled);
+    }
+
+    [Fact]
+    public async Task LoadAsync_ExistingBox_PopulatesProtectionFields()
+    {
+        var box = new CardBox
+        {
+            Id = 8,
+            Name = "Family",
+            ProtectAllCards = true,
+            CardProtectionMode = CardProtectionMode.Hidden
+        };
+        var db = Substitute.For<IDBService>();
+        CardBox.SetDBService(db);
+        db.GetByIdAsync<CardBox>(8).Returns(box);
+
+        var sut = CreateSut();
+        ((IQueryAttributable)sut).ApplyQueryAttributes(
+            new Dictionary<string, object> { { "load", "8" } });
+
+        await Task.Delay(100);
+
+        Assert.True(sut.ProtectAllCards);
+        Assert.Equal(CardProtectionMode.Hidden, sut.CardProtectionMode);
+        Assert.True(sut.IsCascadeModeEnabled);
+    }
 }

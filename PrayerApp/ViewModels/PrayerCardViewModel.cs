@@ -119,6 +119,24 @@ namespace PrayerApp.ViewModels
             }
         }
 
+        /// <summary>
+        /// Card-level protection mode (Off/Locked/Hidden). Pure UI binding — no auth
+        /// gating happens here (see #253/#254/#255); saving persists via the existing
+        /// SaveCommand → SaveCardAsync path.
+        /// </summary>
+        public CardProtectionMode ProtectionMode
+        {
+            get => _prayerCard.ProtectionMode;
+            set
+            {
+                if (_prayerCard.ProtectionMode != value)
+                {
+                    _prayerCard.ProtectionMode = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
         // Read-only derived. Single source of truth: PrayerCardsViewModel.ExpandedCardId.
         // The page-VM owns the singleton invariant — eliminates the cascade-collapse
         // handler and its `_suppressIsExpandedRebuild` flag (the smoke alarm: when a
@@ -636,6 +654,7 @@ namespace PrayerApp.ViewModels
             OnPropertyChanged(nameof(Id));
             OnPropertyChanged(nameof(Title));
             OnPropertyChanged(nameof(IsFavorite));
+            OnPropertyChanged(nameof(ProtectionMode));
             OnPropertyChanged(nameof(IsSystem));
             OnPropertyChanged(nameof(IsImported));
             OnPropertyChanged(nameof(BoxId));
