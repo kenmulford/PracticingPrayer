@@ -325,6 +325,11 @@ namespace PrayerApp.ViewModels
             _messenger.Register<PrayerCardsViewModel, TagChangedMessage>(this, (vm, _) => vm.SyncAsync(null, skipExpandedPrayerReload: true).SafeFireAndForget());
             _messenger.Register<PrayerCardsViewModel, CardBoxChangedMessage>(this, (vm, _) => vm.SyncAsync(null, skipExpandedPrayerReload: true).SafeFireAndForget());
             _messenger.Register<PrayerCardsViewModel, BulkChangedMessage>(this, (vm, _) => vm.SyncAsync().SafeFireAndForget());
+            // Issue #254: App.xaml.cs publishes this right after RelockSession() on Window.Deactivated
+            // (strict re-lock — fires on any deactivation, including a brief app-switcher peek).
+            // Synchronous, no re-sync: IsSessionUnlocked already flipped false on the shared
+            // singleton, so OnSessionRelocked() only needs to re-derive already-loaded state.
+            _messenger.Register<PrayerCardsViewModel, SessionRelockedMessage>(this, (vm, _) => vm.OnSessionRelocked());
         }
 
         public PrayerCardsViewModel() : this(
@@ -378,7 +383,8 @@ namespace PrayerApp.ViewModels
         {
             var vm = _cardVmFactory?.Invoke(pc)
                 ?? new PrayerCardViewModel(pc, _cardService, _prayerService, _onboardingService,
-                    _navigationService, _accessibilityService, _boxService, _settings);
+                    _navigationService, _accessibilityService, _boxService, _settings,
+                    _confidentialAccessService);
             // Wire the back-reference so per-card IsExpanded can project over
             // ExpandedCardId, and ToggleExpandedAsync can write back through.
             vm.Parent = this;
@@ -406,6 +412,37 @@ namespace PrayerApp.ViewModels
             OnPropertyChanged(nameof(IsSessionUnlocked));
             foreach (var card in AllPrayerCards)
                 card.RaiseLockStateChanged();
+            RebuildSections();
+        }
+
+        /// <summary>
+        /// Handles <see cref="SessionRelockedMessage"/> (issue #254) — the mirror image of
+        /// <see cref="ShowConfidentialAsync"/>'s post-unlock refresh. <see cref="IsSessionUnlocked"/>
+        /// already reads live off the shared <see cref="IConfidentialAccessService"/> singleton, so
+        /// re-raising it plus each card's lock-state projections and rebuilding sections is enough
+        /// to re-mask LockedVisible cards and re-exclude Hidden cards immediately — no re-sync
+        /// (DB round-trip) needed, since no underlying data changed. Also collapses the expanded
+        /// card if it is now effectively protected, so its real content (already loaded into
+        /// <see cref="PrayerCardViewModel.Prayers"/> from the earlier gated expand) does not remain
+        /// on screen after re-lock.
+        /// </summary>
+        private void OnSessionRelocked()
+        {
+            OnPropertyChanged(nameof(IsSessionUnlocked));
+            foreach (var card in AllPrayerCards)
+                card.RaiseLockStateChanged();
+
+            if (_expandedCardId is int expandedId)
+            {
+                var expandedCard = AllPrayerCards.FirstOrDefault(c => c.Id == expandedId);
+                if (expandedCard is not null &&
+                    PrayerCard.GetEffectiveProtectionMode(expandedCard.Card, expandedCard.Box) != CardProtectionMode.None)
+                {
+                    ExpandedCardId = null; // setter re-raises IsExpanded + re-runs RebuildSections
+                    return;
+                }
+            }
+
             RebuildSections();
         }
 

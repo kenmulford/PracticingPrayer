@@ -19,6 +19,11 @@ public class PrayerCardViewModelTests
     private readonly ISettings _settings = Substitute.For<ISettings>();
     private readonly IDBService _db = Substitute.For<IDBService>();
     private readonly IPrayerSelectionService _selectionService = Substitute.For<IPrayerSelectionService>();
+    // Issue #254: gates SelectPrayerCardAsync + ToggleExpandedAsync. Fake mirrors the
+    // #251/#253 seam-faking approach — defaults to locked (IsSessionUnlocked=false) via
+    // NSubstitute's bool default, so existing tests that don't care about confidentiality
+    // exercise the unprotected/no-gate path unless a card explicitly sets ProtectionMode.
+    private readonly IConfidentialAccessService _confidentialAccessService = Substitute.For<IConfidentialAccessService>();
 
     private const int ArchivedBoxId = 99;
 
@@ -39,7 +44,7 @@ public class PrayerCardViewModelTests
 
     private PrayerCardViewModel CreateSut() =>
         new(_cardService, _prayerService, _onboardingService, _navigationService,
-            _accessibilityService, _boxService, _settings);
+            _accessibilityService, _boxService, _settings, _confidentialAccessService);
 
     // ── Construction ──────────────────────────────────────────────────
 
@@ -249,7 +254,7 @@ public class PrayerCardViewModelTests
     {
         var card = new PrayerCard { Id = 7, Title = "Family" };
         var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings)
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService)
         {
             SelectionServiceFactory = () => _selectionService
         };
@@ -278,7 +283,7 @@ public class PrayerCardViewModelTests
     {
         var card = new PrayerCard { Id = 8, Title = "Empty" };
         var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings)
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService)
         {
             SelectionServiceFactory = () => _selectionService
         };
@@ -329,7 +334,7 @@ public class PrayerCardViewModelTests
 
         var card = new PrayerCard { Id = 1, Title = "Test", BoxId = 5 };
         var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
         await sut.LoadBoxPickerAsync();
 
         var selected = Assert.IsType<RealBoxPickerItem>(sut.SelectedBox);
@@ -628,7 +633,7 @@ public class PrayerCardViewModelTests
         // Null Parent ⇒ IsExpanded == false ⇒ the count segment is present.
         var card = new PrayerCard { Id = 7, Title = "Family" };
         var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings)
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService)
         {
             ActivePrayerCount = 1
         };
@@ -642,7 +647,7 @@ public class PrayerCardViewModelTests
     {
         var card = new PrayerCard { Id = 7, Title = "Family" };
         var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings)
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService)
         {
             ActivePrayerCount = 3
         };
@@ -659,7 +664,7 @@ public class PrayerCardViewModelTests
         // into this test assembly.
         var card = new PrayerCard { Id = 7, Title = "Family" };
         var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings)
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService)
         {
             ActivePrayerCount = 3
         };
@@ -682,7 +687,7 @@ public class PrayerCardViewModelTests
     {
         var card = new PrayerCard { Id = 7, Title = "Test", BoxId = 0 };
         var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
 
         await ((IAsyncRelayCommand)sut.ArchiveCommand).ExecuteAsync(null);
 
@@ -699,7 +704,7 @@ public class PrayerCardViewModelTests
             .Returns(false);
         var card = new PrayerCard { Id = 7, Title = "Test", BoxId = 0 };
         var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
 
         await ((IAsyncRelayCommand)sut.ArchiveCommand).ExecuteAsync(null);
 
@@ -711,7 +716,7 @@ public class PrayerCardViewModelTests
     {
         var card = new PrayerCard { Id = 7, Title = "Test", BoxId = ArchivedBoxId };
         var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
 
         await ((IAsyncRelayCommand)sut.ArchiveCommand).ExecuteAsync(null);
 
@@ -725,7 +730,7 @@ public class PrayerCardViewModelTests
     {
         var card = new PrayerCard { Id = 7, Title = "Test", BoxId = ArchivedBoxId };
         var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
 
         await ((IAsyncRelayCommand)sut.ArchiveCommand).ExecuteAsync(null);
 
@@ -737,7 +742,7 @@ public class PrayerCardViewModelTests
     {
         var card = new PrayerCard { Id = 7, Title = "Test", BoxId = 42 };
         var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
 
         await ((IAsyncRelayCommand)sut.ArchiveCommand).ExecuteAsync(null);
 
@@ -754,7 +759,7 @@ public class PrayerCardViewModelTests
             new() { Id = 42, Name = "Family" }
         }.AsReadOnly());
         var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
 
         await ((IAsyncRelayCommand)sut.ArchiveCommand).ExecuteAsync(null);
 
@@ -771,7 +776,7 @@ public class PrayerCardViewModelTests
             new() { Id = 7, Name = "Other" }
         }.AsReadOnly());
         var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
 
         await ((IAsyncRelayCommand)sut.ArchiveCommand).ExecuteAsync(null);
 
@@ -790,7 +795,7 @@ public class PrayerCardViewModelTests
             new() { Id = 42, Name = "Family" }
         }.AsReadOnly());
         var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
 
         // 1. Archive: stash 42, move to archived folder.
         await ((IAsyncRelayCommand)sut.ArchiveCommand).ExecuteAsync(null);
@@ -817,7 +822,7 @@ public class PrayerCardViewModelTests
         // via the boxId != 0 guard, WITHOUT consulting GetBoxesAsync.
         var card = new PrayerCard { Id = 7, Title = "Test", BoxId = 0 };
         var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
 
         // 1. Archive from Loose Cards: stash 0.
         await ((IAsyncRelayCommand)sut.ArchiveCommand).ExecuteAsync(null);
@@ -839,7 +844,7 @@ public class PrayerCardViewModelTests
     {
         var card = new PrayerCard { Id = 7, Title = "Test", BoxId = ArchivedBoxId, PreArchiveBoxId = null };
         var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
 
         await ((IAsyncRelayCommand)sut.ArchiveCommand).ExecuteAsync(null);
 
@@ -852,7 +857,7 @@ public class PrayerCardViewModelTests
     {
         var card = new PrayerCard { Id = 7, BoxId = 0 };
         var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
 
         Assert.False(sut.IsArchived);
     }
@@ -862,7 +867,7 @@ public class PrayerCardViewModelTests
     {
         var card = new PrayerCard { Id = 7, BoxId = ArchivedBoxId };
         var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
 
         Assert.True(sut.IsArchived);
     }
@@ -872,7 +877,7 @@ public class PrayerCardViewModelTests
     {
         var card = new PrayerCard { Id = 7, BoxId = 0 };
         var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
 
         Assert.Equal("Archive", sut.ArchiveLabel);
     }
@@ -882,7 +887,7 @@ public class PrayerCardViewModelTests
     {
         var card = new PrayerCard { Id = 7, BoxId = ArchivedBoxId };
         var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
 
         Assert.Equal("Unarchive", sut.ArchiveLabel);
     }
@@ -892,7 +897,7 @@ public class PrayerCardViewModelTests
     {
         var card = new PrayerCard { Id = 7, IsSystem = true };
         var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
 
         Assert.False(sut.ArchiveCommand.CanExecute(null));
     }
@@ -902,7 +907,7 @@ public class PrayerCardViewModelTests
     {
         var card = new PrayerCard { Id = 7, Title = "Test", BoxId = 0 };
         var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
 
         await ((IAsyncRelayCommand)sut.ArchiveCommand).ExecuteAsync(null);
 
@@ -914,7 +919,7 @@ public class PrayerCardViewModelTests
     {
         var card = new PrayerCard { Id = 7, Title = "Test", BoxId = 0 };
         var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
 
         var raised = new List<string?>();
         sut.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
@@ -936,7 +941,7 @@ public class PrayerCardViewModelTests
     {
         var card = new PrayerCard { Id = 7, Title = "Family" };
         var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
 
         await ((IAsyncRelayCommand)sut.AddPrayerCommand).ExecuteAsync(null);
 
@@ -956,7 +961,7 @@ public class PrayerCardViewModelTests
     {
         var card = new PrayerCard { Id = 12, Title = "Family" };
         var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
 
         await ((IAsyncRelayCommand)sut.SelectCardCommand).ExecuteAsync(null);
 
@@ -968,7 +973,7 @@ public class PrayerCardViewModelTests
     {
         var card = new PrayerCard { Id = 13, Title = "Quick Add", IsSystem = true };
         var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
 
         Assert.False(sut.SelectCardCommand.CanExecute(null));
 
@@ -993,7 +998,7 @@ public class PrayerCardViewModelTests
         // Null Parent ⇒ IsExpanded false ⇒ chips hidden.
         var card = new PrayerCard { Id = 7, Title = "Family" };
         var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
 
         Assert.False(sut.IsExpanded);
         Assert.False(sut.ShowActionChips);
@@ -1004,7 +1009,7 @@ public class PrayerCardViewModelTests
     {
         var card = new PrayerCard { Id = 7, Title = "Family" };
         var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
 
         var parent = new PrayerCardsViewModel(_cardService, _prayerService, _onboardingService,
             _navigationService, _accessibilityService, Substitute.For<ITagService>(), _settings,
@@ -1024,7 +1029,7 @@ public class PrayerCardViewModelTests
         // Edit/Favorite/Delete affordances — matches Cards_SystemCard_* E2E intent).
         var card = new PrayerCard { Id = 7, Title = "Quick Add", IsSystem = true };
         var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
 
         var parent = new PrayerCardsViewModel(_cardService, _prayerService, _onboardingService,
             _navigationService, _accessibilityService, Substitute.For<ITagService>(), _settings,
@@ -1050,7 +1055,7 @@ public class PrayerCardViewModelTests
     {
         var card = new PrayerCard { Id = 7, Title = "Family" };
         var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
         Assert.False(sut.IsFavorite);
 
         // false → true
@@ -1085,7 +1090,7 @@ public class PrayerCardViewModelTests
     {
         var card = new PrayerCard { Id = 3, Title = "Family" };
         var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
 
         sut.ProtectionMode = CardProtectionMode.Hidden;
 
@@ -1120,7 +1125,7 @@ public class PrayerCardViewModelTests
         // so treat as not locked-visible rather than throwing.
         var card = new PrayerCard { Id = 1, Title = "Secret", ProtectionMode = CardProtectionMode.LockedVisible };
         var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
 
         Assert.False(sut.IsLockedVisible);
         Assert.Equal("Secret", sut.DisplayTitle);
@@ -1131,7 +1136,7 @@ public class PrayerCardViewModelTests
     {
         var card = new PrayerCard { Id = 1, Title = "Secret Card", ProtectionMode = CardProtectionMode.LockedVisible };
         var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
         var confidential = Substitute.For<IConfidentialAccessService>();
         confidential.IsSessionUnlocked.Returns(false);
         sut.Parent = new PrayerCardsViewModel(_cardService, _prayerService, _onboardingService,
@@ -1148,7 +1153,7 @@ public class PrayerCardViewModelTests
     {
         var card = new PrayerCard { Id = 1, Title = "Secret Card", ProtectionMode = CardProtectionMode.LockedVisible };
         var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
         var confidential = Substitute.For<IConfidentialAccessService>();
         confidential.IsSessionUnlocked.Returns(true);
         sut.Parent = new PrayerCardsViewModel(_cardService, _prayerService, _onboardingService,
@@ -1164,7 +1169,7 @@ public class PrayerCardViewModelTests
     {
         var card = new PrayerCard { Id = 1, Title = "Open Card", ProtectionMode = CardProtectionMode.None };
         var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
         var confidential = Substitute.For<IConfidentialAccessService>();
         confidential.IsSessionUnlocked.Returns(false);
         sut.Parent = new PrayerCardsViewModel(_cardService, _prayerService, _onboardingService,
@@ -1183,7 +1188,7 @@ public class PrayerCardViewModelTests
         // Hidden card's cell (if ever bound) is not masked via this path.
         var card = new PrayerCard { Id = 1, Title = "Hidden Card", ProtectionMode = CardProtectionMode.Hidden };
         var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
         var confidential = Substitute.For<IConfidentialAccessService>();
         confidential.IsSessionUnlocked.Returns(false);
         sut.Parent = new PrayerCardsViewModel(_cardService, _prayerService, _onboardingService,
@@ -1202,7 +1207,7 @@ public class PrayerCardViewModelTests
         var box = new CardBox { Id = 7, Name = "Family", ProtectAllCards = true, CardProtectionMode = CardProtectionMode.LockedVisible };
         var card = new PrayerCard { Id = 1, Title = "Cascaded Secret", ProtectionMode = CardProtectionMode.None, BoxId = 7 };
         var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
         var confidential = Substitute.For<IConfidentialAccessService>();
         confidential.IsSessionUnlocked.Returns(false);
         sut.Parent = new PrayerCardsViewModel(_cardService, _prayerService, _onboardingService,
@@ -1212,5 +1217,174 @@ public class PrayerCardViewModelTests
 
         Assert.True(sut.IsLockedVisible);
         Assert.Equal("Protected", sut.DisplayTitle);
+    }
+
+    // ── Issue #254: open-card + in-place-expand auth gate ───────────────
+    // SelectPrayerCardAsync (navigate-to-edit) and ToggleExpandedAsync (in-place
+    // expand) both gate on the same condition (PrayerCardViewModel.cs:523-531):
+    // effectively-protected (own ProtectionMode or box cascade) AND session locked.
+    // On deny, neither navigates/expands/loads. Unprotected and already-unlocked
+    // cards proceed with no auth prompt at all.
+
+    [Fact]
+    public async Task SelectCardCommand_ProtectedAndLocked_AuthSucceeds_Navigates()
+    {
+        var card = new PrayerCard { Id = 12, Title = "Secret", ProtectionMode = CardProtectionMode.LockedVisible };
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        _confidentialAccessService.AuthenticateAsync(Arg.Any<string>()).Returns(true);
+        var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
+
+        await ((IAsyncRelayCommand)sut.SelectCardCommand).ExecuteAsync(null);
+
+        await _confidentialAccessService.Received(1).AuthenticateAsync(Arg.Any<string>());
+        await _navigationService.Received(1).GoToAsync($"{Routes.PrayerCardPage}?load=12");
+    }
+
+    [Fact]
+    public async Task SelectCardCommand_ProtectedAndLocked_AuthDenied_DoesNotNavigate()
+    {
+        var card = new PrayerCard { Id = 12, Title = "Secret", ProtectionMode = CardProtectionMode.LockedVisible };
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        _confidentialAccessService.AuthenticateAsync(Arg.Any<string>()).Returns(false);
+        var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
+
+        await ((IAsyncRelayCommand)sut.SelectCardCommand).ExecuteAsync(null);
+
+        await _confidentialAccessService.Received(1).AuthenticateAsync(Arg.Any<string>());
+        await _navigationService.DidNotReceive().GoToAsync(Arg.Any<string>());
+    }
+
+    [Fact]
+    public async Task SelectCardCommand_Unprotected_ProceedsWithNoAuthCall()
+    {
+        var card = new PrayerCard { Id = 12, Title = "Open", ProtectionMode = CardProtectionMode.None };
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
+
+        await ((IAsyncRelayCommand)sut.SelectCardCommand).ExecuteAsync(null);
+
+        await _confidentialAccessService.DidNotReceive().AuthenticateAsync(Arg.Any<string>());
+        await _navigationService.Received(1).GoToAsync($"{Routes.PrayerCardPage}?load=12");
+    }
+
+    [Fact]
+    public async Task SelectCardCommand_ProtectedButAlreadyUnlocked_ProceedsWithNoAuthPrompt()
+    {
+        var card = new PrayerCard { Id = 12, Title = "Secret", ProtectionMode = CardProtectionMode.LockedVisible };
+        _confidentialAccessService.IsSessionUnlocked.Returns(true);
+        var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
+
+        await ((IAsyncRelayCommand)sut.SelectCardCommand).ExecuteAsync(null);
+
+        await _confidentialAccessService.DidNotReceive().AuthenticateAsync(Arg.Any<string>());
+        await _navigationService.Received(1).GoToAsync($"{Routes.PrayerCardPage}?load=12");
+    }
+
+    // ── ToggleExpandedCommand auth gate (folded-in scope) ───────────────
+    // Expand loads real content (LoadPrayersAsync) and sets Parent.ExpandedCardId —
+    // both must be gated. Collapse never needs auth (no content is newly revealed).
+
+    private PrayerCardsViewModel CreateParentForExpandTests(PrayerCardViewModel card)
+    {
+        var parent = new PrayerCardsViewModel(_cardService, _prayerService, _onboardingService,
+            _navigationService, _accessibilityService, Substitute.For<ITagService>(), _settings,
+            _boxService, _confidentialAccessService, new WeakReferenceMessenger());
+        card.Parent = parent;
+        return parent;
+    }
+
+    [Fact]
+    public async Task ToggleExpandedCommand_ProtectedAndLocked_AuthSucceeds_ExpandsAndLoadsPrayers()
+    {
+        var card = new PrayerCard { Id = 21, Title = "Secret", ProtectionMode = CardProtectionMode.LockedVisible };
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        _confidentialAccessService.AuthenticateAsync(Arg.Any<string>()).Returns(true);
+        var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
+        CreateParentForExpandTests(sut);
+        _prayerService.GetPrayersByCardAsync(21).Returns(new List<Prayer>());
+
+        await ((IAsyncRelayCommand)sut.ToggleExpandedCommand).ExecuteAsync(null);
+
+        await _confidentialAccessService.Received(1).AuthenticateAsync(Arg.Any<string>());
+        Assert.True(sut.IsExpanded);
+        await _prayerService.Received(1).GetPrayersByCardAsync(21);
+    }
+
+    [Fact]
+    public async Task ToggleExpandedCommand_ProtectedAndLocked_AuthDenied_DoesNotExpandOrLoad()
+    {
+        var card = new PrayerCard { Id = 22, Title = "Secret", ProtectionMode = CardProtectionMode.LockedVisible };
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        _confidentialAccessService.AuthenticateAsync(Arg.Any<string>()).Returns(false);
+        var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
+        CreateParentForExpandTests(sut);
+
+        await ((IAsyncRelayCommand)sut.ToggleExpandedCommand).ExecuteAsync(null);
+
+        await _confidentialAccessService.Received(1).AuthenticateAsync(Arg.Any<string>());
+        Assert.False(sut.IsExpanded);
+        await _prayerService.DidNotReceive().GetPrayersByCardAsync(Arg.Any<int>());
+    }
+
+    [Fact]
+    public async Task ToggleExpandedCommand_Unprotected_ExpandsWithNoAuthCall()
+    {
+        var card = new PrayerCard { Id = 23, Title = "Open", ProtectionMode = CardProtectionMode.None };
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
+        CreateParentForExpandTests(sut);
+        _prayerService.GetPrayersByCardAsync(23).Returns(new List<Prayer>());
+
+        await ((IAsyncRelayCommand)sut.ToggleExpandedCommand).ExecuteAsync(null);
+
+        await _confidentialAccessService.DidNotReceive().AuthenticateAsync(Arg.Any<string>());
+        Assert.True(sut.IsExpanded);
+    }
+
+    [Fact]
+    public async Task ToggleExpandedCommand_ProtectedButAlreadyUnlocked_ExpandsWithNoAuthPrompt()
+    {
+        var card = new PrayerCard { Id = 24, Title = "Secret", ProtectionMode = CardProtectionMode.LockedVisible };
+        _confidentialAccessService.IsSessionUnlocked.Returns(true);
+        var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
+        CreateParentForExpandTests(sut);
+        _prayerService.GetPrayersByCardAsync(24).Returns(new List<Prayer>());
+
+        await ((IAsyncRelayCommand)sut.ToggleExpandedCommand).ExecuteAsync(null);
+
+        await _confidentialAccessService.DidNotReceive().AuthenticateAsync(Arg.Any<string>());
+        Assert.True(sut.IsExpanded);
+    }
+
+    [Fact]
+    public async Task ToggleExpandedCommand_ProtectedAndLocked_Collapsing_DoesNotPromptAuth()
+    {
+        // Collapse direction never reveals new content — no gate should fire even
+        // though the card is effectively protected and the session is locked.
+        var card = new PrayerCard { Id = 25, Title = "Secret", ProtectionMode = CardProtectionMode.LockedVisible };
+        _confidentialAccessService.IsSessionUnlocked.Returns(true); // unlocked only to seed the expand
+        var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
+        var parent = CreateParentForExpandTests(sut);
+        _prayerService.GetPrayersByCardAsync(25).Returns(new List<Prayer>());
+        await ((IAsyncRelayCommand)sut.ToggleExpandedCommand).ExecuteAsync(null); // expand first
+        Assert.True(sut.IsExpanded);
+
+        // Now lock the session and collapse — collapse must not gate.
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        _confidentialAccessService.ClearReceivedCalls();
+
+        await ((IAsyncRelayCommand)sut.ToggleExpandedCommand).ExecuteAsync(null);
+
+        await _confidentialAccessService.DidNotReceive().AuthenticateAsync(Arg.Any<string>());
+        Assert.False(sut.IsExpanded);
     }
 }

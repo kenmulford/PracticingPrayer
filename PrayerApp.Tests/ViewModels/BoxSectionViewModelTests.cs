@@ -23,7 +23,8 @@ public class BoxSectionViewModelTests
             Substitute.For<INavigationService>(),
             Substitute.For<IAccessibilityService>(),
             Substitute.For<IBoxService>(),
-            Substitute.For<ISettings>());
+            Substitute.For<ISettings>(),
+            Substitute.For<IConfidentialAccessService>());
 
     // ── Construction ──────────────────────────────────────────────────
 
