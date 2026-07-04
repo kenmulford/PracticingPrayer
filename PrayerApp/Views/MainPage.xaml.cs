@@ -43,6 +43,12 @@ public partial class MainPage : ContentPage
         {
             Command = new Command(async () => await LaunchPrayerTimeAsync())
         });
+
+        // Issue #156: single-column (accessibility-scale) mirror of the same card.
+        LastPrayedCardAccessibility.GestureRecognizers.Add(new TapGestureRecognizer
+        {
+            Command = new Command(async () => await LaunchPrayerTimeAsync())
+        });
     }
 
     private async Task LaunchPrayerTimeAsync()

@@ -5,6 +5,7 @@
              xmlns:models="clr-namespace:PrayerApp.Models"
              xmlns:onboarding="clr-namespace:PrayerApp.Views.Onboarding"
              xmlns:shared="clr-namespace:PrayerApp.Views.Shared"
+             xmlns:behaviors="clr-namespace:PrayerApp.Behaviors"
              x:DataType="viewModels:HomeViewModel"
              x:Class="PrayerApp.Views.MainPage"
              SafeAreaEdges="Container">
@@ -30,8 +31,19 @@
                             HorizontalOptions="Fill" />
                 </Grid>
 
-                <!-- 2x2 metric grid; row 2 holds a full-width "answered on this date" card -->
-                <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="10">
+                <!-- 2x2 metric grid; row 2 holds a full-width "answered on this date" card.
+                     Issue #156: at large Dynamic Type / accessibility font sizes the 2-col
+                     grid clips (numbers cut off, no reflow). AccessibilityScaleBehavior
+                     (mirrors the #154 ChipStripHeightBehavior iOS content-size-category
+                     detection pattern) exposes IsAccessibilityScale; this grid and the
+                     parallel single-column MetricStackAccessibility below are toggled by
+                     IsVisible off that one flag — neither layout mutates Grid.Row/Column
+                     live in code-behind. iOS-only; Android's grid is unchanged. -->
+                <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="10"
+                      IsVisible="{Binding Source={x:Reference AccessibilityScale}, Path=IsAccessibilityScale, Converter={StaticResource InverseBool}, x:DataType=behaviors:AccessibilityScaleBehavior}">
+                    <Grid.Behaviors>
+                        <behaviors:AccessibilityScaleBehavior x:Name="AccessibilityScale" />
+                    </Grid.Behaviors>
 
                     <!-- Active Cards metric -->
                     <Border Grid.Row="0" Grid.Column="0"
@@ -176,6 +188,157 @@
                     </Border>
 
                 </Grid>
+
+                <!-- Issue #156: single-column reflow of the metric tiles above, shown
+                     instead of the 2-col grid at accessibility Dynamic Type sizes.
+                     Same reading order as the grid: Active Cards, Unanswered Prayers,
+                     Last Prayed, Overdue, Answered-on-this-date. AutomationIds carry an
+                     "_A11yScale" suffix to stay distinct from the grid's tiles — the two
+                     layouts are mutually exclusive via IsVisible, never both on-screen. -->
+                <VerticalStackLayout x:Name="MetricStackAccessibility" Spacing="10"
+                                      IsVisible="{Binding Source={x:Reference AccessibilityScale}, Path=IsAccessibilityScale, x:DataType=behaviors:AccessibilityScaleBehavior}">
+
+                    <!-- Active Cards metric -->
+                    <Border AutomationId="Home_Metric_Cards_A11yScale"
+                            SemanticProperties.Description="{Binding ActiveCardsAccessible}"
+                            Style="{StaticResource PrayerCardBorder}" Padding="14,12">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding GoToCardsCommand}" />
+                        </Border.GestureRecognizers>
+                        <VerticalStackLayout HorizontalOptions="Center" Spacing="2">
+                            <Label Style="{StaticResource MetricTileLabel}"
+                                   Text="{Binding ActiveCardLabel}" />
+                            <Label Style="{StaticResource MetricTileNumber}"
+                                   Text="{Binding ActiveCardCount}"
+                                   IsVisible="{Binding HasActiveCards}" />
+                            <Label Style="{StaticResource MetricTileEmpty}"
+                                   Text="No active cards"
+                                   IsVisible="{Binding HasActiveCards, Converter={StaticResource InverseBool}}" />
+                            <Label Style="{StaticResource MetricTileTapHint}"
+                                   Text="{Binding ActiveCardTapHint}" />
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- Unanswered Prayers metric -->
+                    <Border AutomationId="Home_Metric_Unanswered_A11yScale"
+                            SemanticProperties.Description="{Binding UnansweredAccessible}"
+                            Style="{StaticResource PrayerCardBorder}" Padding="14,12">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding GoToPrayersCommand}" />
+                        </Border.GestureRecognizers>
+                        <VerticalStackLayout HorizontalOptions="Center" Spacing="2">
+                            <Label Style="{StaticResource MetricTileLabel}"
+                                   Text="{Binding UnansweredLabel}" />
+                            <Label Style="{StaticResource MetricTileNumber}"
+                                   Text="{Binding UnansweredCount}"
+                                   IsVisible="{Binding HasUnanswered}" />
+                            <Label Style="{StaticResource MetricTileEmpty}"
+                                   Text="No prayers yet"
+                                   IsVisible="{Binding HasUnanswered, Converter={StaticResource InverseBool}}" />
+                            <Label Style="{StaticResource MetricTileTapHint}"
+                                   Text="{Binding UnansweredTapHint}" />
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- Last Prayed date metric — also launches Prayer Time; gesture wired
+                         in code-behind (MainPage.xaml.cs) same as the grid's LastPrayedCard,
+                         since there is no LastPrayed VM command to bind to. -->
+                    <Border x:Name="LastPrayedCardAccessibility"
+                            AutomationId="Home_Metric_LastPrayed_A11yScale"
+                            SemanticProperties.Description="{Binding LastPrayedAccessible}"
+                            Style="{StaticResource PrayerCardBorder}" Padding="14,12">
+                        <VerticalStackLayout HorizontalOptions="Center" Spacing="0">
+                            <Label Style="{StaticResource MetricTileLabel}"
+                                   Text="Last Prayed"
+                                   Margin="0,0,0,4" />
+                            <Label Text="{Binding LastPrayedMonth}"
+                                   IsVisible="{Binding HasLastPrayed}"
+                                   FontSize="{StaticResource FontTiny}" FontAttributes="Bold" HorizontalOptions="Center"
+                                   AutomationProperties.IsInAccessibleTree="False"
+                                   TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}" />
+                            <Label Text="{Binding LastPrayedDay}"
+                                   IsVisible="{Binding HasLastPrayed}"
+                                   FontSize="{StaticResource FontHero}" FontAttributes="Bold" HorizontalOptions="Center"
+                                   AutomationProperties.IsInAccessibleTree="False"
+                                   TextColor="{AppThemeBinding Light={StaticResource Tertiary}, Dark={StaticResource TextPrimaryDark}}" />
+                            <Label Style="{StaticResource MetricTileEmpty}"
+                                   Text="Not yet"
+                                   IsVisible="{Binding HasLastPrayed, Converter={StaticResource InverseBool}}" />
+                            <Label Style="{StaticResource MetricTileTapHint}"
+                                   Text="{Binding LastPrayedTapHint}" />
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- Overdue metric (gold highlight when has overdue) -->
+                    <Border AutomationId="Home_Metric_Overdue_A11yScale"
+                            SemanticProperties.Description="{Binding OverdueAccessible}"
+                            Style="{StaticResource PrayerCardBorder}" Padding="14,12">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding GoToOverdueCommand}" />
+                        </Border.GestureRecognizers>
+                        <Border.Triggers>
+                            <DataTrigger TargetType="Border" Binding="{Binding HasOverdue}" Value="True">
+                                <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource OverdueLight}, Dark={StaticResource OverdueDark}}" />
+                                <Setter Property="Stroke" Value="{AppThemeBinding Light={StaticResource WarmGold}, Dark={StaticResource WarmGoldDark}}" />
+                                <!-- Issue #33 P1: PrayerCardBorder style flipped StrokeThickness default to 0.
+                                     This DataTrigger writes Stroke; explicit StrokeThickness keeps the warm-gold
+                                     overdue-state border visible. -->
+                                <Setter Property="StrokeThickness" Value="1.5" />
+                            </DataTrigger>
+                        </Border.Triggers>
+                        <VerticalStackLayout HorizontalOptions="Center" Spacing="2">
+                            <Label Style="{StaticResource MetricTileLabel}"
+                                   Text="Overdue" />
+                            <Label Text="{Binding OverdueCount}"
+                                   IsVisible="{Binding HasOverdue}"
+                                   FontSize="{StaticResource FontDisplayLg}" FontAttributes="Bold" HorizontalOptions="Center"
+                                   AutomationProperties.IsInAccessibleTree="False"
+                                   TextColor="{AppThemeBinding Light={StaticResource WarmGold}, Dark={StaticResource WarmGoldDark}}" />
+                            <VerticalStackLayout IsVisible="{Binding HasOverdue, Converter={StaticResource InverseBool}}"
+                                                 HorizontalOptions="Center" Spacing="0"
+                                                 AutomationProperties.IsInAccessibleTree="False">
+                                <Label Text="&#x2713;" FontSize="{StaticResource FontHeading}" HorizontalOptions="Center"
+                                       TextColor="{AppThemeBinding Light={StaticResource SuccessGreen}, Dark={StaticResource SuccessGreenDark}}" />
+                                <Label Text="All requests have been recently prayed for." FontSize="{StaticResource FontCaption}" HorizontalOptions="Center"
+                                       TextColor="{AppThemeBinding Light={StaticResource Gray400}, Dark={StaticResource TextMutedDark}}" />
+                            </VerticalStackLayout>
+                            <Label Style="{StaticResource MetricTileTapHint}"
+                                   Text="View in Prayers &#x2192;"
+                                   IsVisible="{Binding HasOverdue}" />
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- Answered prayers on this date in prior years (hidden when empty) -->
+                    <Border AutomationId="Home_Card_AnsweredOnThisDate_A11yScale"
+                            IsVisible="{Binding HasAnsweredOnThisDate}"
+                            SemanticProperties.Description="{Binding AnsweredOnThisDateAccessible}"
+                            Style="{StaticResource PrayerCardBorder}" Padding="14,12">
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="{Binding AnsweredOnThisDateHeader}"
+                                   FontSize="{StaticResource FontSmall}"
+                                   FontAttributes="Bold"
+                                   HorizontalOptions="Center"
+                                   HorizontalTextAlignment="Center"
+                                   AutomationProperties.IsInAccessibleTree="False"
+                                   TextColor="{AppThemeBinding Light={StaticResource Tertiary}, Dark={StaticResource TextPrimaryDark}}" />
+                            <VerticalStackLayout BindableLayout.ItemsSource="{Binding AnsweredOnThisDate}"
+                                                 Spacing="2"
+                                                 Margin="0,4,0,0"
+                                                 AutomationProperties.IsInAccessibleTree="False">
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate x:DataType="models:Prayer">
+                                        <Label Text="{Binding Title}"
+                                               FontSize="{StaticResource FontSmall}"
+                                               HorizontalOptions="Center"
+                                               HorizontalTextAlignment="Center"
+                                               TextColor="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource TextMutedDark}}" />
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
+                            </VerticalStackLayout>
+                        </VerticalStackLayout>
+                    </Border>
+
+                </VerticalStackLayout>
 
             </VerticalStackLayout>
         </ScrollView>
