@@ -28,4 +28,15 @@ public interface IConfidentialAccessService
 
     /// <summary>Locks the current session — the next protected access requires re-authentication.</summary>
     void RelockSession();
+
+    /// <summary>
+    /// Ensures a confidential-access PIN is configured, prompting first-enable-protection PIN
+    /// setup (<see cref="Confidential.IPinPrompt.PromptSetPinAsync"/>) when none is stored yet.
+    /// No-ops (and returns true) when a PIN is already configured. Used by backup restore
+    /// (issue #258) to set up the auth gate on a new device before its first access to
+    /// newly-restored protected cards — unlike <see cref="AuthenticateAsync"/>, this never tries
+    /// biometrics and never unlocks the session; it only guarantees a PIN record exists.
+    /// </summary>
+    /// <returns>True if a PIN is (now) configured; false if the user canceled setup.</returns>
+    Task<bool> EnsurePinConfiguredAsync();
 }

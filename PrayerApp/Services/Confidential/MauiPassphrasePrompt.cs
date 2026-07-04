@@ -10,12 +10,16 @@ namespace PrayerApp.Services.Confidential;
 /// </summary>
 public class MauiPassphrasePrompt : IPassphrasePrompt
 {
-    public async Task<string?> PromptForExportPassphraseAsync()
+    public Task<string?> PromptForExportPassphraseAsync() => ShowAsync(isImporting: false);
+
+    public Task<string?> PromptForImportPassphraseAsync() => ShowAsync(isImporting: true);
+
+    private static async Task<string?> ShowAsync(bool isImporting)
     {
         var page = Application.Current?.Windows.FirstOrDefault()?.Page;
         if (page is null) return null;
 
-        var popup = new PassphrasePromptPopup();
+        var popup = new PassphrasePromptPopup(isImporting);
         await page.ShowPopupAsync(popup, null, CancellationToken.None);
 
         return popup.EnteredPassphrase;

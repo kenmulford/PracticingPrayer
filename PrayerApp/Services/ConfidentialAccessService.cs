@@ -47,6 +47,20 @@ public class ConfidentialAccessService : IConfidentialAccessService
         IsSessionUnlocked = false;
     }
 
+    public async Task<bool> EnsurePinConfiguredAsync()
+    {
+        var storedRecord = await _secureStore.GetAsync(PinRecordKey);
+        if (!string.IsNullOrEmpty(storedRecord))
+            return true; // already configured — no-op
+
+        var newPin = await _pinPrompt.PromptSetPinAsync();
+        if (newPin is null)
+            return false; // user canceled setup
+
+        await _secureStore.SetAsync(PinRecordKey, PinHasher.Hash(newPin));
+        return true;
+    }
+
     private async Task<bool> AuthenticateWithPinAsync()
     {
         var storedRecord = await _secureStore.GetAsync(PinRecordKey);
