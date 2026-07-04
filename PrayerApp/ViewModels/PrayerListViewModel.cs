@@ -26,7 +26,14 @@ namespace PrayerApp.ViewModels
         private readonly ISettings _settings;
         private readonly IPrayerSelectionService _selectionService;
         private readonly IMessenger _messenger;
+        private readonly IBoxService _boxService;
+        private readonly IConfidentialAccessService _confidentialAccessService;
         private Dictionary<int, string> _cardTitleLookup = new();
+        // Issue #255: cardId → owning PrayerCard, refreshed each SyncAsync alongside
+        // _cardTitleLookup, so ApplyFilter can resolve GetEffectiveProtectionMode without
+        // an extra per-filter service round-trip.
+        private Dictionary<int, PrayerCard> _cardLookup = new();
+        private IReadOnlyList<CardBox> _boxes = Array.Empty<CardBox>();
         private CancellationTokenSource? _filterAnnounceCts;
 
         private bool _isLoading = true;
@@ -125,7 +132,8 @@ namespace PrayerApp.ViewModels
 
         public PrayerListViewModel(IPrayerService prayerService, ICardService cardService, ITagService tagService,
             INavigationService navigationService, IAccessibilityService accessibilityService, ISettings settings,
-            IPrayerSelectionService selectionService, IMessenger messenger)
+            IPrayerSelectionService selectionService, IMessenger messenger,
+            IBoxService boxService, IConfidentialAccessService confidentialAccessService)
         {
             _prayerService = prayerService;
             _cardService   = cardService;
@@ -135,6 +143,8 @@ namespace PrayerApp.ViewModels
             _settings = settings;
             _selectionService = selectionService;
             _messenger = messenger;
+            _boxService = boxService;
+            _confidentialAccessService = confidentialAccessService;
 
             // Any change to the backing store re-runs the filter (suppressed during bulk loads)
             AllPrayers.CollectionChanged += (_, _) => { if (!_suppressFilter) ApplyFilter(); };
@@ -169,7 +179,9 @@ namespace PrayerApp.ViewModels
             IPlatformApplication.Current!.Services.GetRequiredService<IAccessibilityService>(),
             IPlatformApplication.Current!.Services.GetRequiredService<ISettings>(),
             IPlatformApplication.Current!.Services.GetRequiredService<IPrayerSelectionService>(),
-            IPlatformApplication.Current!.Services.GetRequiredService<IMessenger>())
+            IPlatformApplication.Current!.Services.GetRequiredService<IMessenger>(),
+            IPlatformApplication.Current!.Services.GetRequiredService<IBoxService>(),
+            IPlatformApplication.Current!.Services.GetRequiredService<IConfidentialAccessService>())
         { }
 
         public async Task SyncAsync()
@@ -185,8 +197,15 @@ namespace PrayerApp.ViewModels
             _suppressFilter = true;
             try
             {
-                var cards = await _cardService.GetCardsAsync();
+                var cardsTask = _cardService.GetCardsAsync();
+                var boxesTask = _boxService.GetBoxesAsync();
+                await Task.WhenAll(cardsTask, boxesTask);
+                var cards = cardsTask.Result;
+                _boxes = boxesTask.Result;
                 _cardTitleLookup = cards.ToDictionary(c => c.Id, c => c.Title ?? string.Empty);
+                // Issue #255: cardId → PrayerCard, so ApplyFilter can resolve
+                // GetEffectiveProtectionMode(card, box) per prayer without a service call.
+                _cardLookup = cards.ToDictionary(c => c.Id);
 
                 _prayerList = (await _prayerService.GetAllPrayersAsync()).ToList();
                 _requestTagIds = await BuildRequestTagLookupAsync();
@@ -314,6 +333,7 @@ namespace PrayerApp.ViewModels
                         // Refresh card lookup in case the prayer moved to a different card
                         var cards = await _cardService.GetCardsAsync();
                         _cardTitleLookup = cards.ToDictionary(c => c.Id, c => c.Title ?? string.Empty);
+                        _cardLookup = cards.ToDictionary(c => c.Id);
 
                         // Update all list-visible properties from the awaited DB load
                         // (replaces fire-and-forget Reload which raced with ApplyFilter)
@@ -388,6 +408,17 @@ namespace PrayerApp.ViewModels
         private void ApplyFilter()
         {
             IEnumerable<PrayerRequestDetailViewModel> result = AllPrayers;
+
+            // Issue #255: drop effectively-protected prayers from the list while locked.
+            // Resolves each prayer's owning card (+ that card's box, for box-cascaded
+            // protection) via the lookups refreshed in SyncCoreAsync — no extra service
+            // call per filter pass.
+            if (!_confidentialAccessService.IsSessionUnlocked)
+            {
+                result = result.Where(p =>
+                    !_cardLookup.TryGetValue(p.PrayerCardId, out var owningCard) ||
+                    !ProtectionPolicy.IsAccessBlocked(owningCard, _boxes.FirstOrDefault(b => b.Id == owningCard.BoxId), isSessionUnlocked: false));
+            }
 
             // 1. Status filter
             result = StatusFilter switch

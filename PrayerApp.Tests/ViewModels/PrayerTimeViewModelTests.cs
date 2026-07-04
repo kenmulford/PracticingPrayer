@@ -20,6 +20,11 @@ public class PrayerTimeViewModelTests
     private readonly IPrayerSelectionService _selectionService = Substitute.For<IPrayerSelectionService>();
     private readonly IDispatcher _dispatcher = Substitute.For<IDispatcher>();
     private readonly IDispatcherTimer _autoTimer = Substitute.For<IDispatcherTimer>();
+    private readonly IBoxService _boxService = Substitute.For<IBoxService>();
+    // Issue #255: Prayer Time always re-authenticates when the session includes a
+    // protected prayer, regardless of IsSessionUnlocked. Fake mirrors #251/#253/#254 —
+    // defaults to locked via NSubstitute's bool default.
+    private readonly IConfidentialAccessService _confidentialAccessService = Substitute.For<IConfidentialAccessService>();
 
     public PrayerTimeViewModelTests()
     {
@@ -27,12 +32,13 @@ public class PrayerTimeViewModelTests
         // Use a non-zero ID so cards with BoxId=0 are not incorrectly treated as archived.
         _settings.ArchivedFolderId.Returns(999);
         _dispatcher.CreateTimer().Returns(_autoTimer);
+        _boxService.GetBoxesAsync().Returns(new List<CardBox>().AsReadOnly());
     }
 
     private PrayerTimeViewModel CreateSut() =>
         new(_prayerService, _cardService, _tagService, _interactionService,
             _navigationService, _accessibilityService, _notificationService, _settings,
-            _selectionService, _dispatcher);
+            _selectionService, _dispatcher, _boxService, _confidentialAccessService);
 
     // ── Construction ──────────────────────────────────────────────────
 
@@ -384,5 +390,139 @@ public class PrayerTimeViewModelTests
 
         _dispatcher.Received(1).CreateTimer();
         _autoTimer.Received(1).Start();
+    }
+
+    // ── Issue #255: Prayer Time stricter re-auth gate ─────────────────────
+    // Unlike the search/share gates (which skip auth when IsSessionUnlocked is already
+    // true), Prayer Time is an exposed landscape view that always re-authenticates when
+    // the session includes any effectively-protected prayer — even if the confidential
+    // session is already unlocked. On deny, the protected prayers are excluded and the
+    // session still runs with the remaining unprotected prayers. On success, they're
+    // included.
+
+    private static PrayerCard ProtectedCard(int id, string title) =>
+        new() { Id = id, Title = title, ProtectionMode = CardProtectionMode.LockedVisible };
+
+    [Fact]
+    public async Task LoadEntries_ContainsProtectedPrayer_ReAuthenticatesEvenWhenAlreadyUnlocked()
+    {
+        _cardService.GetCardsAsync().Returns(new List<PrayerCard>
+        {
+            ProtectedCard(1, "Secret")
+        }.AsReadOnly());
+        _prayerService.GetAllActivePrayersAsync().Returns(new List<Prayer>
+        {
+            new() { Id = 100, Title = "Prayer A", PrayerCardId = 1 }
+        }.AsReadOnly());
+        _confidentialAccessService.IsSessionUnlocked.Returns(true); // already unlocked
+        _confidentialAccessService.AuthenticateAsync(Arg.Any<string>()).Returns(true);
+
+        var sut = CreateSut();
+        sut.ApplyQueryAttributes(new Dictionary<string, object> { { "scope", "all" } });
+        await Task.Delay(200);
+
+        // Stricter gate: re-auths regardless of already-unlocked session.
+        await _confidentialAccessService.Received(1).AuthenticateAsync(Arg.Any<string>());
+        var realEntries = sut.Entries.Where(e => !e.IsSentinel).ToList();
+        Assert.Single(realEntries);
+        Assert.Equal(100, realEntries[0].PrayerId);
+    }
+
+    [Fact]
+    public async Task LoadEntries_ContainsProtectedPrayer_AuthDenied_ExcludesProtectedButRunsWithRest()
+    {
+        _cardService.GetCardsAsync().Returns(new List<PrayerCard>
+        {
+            ProtectedCard(1, "Secret"),
+            new() { Id = 2, Title = "Open", ProtectionMode = CardProtectionMode.None }
+        }.AsReadOnly());
+        _prayerService.GetAllActivePrayersAsync().Returns(new List<Prayer>
+        {
+            new() { Id = 100, Title = "Protected Prayer", PrayerCardId = 1 },
+            new() { Id = 200, Title = "Open Prayer", PrayerCardId = 2 }
+        }.AsReadOnly());
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        _confidentialAccessService.AuthenticateAsync(Arg.Any<string>()).Returns(false);
+
+        var sut = CreateSut();
+        sut.ApplyQueryAttributes(new Dictionary<string, object> { { "scope", "all" } });
+        await Task.Delay(200);
+
+        var realEntries = sut.Entries.Where(e => !e.IsSentinel).ToList();
+        Assert.Single(realEntries);
+        Assert.Equal(200, realEntries[0].PrayerId);
+        Assert.False(sut.HasCompleted); // session still runs with the remaining prayer
+    }
+
+    [Fact]
+    public async Task LoadEntries_ContainsProtectedPrayer_AuthSucceeds_IncludesProtected()
+    {
+        _cardService.GetCardsAsync().Returns(new List<PrayerCard>
+        {
+            ProtectedCard(1, "Secret"),
+            new() { Id = 2, Title = "Open", ProtectionMode = CardProtectionMode.None }
+        }.AsReadOnly());
+        _prayerService.GetAllActivePrayersAsync().Returns(new List<Prayer>
+        {
+            new() { Id = 100, Title = "Protected Prayer", PrayerCardId = 1 },
+            new() { Id = 200, Title = "Open Prayer", PrayerCardId = 2 }
+        }.AsReadOnly());
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        _confidentialAccessService.AuthenticateAsync(Arg.Any<string>()).Returns(true);
+
+        var sut = CreateSut();
+        sut.ApplyQueryAttributes(new Dictionary<string, object> { { "scope", "all" } });
+        await Task.Delay(200);
+
+        var realEntries = sut.Entries.Where(e => !e.IsSentinel).ToList();
+        Assert.Equal(2, realEntries.Count);
+        Assert.Contains(realEntries, e => e.PrayerId == 100);
+        Assert.Contains(realEntries, e => e.PrayerId == 200);
+    }
+
+    [Fact]
+    public async Task LoadEntries_NoProtectedPrayers_NeverPromptsAuth()
+    {
+        _cardService.GetCardsAsync().Returns(new List<PrayerCard>
+        {
+            new() { Id = 1, Title = "Open", ProtectionMode = CardProtectionMode.None }
+        }.AsReadOnly());
+        _prayerService.GetAllActivePrayersAsync().Returns(new List<Prayer>
+        {
+            new() { Id = 100, Title = "Open Prayer", PrayerCardId = 1 }
+        }.AsReadOnly());
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+
+        var sut = CreateSut();
+        sut.ApplyQueryAttributes(new Dictionary<string, object> { { "scope", "all" } });
+        await Task.Delay(200);
+
+        await _confidentialAccessService.DidNotReceive().AuthenticateAsync(Arg.Any<string>());
+        var realEntries = sut.Entries.Where(e => !e.IsSentinel).ToList();
+        Assert.Single(realEntries);
+    }
+
+    [Fact]
+    public async Task LoadEntries_ProtectedPrayerViaBoxCascade_ReAuthenticates()
+    {
+        var box = new CardBox { Id = 7, Name = "Family", ProtectAllCards = true, CardProtectionMode = CardProtectionMode.LockedVisible };
+        _boxService.GetBoxesAsync().Returns(new List<CardBox> { box }.AsReadOnly());
+        _cardService.GetCardsAsync().Returns(new List<PrayerCard>
+        {
+            new() { Id = 1, Title = "Cascaded", ProtectionMode = CardProtectionMode.None, BoxId = 7 }
+        }.AsReadOnly());
+        _prayerService.GetAllActivePrayersAsync().Returns(new List<Prayer>
+        {
+            new() { Id = 100, Title = "Prayer", PrayerCardId = 1 }
+        }.AsReadOnly());
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        _confidentialAccessService.AuthenticateAsync(Arg.Any<string>()).Returns(true);
+
+        var sut = CreateSut();
+        sut.ApplyQueryAttributes(new Dictionary<string, object> { { "scope", "all" } });
+        await Task.Delay(200);
+
+        await _confidentialAccessService.Received(1).AuthenticateAsync(Arg.Any<string>());
+        Assert.Single(sut.Entries.Where(e => !e.IsSentinel));
     }
 }

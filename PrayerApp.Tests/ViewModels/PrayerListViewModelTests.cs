@@ -18,6 +18,12 @@ public class PrayerListViewModelTests
     private readonly ISettings _settings = Substitute.For<ISettings>();
     private readonly IPrayerSelectionService _selectionService = Substitute.For<IPrayerSelectionService>();
     private readonly IMessenger _messenger = new WeakReferenceMessenger();
+    private readonly IBoxService _boxService = Substitute.For<IBoxService>();
+    // Issue #255: gates search-result exclusion of effectively-protected prayers while
+    // locked. Fake mirrors the #251/#253/#254 seam-faking approach — defaults to locked
+    // (IsSessionUnlocked=false) so existing tests exercise the unprotected path unless a
+    // card explicitly sets ProtectionMode.
+    private readonly IConfidentialAccessService _confidentialAccessService = Substitute.For<IConfidentialAccessService>();
 
     // Extra mocks needed only to build stub prayer rows via the internal test-only
     // PrayerRequestDetailViewModel ctor (the production (Prayer) ctor chains through
@@ -25,15 +31,22 @@ public class PrayerListViewModelTests
     private readonly IOnboardingService _onboardingService = Substitute.For<IOnboardingService>();
     private readonly INotificationService _notificationService = Substitute.For<INotificationService>();
 
+    public PrayerListViewModelTests()
+    {
+        _boxService.GetBoxesAsync().Returns(new List<CardBox>().AsReadOnly());
+    }
+
     private PrayerListViewModel CreateSut() =>
-        new(_prayerService, _cardService, _tagService, _navigationService, _accessibilityService, _settings, _selectionService, _messenger)
+        new(_prayerService, _cardService, _tagService, _navigationService, _accessibilityService, _settings,
+            _selectionService, _messenger, _boxService, _confidentialAccessService)
         {
             PrayerRowFactory = BuildStubPrayerRowVm
         };
 
     private PrayerRequestDetailViewModel BuildStubPrayerRowVm(Prayer p)
         => new(p, _prayerService, _tagService, _cardService, _onboardingService,
-            _notificationService, _navigationService, _accessibilityService, _settings);
+            _notificationService, _navigationService, _accessibilityService, _settings,
+            _boxService, _confidentialAccessService);
 
     // ── Construction ──────────────────────────────────────────────────
 
@@ -360,5 +373,60 @@ public class PrayerListViewModelTests
         // Navigating away preserves the underlying page's filter state.
         Assert.Equal(FilterStatus.All, sut.StatusFilter);
         Assert.Equal("Keep", sut.SearchText);
+    }
+
+    // ── Issue #255 — search exclusion of effectively-protected prayers while locked ──
+
+    [Fact]
+    public async Task ApplyFilter_ProtectedPrayer_SessionLocked_ExcludedFromFilteredView()
+    {
+        var protectedCard = new PrayerCard { Id = 1, Title = "Secret", ProtectionMode = CardProtectionMode.LockedVisible };
+        var openCard = new PrayerCard { Id = 2, Title = "Open", ProtectionMode = CardProtectionMode.None };
+        SetupSync(new[]
+        {
+            new Prayer { Id = 100, Title = "Protected Prayer", PrayerCardId = 1, IsAnswered = false },
+            new Prayer { Id = 200, Title = "Open Prayer", PrayerCardId = 2, IsAnswered = false }
+        }, cards: new[] { protectedCard, openCard });
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+
+        var sut = CreateSut();
+        await sut.SyncAsync();
+
+        Assert.DoesNotContain(sut.FilteredPrayers, p => p.Id == 100);
+        Assert.Contains(sut.FilteredPrayers, p => p.Id == 200);
+    }
+
+    [Fact]
+    public async Task ApplyFilter_ProtectedPrayer_SessionUnlocked_IncludedInFilteredView()
+    {
+        var protectedCard = new PrayerCard { Id = 1, Title = "Secret", ProtectionMode = CardProtectionMode.LockedVisible };
+        SetupSync(new[]
+        {
+            new Prayer { Id = 100, Title = "Protected Prayer", PrayerCardId = 1, IsAnswered = false }
+        }, cards: new[] { protectedCard });
+        _confidentialAccessService.IsSessionUnlocked.Returns(true);
+
+        var sut = CreateSut();
+        await sut.SyncAsync();
+
+        Assert.Contains(sut.FilteredPrayers, p => p.Id == 100);
+    }
+
+    [Fact]
+    public async Task ApplyFilter_ProtectedPrayerViaBoxCascade_SessionLocked_Excluded()
+    {
+        var box = new CardBox { Id = 7, Name = "Family", ProtectAllCards = true, CardProtectionMode = CardProtectionMode.Hidden };
+        _boxService.GetBoxesAsync().Returns(new List<CardBox> { box }.AsReadOnly());
+        var card = new PrayerCard { Id = 1, Title = "Cascaded", ProtectionMode = CardProtectionMode.None, BoxId = 7 };
+        SetupSync(new[]
+        {
+            new Prayer { Id = 100, Title = "Prayer", PrayerCardId = 1, IsAnswered = false }
+        }, cards: new[] { card });
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+
+        var sut = CreateSut();
+        await sut.SyncAsync();
+
+        Assert.DoesNotContain(sut.FilteredPrayers, p => p.Id == 100);
     }
 }

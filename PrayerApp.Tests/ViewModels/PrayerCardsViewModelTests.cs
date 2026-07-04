@@ -1463,7 +1463,8 @@ public class PrayerCardsViewModelTests
 
     private PrayerRequestDetailViewModel BuildStubPrayerRowVm(Prayer p)
         => new(p, _prayerService, _tagService, _cardService, _onboardingService,
-            _notificationService, _navigationService, _accessibilityService, _settings);
+            _notificationService, _navigationService, _accessibilityService, _settings,
+            _boxService, _confidentialAccessService);
 
     private void SetupBug78EmptySync(int cardId, params Prayer[] prayers)
     {
@@ -2335,6 +2336,100 @@ public class PrayerCardsViewModelTests
         // Unprotected card — relock has nothing to hide, so it stays expanded.
         Assert.Equal(5, sut.ExpandedCardId);
         Assert.True(cardVm.IsExpanded);
+    }
+
+    // ── Issue #255 — search exclusion of effectively-protected cards while locked ──
+    // Unlike #253's RebuildSections (which only excludes Hidden — LockedVisible cards
+    // stay in the list, masked), a search/tag filter must drop ALL effectively-protected
+    // cards (Hidden AND LockedVisible) while locked — a masked "Protected" row surfacing
+    // as a search hit would defeat the point of typing a search term.
+
+    [Fact]
+    public async Task ApplyFilter_SearchMatchesLockedVisibleCard_SessionLocked_ExcludedFromResults()
+    {
+        SetupSystemBoxes();
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        var protectedCard = new PrayerCard { Id = 3, Title = "Secret Diagnosis", BoxId = 0, ProtectionMode = CardProtectionMode.LockedVisible };
+        var openCard = new PrayerCard { Id = 4, Title = "Secret Recipe", BoxId = 0, ProtectionMode = CardProtectionMode.None };
+        _cardService.GetCardsAsync().Returns(new List<PrayerCard> { protectedCard, openCard }.AsReadOnly());
+        _tagService.GetTagsAsync().Returns(new List<PrayerTag>().AsReadOnly());
+        _prayerService.GetAllPrayersAsync().Returns(new List<Prayer>().AsReadOnly());
+        SetupDbMocks(new List<PrayerCardTag>());
+        var sut = CreateSut();
+        await sut.SyncAsync();
+
+        sut.SearchText = "Secret";
+
+        var visible = GetAllSectionMemberCards(sut);
+        Assert.DoesNotContain(visible, c => c.Id == 3);
+        Assert.Contains(visible, c => c.Id == 4);
+    }
+
+    [Fact]
+    public async Task ApplyFilter_SearchMatchesLockedVisibleCard_SessionUnlocked_IncludedInResults()
+    {
+        SetupSystemBoxes();
+        _confidentialAccessService.IsSessionUnlocked.Returns(true);
+        var protectedCard = new PrayerCard { Id = 3, Title = "Secret Diagnosis", BoxId = 0, ProtectionMode = CardProtectionMode.LockedVisible };
+        _cardService.GetCardsAsync().Returns(new List<PrayerCard> { protectedCard }.AsReadOnly());
+        _tagService.GetTagsAsync().Returns(new List<PrayerTag>().AsReadOnly());
+        _prayerService.GetAllPrayersAsync().Returns(new List<Prayer>().AsReadOnly());
+        SetupDbMocks(new List<PrayerCardTag>());
+        var sut = CreateSut();
+        await sut.SyncAsync();
+
+        sut.SearchText = "Secret";
+
+        Assert.Contains(GetAllSectionMemberCards(sut), c => c.Id == 3);
+    }
+
+    [Fact]
+    public async Task ApplyFilter_NoActiveFilter_SessionLocked_LockedVisibleCardStaysInDefaultList()
+    {
+        // Regression guard: clearing a search (or deselecting the last tag) while locked
+        // must NOT drop LockedVisible cards from the default (no-filter) list — that list
+        // must match RebuildSections' base exclusion (Hidden only), per #253. Only an
+        // ACTIVE filter applies the stricter "drop LockedVisible too" rule.
+        SetupSystemBoxes();
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        var lockedVisibleCard = new PrayerCard { Id = 3, Title = "Secret Diagnosis", BoxId = 0, ProtectionMode = CardProtectionMode.LockedVisible };
+        var hiddenCard = new PrayerCard { Id = 4, Title = "Hidden Secret", BoxId = 0, ProtectionMode = CardProtectionMode.Hidden };
+        _cardService.GetCardsAsync().Returns(new List<PrayerCard> { lockedVisibleCard, hiddenCard }.AsReadOnly());
+        _tagService.GetTagsAsync().Returns(new List<PrayerTag>().AsReadOnly());
+        _prayerService.GetAllPrayersAsync().Returns(new List<Prayer>().AsReadOnly());
+        SetupDbMocks(new List<PrayerCardTag>());
+        var sut = CreateSut();
+        await sut.SyncAsync();
+
+        // Set a search (excludes LockedVisible too), then clear it back to empty.
+        sut.SearchText = "Secret";
+        sut.SearchText = string.Empty;
+
+        var visible = GetAllSectionMemberCards(sut);
+        Assert.Contains(visible, c => c.Id == 3); // LockedVisible stays, masked
+        Assert.DoesNotContain(visible, c => c.Id == 4); // Hidden stays excluded
+    }
+
+    [Fact]
+    public async Task ApplyFilter_TagToggledOffAfterOn_SessionLocked_LockedVisibleCardStaysInDefaultList()
+    {
+        SetupSystemBoxes();
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        var lockedVisibleCard = new PrayerCard { Id = 3, Title = "Secret Diagnosis", BoxId = 0, ProtectionMode = CardProtectionMode.LockedVisible };
+        var tag = new PrayerTag { Id = 100, Name = "Health" };
+        _cardService.GetCardsAsync().Returns(new List<PrayerCard> { lockedVisibleCard }.AsReadOnly());
+        _tagService.GetTagsAsync().Returns(new List<PrayerTag> { tag }.AsReadOnly());
+        _prayerService.GetAllPrayersAsync().Returns(new List<Prayer>().AsReadOnly());
+        SetupDbMocks(new List<PrayerCardTag>());
+        var sut = CreateSut();
+        await sut.SyncAsync();
+
+        var chip = sut.AvailableTags.Single(c => c.Tag.Id == 100);
+        chip.ToggleCommand.Execute(null); // select — active filter now, LockedVisible excluded
+        chip.ToggleCommand.Execute(null); // deselect — back to no-filter
+
+        var visible = GetAllSectionMemberCards(sut);
+        Assert.Contains(visible, c => c.Id == 3);
     }
 
     // ── Helper ──────────────────────────────────────────────────────────

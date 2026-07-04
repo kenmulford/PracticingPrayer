@@ -24,9 +24,15 @@ namespace PrayerApp.ViewModels
         private readonly INavigationService _navigationService;
         private readonly IAccessibilityService _accessibilityService;
         private readonly ISettings _settings;
+        private readonly IBoxService _boxService;
+        private readonly IConfidentialAccessService _confidentialAccessService;
         private List<PrayerTag> _allTags = new();
         private int _prayedCount;
         private string _prayedSummary = string.Empty;
+        // Issue #255: the owning card's box, resolved once per LoadCardsAsync (mirrors
+        // PrayerCardViewModel._box) so CanShare can evaluate GetEffectiveProtectionMode
+        // without a service call per property read.
+        private CardBox? _ownerBox;
 
         /// <summary>
         /// True while SaveAsync or SaveAndNewAsync is in flight. Drives the page-level
@@ -418,13 +424,34 @@ namespace PrayerApp.ViewModels
                 {
                     PrayerCardId = value.Id;
                     CardTitle = value.Title ?? string.Empty;
+                    RaiseCanShareChanged();
                 }
             }
+        }
+
+        /// <summary>
+        /// Re-raises CanShare and notifies ShareCommand's canExecute. Called whenever the
+        /// owning card, its box, or the confidential-access lock state changes (issue #255).
+        /// </summary>
+        private void RaiseCanShareChanged()
+        {
+            OnPropertyChanged(nameof(CanShare));
+            (ShareCommand as IRelayCommand)?.NotifyCanExecuteChanged();
         }
 
         public bool IsImported => _prayer.IsImported;
         public DateTime CreatedAt => _prayer.CreatedAt;
         public DateTime UpdatedAt => _prayer.UpdatedAt;
+
+        /// <summary>
+        /// Gates the Share action (issue #255): disabled (not hidden — per
+        /// .project/design-system.md "Required states") when the owning card is
+        /// effectively protected and the confidential-access session is locked. True
+        /// when the owning card hasn't loaded yet (e.g. a brand-new unsaved prayer has
+        /// no card resolved) — mirrors the pre-#255 always-enabled behavior for that case.
+        /// </summary>
+        public bool CanShare => _selectedCard is null
+            || !ProtectionPolicy.IsAccessBlocked(_selectedCard, _ownerBox, _confidentialAccessService.IsSessionUnlocked);
 
         /// <summary>
         /// Shows how many times this prayer has been prayed and when it was created.
@@ -453,7 +480,8 @@ namespace PrayerApp.ViewModels
 
         public PrayerRequestDetailViewModel(IPrayerService prayerService, ITagService tagService,
             ICardService cardService, IOnboardingService onboardingService, INotificationService notificationService,
-            INavigationService navigationService, IAccessibilityService accessibilityService, ISettings settings)
+            INavigationService navigationService, IAccessibilityService accessibilityService, ISettings settings,
+            IBoxService boxService, IConfidentialAccessService confidentialAccessService)
         {
             _prayer = new Prayer();
             _prayerService = prayerService;
@@ -464,13 +492,15 @@ namespace PrayerApp.ViewModels
             _navigationService = navigationService;
             _accessibilityService = accessibilityService;
             _settings = settings;
+            _boxService = boxService;
+            _confidentialAccessService = confidentialAccessService;
             SaveCommand = new AsyncRelayCommand(SaveAsync, () => !IsBusy);
             SaveAndNewCommand = new AsyncRelayCommand(SaveAndNewAsync, () => !IsBusy);
             DeleteCommand = new AsyncRelayCommand(DeleteAsync);
             SelectPrayerCommand = new AsyncRelayCommand(SelectPrayerAsync);
             EditPrayerCommand = new RelayCommand(EditPrayer);
             MarkAnsweredCommand = new AsyncRelayCommand(MarkAnsweredAsync);
-            ShareCommand = new AsyncRelayCommand(ShareAsync);
+            ShareCommand = new AsyncRelayCommand(ShareAsync, () => CanShare);
             OpenTagPickerCommand = new AsyncRelayCommand(OpenTagPickerAsync);
 
             SelectedTags.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasTags));
@@ -484,7 +514,9 @@ namespace PrayerApp.ViewModels
             IPlatformApplication.Current!.Services.GetRequiredService<INotificationService>(),
             IPlatformApplication.Current!.Services.GetRequiredService<INavigationService>(),
             IPlatformApplication.Current!.Services.GetRequiredService<IAccessibilityService>(),
-            IPlatformApplication.Current!.Services.GetRequiredService<ISettings>())
+            IPlatformApplication.Current!.Services.GetRequiredService<ISettings>(),
+            IPlatformApplication.Current!.Services.GetRequiredService<IBoxService>(),
+            IPlatformApplication.Current!.Services.GetRequiredService<IConfidentialAccessService>())
         { }
 
         public PrayerRequestDetailViewModel(Prayer prayer) : this()
@@ -502,9 +534,10 @@ namespace PrayerApp.ViewModels
             ICardService cardService, IOnboardingService onboardingService,
             INotificationService notificationService,
             INavigationService navigationService, IAccessibilityService accessibilityService,
-            ISettings settings)
+            ISettings settings, IBoxService boxService, IConfidentialAccessService confidentialAccessService)
             : this(prayerService, tagService, cardService, onboardingService,
-                notificationService, navigationService, accessibilityService, settings)
+                notificationService, navigationService, accessibilityService, settings,
+                boxService, confidentialAccessService)
         {
             _prayer = prayer ?? new Prayer();
             IsReadOnly = false;
@@ -669,6 +702,10 @@ namespace PrayerApp.ViewModels
 
         private async Task ShareAsync()
         {
+            // Issue #255 defense in depth: CanShare already gates ShareCommand's
+            // canExecute (disabling the button), but guard the action itself in case it's
+            // ever invoked directly (e.g. ExecuteAsync bypassing canExecute).
+            if (!CanShare) return;
             var deepLinkService = IPlatformApplication.Current!.Services.GetRequiredService<IDeepLinkService>();
             await deepLinkService.ShareRequestAsync(_prayer);
             _onboardingService.Advance();
@@ -788,6 +825,15 @@ namespace PrayerApp.ViewModels
             // Set SelectedCard to the current prayer's card
             _selectedCard = AvailableCards.FirstOrDefault(c => c.Id == _prayer.PrayerCardId);
             OnPropertyChanged(nameof(SelectedCard));
+
+            // Issue #255: resolve the owning card's box so CanShare can evaluate
+            // GetEffectiveProtectionMode (box-cascaded protection). One GetBoxesAsync
+            // call reused across this load — mirrors PrayerCardsViewModel.RebuildSections'
+            // per-sync box lookup rather than a per-card round-trip.
+            _ownerBox = _selectedCard is not null
+                ? (await _boxService.GetBoxesAsync()).FirstOrDefault(b => b.Id == _selectedCard.BoxId)
+                : null;
+            RaiseCanShareChanged();
         }
 
         private async Task LoadTagsAsync()
