@@ -65,6 +65,8 @@ dotnet build PrayerApp/PrayerApp.csproj -t:Run -f net10.0-android
 
 # iOS (macOS + Xcode required)
 dotnet build PrayerApp/PrayerApp.csproj -t:Run -f net10.0-ios
+# For an iOS Simulator Debug build/run, add -r iossimulator-arm64 — it selects the
+# simulator native-lib slice; without it the link step fails (see issue #150).
 ```
 
 Release builds for Android are signed via environment variables — see the `AndroidSigningStorePass` / `AndroidSigningKeyPass` block in `PrayerApp/PrayerApp.csproj`.

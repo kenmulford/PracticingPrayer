@@ -31,4 +31,4 @@ Third-party services the app depends on: auth / identity, payments, email / SMS,
 
 ## Runtime & hosting
 Where it runs and the runtime/version targets (hosting platform, language-runtime versions, regions). For mandated frameworks and packages, cross-reference `library-manifest.md`.
-> On-device only: iOS (min 16.0) and Android (min API 21), built against iOS 26.5 / Android API 36. No server hosting. App ID `com.multithreadedllc.prayercards`. For mandated frameworks and packages, see `library-manifest.md`.
+> On-device only: iOS (min 16.0) and Android (min API 21), built against iOS 26.5 / Android API 36. No server hosting. App ID `com.multithreadedllc.prayercards`. For mandated frameworks and packages, see `library-manifest.md`. **iOS-simulator Debug builds require `-r iossimulator-arm64`** — it selects the simulator slice of the `libHostShortcuts.a` native lib; without it the native link step picks the device slice and fails (issue #150; the `build/HostShortcuts.targets` code fix that would remove the need for the explicit RID is deferred).
