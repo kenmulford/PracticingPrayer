@@ -124,6 +124,24 @@ public class BoxService : IBoxService
         _messenger.Send(new BulkChangedMessage());
     }
 
+    public async Task<bool> HasConfidentialCardsAsync()
+    {
+        var cards = await _cardService.GetCardsAsync();
+        if (cards.Count == 0) return false;
+
+        var boxes = await GetBoxesAsync();
+        var boxesById = boxes.ToDictionary(b => b.Id);
+
+        foreach (var card in cards)
+        {
+            boxesById.TryGetValue(card.BoxId, out var box);
+            if (PrayerCard.GetEffectiveProtectionMode(card, box) != CardProtectionMode.None)
+                return true;
+        }
+
+        return false;
+    }
+
     public void InvalidateCache()
     {
         _cache = null;

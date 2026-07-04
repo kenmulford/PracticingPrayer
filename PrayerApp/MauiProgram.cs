@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Messaging;
 using Maui.Biometric;
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.LifecycleEvents;
+using PrayerApp.Messages;
 using PrayerApp.Models;
 using Plugin.LocalNotification;
 using PrayerApp.Services;
@@ -94,6 +95,19 @@ namespace PrayerApp
                     // Warm launch — app already running, new link tapped
                     android.OnNewIntent((activity, intent) =>
                         HandleAndroidIntent(intent));
+
+                    // Issue #257 — background privacy screen. OnPause fires before the OS
+                    // captures the recents/app-switcher thumbnail, so the branded overlay is
+                    // added here — not on the cross-platform Window.Deactivated event, which
+                    // can fire too late relative to the snapshot. FLAG_SECURE itself is kept
+                    // current by RefreshConfidentialCardsCacheAsync (on resume + on card/box
+                    // change messages), so OnPause only needs to check it's already set.
+                    android.OnPause(activity => Platforms.Android.PrivacyScreenOverlay.Show(activity));
+                    android.OnResume(activity =>
+                    {
+                        Platforms.Android.PrivacyScreenOverlay.Hide(activity);
+                        RefreshConfidentialCardsCacheAsync().SafeFireAndForget();
+                    });
                 });
 #elif IOS
                 events.AddiOS(ios =>
@@ -132,6 +146,23 @@ namespace PrayerApp
                             return true;
                         }
                         return false;
+                    });
+
+                    // Issue #257 — background privacy screen. OnResignActivation (WillResignActive)
+                    // fires synchronously before iOS captures the app-switcher snapshot, so the
+                    // overlay must be added here — not on the cross-platform Window.Deactivated
+                    // event, which is not guaranteed to run before the snapshot. The gate check
+                    // is a cached flag (refreshed on OnActivated) since the overlay must be added
+                    // synchronously and HasConfidentialCardsAsync is an async DB-backed call.
+                    ios.OnResignActivation(app =>
+                    {
+                        if (_hasConfidentialCardsCache)
+                            Platforms.iOS.PrivacyScreenOverlay.Show();
+                    });
+                    ios.OnActivated(app =>
+                    {
+                        Platforms.iOS.PrivacyScreenOverlay.Hide();
+                        RefreshConfidentialCardsCacheAsync().SafeFireAndForget();
                     });
                 });
 #endif
@@ -320,6 +351,10 @@ namespace PrayerApp
 
             var app = builder.Build();
 
+            // Issue #257 — keep the background-privacy-screen gate current on every
+            // card/box change while the app runs (see RefreshConfidentialCardsCacheAsync).
+            WirePrivacyScreenGateRefresh(app.Services);
+
             PrayerApp.Services.Settings.ConfigureNotificationService(
                 app.Services.GetRequiredService<INotificationService>());
 
@@ -365,6 +400,60 @@ namespace PrayerApp
             App.InitTask = SeedAsync(app.Services);
 
             return app;
+        }
+
+        /// <summary>
+        /// Issue #257 — cached "does the DB have any confidential card" flag. Both platforms'
+        /// snapshot-blanking hooks (iOS <c>OnResignActivation</c>, Android <c>OnPause</c>) must
+        /// decide synchronously whether to show the privacy overlay, but the underlying check
+        /// (<see cref="IBoxService.HasConfidentialCardsAsync"/>) is an async DB-backed call — so
+        /// it's kept current here instead, refreshed on app resume/activate AND on every
+        /// card/box change message while the app is foregrounded (covers the case where a card
+        /// is protected and the app is backgrounded again without an intervening resume).
+        /// </summary>
+        private static bool _hasConfidentialCardsCache;
+
+        private static async Task RefreshConfidentialCardsCacheAsync()
+        {
+            await App.InitTask;
+            var boxService = IPlatformApplication.Current?.Services?.GetService<IBoxService>();
+            if (boxService is null) return;
+            _hasConfidentialCardsCache = await boxService.HasConfidentialCardsAsync();
+
+#if ANDROID
+            // FLAG_SECURE can be applied immediately (cheap, idempotent); the branded overlay
+            // itself is only ever added at OnPause (Show), gated on this same flag being set.
+            var activity = Microsoft.Maui.ApplicationModel.Platform.CurrentActivity;
+            if (activity?.Window is not null)
+            {
+                if (_hasConfidentialCardsCache)
+                    activity.Window.AddFlags(global::Android.Views.WindowManagerFlags.Secure);
+                else
+                    activity.Window.ClearFlags(global::Android.Views.WindowManagerFlags.Secure);
+            }
+#endif
+        }
+
+        /// <summary>
+        /// Held alive for the app's lifetime as the WeakReferenceMessenger recipient key for
+        /// the #257 privacy-screen gate refresh — mirrors the ViewModel Register&lt;TRecipient,...&gt;
+        /// pattern (e.g. HomeViewModel.cs), but there's no ViewModel instance at this app-level
+        /// scope, so a small dedicated static object plays that role instead.
+        /// </summary>
+        private static readonly object _privacyScreenGateRecipient = new();
+
+        /// <summary>
+        /// Wires the #257 privacy-screen cache to refresh whenever cards or boxes change, so a
+        /// card protected while the app is foregrounded is caught before the next backgrounding
+        /// even without an intervening resume/activate. Called once after the DI container is
+        /// built (services, including the messenger, must already be resolvable).
+        /// </summary>
+        private static void WirePrivacyScreenGateRefresh(IServiceProvider services)
+        {
+            var messenger = services.GetRequiredService<IMessenger>();
+            messenger.Register<object, PrayerCardChangedMessage>(_privacyScreenGateRecipient, (_, _) => RefreshConfidentialCardsCacheAsync().SafeFireAndForget());
+            messenger.Register<object, CardBoxChangedMessage>(_privacyScreenGateRecipient, (_, _) => RefreshConfidentialCardsCacheAsync().SafeFireAndForget());
+            messenger.Register<object, BulkChangedMessage>(_privacyScreenGateRecipient, (_, _) => RefreshConfidentialCardsCacheAsync().SafeFireAndForget());
         }
 
         /// <summary>
