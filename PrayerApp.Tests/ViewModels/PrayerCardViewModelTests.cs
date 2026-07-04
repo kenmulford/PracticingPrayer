@@ -1065,4 +1065,46 @@ public class PrayerCardViewModelTests
         // PrayerCard reference passed to the service).
         await _cardService.Received(2).SaveCardAsync(card);
     }
+
+    // ── ProtectionMode (issue #252) ──────────────────────────────────────
+    // Pure get/set wrapper over PrayerCard.ProtectionMode, mirroring the
+    // IsFavorite property pattern (PrayerCardViewModel.cs:107-114). No auth
+    // gating here — that lands in #253/#254/#255. Saving persists via the
+    // existing SaveCommand → SaveCardAsync path (issue #250 already added
+    // the column), so no new persistence coverage is required.
+
+    [Fact]
+    public void ProtectionMode_DefaultsToNone()
+    {
+        var sut = CreateSut();
+        Assert.Equal(CardProtectionMode.None, sut.ProtectionMode);
+    }
+
+    [Fact]
+    public void ProtectionMode_Set_UpdatesUnderlyingCard()
+    {
+        var card = new PrayerCard { Id = 3, Title = "Family" };
+        var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+
+        sut.ProtectionMode = CardProtectionMode.Hidden;
+
+        Assert.Equal(CardProtectionMode.Hidden, sut.ProtectionMode);
+        Assert.Equal(CardProtectionMode.Hidden, card.ProtectionMode);
+    }
+
+    [Fact]
+    public void ProtectionMode_RoundTripsAllValues()
+    {
+        var sut = CreateSut();
+
+        sut.ProtectionMode = CardProtectionMode.LockedVisible;
+        Assert.Equal(CardProtectionMode.LockedVisible, sut.ProtectionMode);
+
+        sut.ProtectionMode = CardProtectionMode.Hidden;
+        Assert.Equal(CardProtectionMode.Hidden, sut.ProtectionMode);
+
+        sut.ProtectionMode = CardProtectionMode.None;
+        Assert.Equal(CardProtectionMode.None, sut.ProtectionMode);
+    }
 }

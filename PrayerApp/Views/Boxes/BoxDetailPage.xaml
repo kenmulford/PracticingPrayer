@@ -51,6 +51,42 @@
                 </VerticalStackLayout>
             </Border>
 
+            <!-- Protection cascade (label-above-field, full-width per design-system.md#Layout & responsive rules) -->
+            <Border Style="{StaticResource PrayerCardBorder}" Padding="16">
+                <VerticalStackLayout Spacing="16">
+                    <Grid ColumnDefinitions="*, Auto" ColumnSpacing="12" HorizontalOptions="Fill">
+                        <Label Text="Protect all cards in this collection" VerticalOptions="Center" />
+                        <Switch Grid.Column="1"
+                                AutomationId="BoxDetail_Switch_ProtectAllCards"
+                                IsToggled="{Binding ProtectAllCards}"
+                                SemanticProperties.Description="Protect all cards in this collection"
+                                SemanticProperties.Hint="When on, cascades the protection level below to every card in this collection" />
+                    </Grid>
+
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Protection Level" Style="{StaticResource FormLabel}" />
+                        <HorizontalStackLayout Spacing="16"
+                                               IsEnabled="{Binding IsCascadeModeEnabled}"
+                                               AutomationId="BoxDetail_Picker_CardProtectionMode"
+                                               SemanticProperties.Description="Protection level for all cards in this collection"
+                                               SemanticProperties.Hint="Choose whether cascaded cards are locked or hidden">
+                            <RadioButton Content="Off"
+                                         AutomationId="BoxDetail_Radio_ProtectionOff"
+                                         GroupName="BoxCardProtectionMode"
+                                         IsChecked="{Binding CardProtectionMode, Converter={StaticResource EnumToBool}, ConverterParameter=None}" />
+                            <RadioButton Content="Locked"
+                                         AutomationId="BoxDetail_Radio_ProtectionLocked"
+                                         GroupName="BoxCardProtectionMode"
+                                         IsChecked="{Binding CardProtectionMode, Converter={StaticResource EnumToBool}, ConverterParameter=LockedVisible}" />
+                            <RadioButton Content="Hidden"
+                                         AutomationId="BoxDetail_Radio_ProtectionHidden"
+                                         GroupName="BoxCardProtectionMode"
+                                         IsChecked="{Binding CardProtectionMode, Converter={StaticResource EnumToBool}, ConverterParameter=Hidden}" />
+                        </HorizontalStackLayout>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
         </VerticalStackLayout>
     </ScrollView>
 

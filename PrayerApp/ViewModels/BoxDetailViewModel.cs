@@ -33,6 +33,47 @@ namespace PrayerApp.ViewModels
         public bool IsNameEditable => !IsSystem;
         public bool IsExisting => _box.Id > 0;
 
+        /// <summary>
+        /// When true, cascades <see cref="CardProtectionMode"/> to every card in this
+        /// collection with no explicit protection mode of its own. Pure UI binding — no
+        /// auth gating happens here (see #253/#254/#255); saving persists via the
+        /// existing SaveCommand → SaveBoxAsync path.
+        /// </summary>
+        public bool ProtectAllCards
+        {
+            get => _box.ProtectAllCards;
+            set
+            {
+                if (_box.ProtectAllCards != value)
+                {
+                    _box.ProtectAllCards = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(IsCascadeModeEnabled));
+                }
+            }
+        }
+
+        /// <summary>The protection mode cascaded to cards in this collection when <see cref="ProtectAllCards"/> is true.</summary>
+        public CardProtectionMode CardProtectionMode
+        {
+            get => _box.CardProtectionMode;
+            set
+            {
+                if (_box.CardProtectionMode != value)
+                {
+                    _box.CardProtectionMode = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gates the cascade mode picker's Disabled state (design-system.md#Required
+        /// states) — the mode picker is only meaningful when <see cref="ProtectAllCards"/>
+        /// is on.
+        /// </summary>
+        public bool IsCascadeModeEnabled => ProtectAllCards;
+
         public bool IsDirty => Name != _originalName;
 
         public async Task<bool> CanLeaveAsync()
@@ -98,6 +139,9 @@ namespace PrayerApp.ViewModels
             OnPropertyChanged(nameof(IsExisting));
             OnPropertyChanged(nameof(IsNameEditable));
             OnPropertyChanged(nameof(Name));
+            OnPropertyChanged(nameof(ProtectAllCards));
+            OnPropertyChanged(nameof(CardProtectionMode));
+            OnPropertyChanged(nameof(IsCascadeModeEnabled));
             CaptureOriginals();
         }
 

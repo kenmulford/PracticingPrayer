@@ -62,6 +62,30 @@
                     </VerticalStackLayout>
                 </Border>
 
+                <!-- Protection (label-above-field, full-width per design-system.md#Layout & responsive rules) -->
+                <Border Style="{StaticResource PrayerCardBorder}" Padding="16,11">
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Protection" Style="{StaticResource FormLabel}" />
+                        <HorizontalStackLayout Spacing="16"
+                                               AutomationId="Card_Picker_Protection"
+                                               SemanticProperties.Description="Protection level"
+                                               SemanticProperties.Hint="Choose whether this card is unprotected, locked, or hidden">
+                            <RadioButton Content="Off"
+                                         AutomationId="Card_Radio_ProtectionOff"
+                                         GroupName="CardProtectionMode"
+                                         IsChecked="{Binding ProtectionMode, Converter={StaticResource EnumToBool}, ConverterParameter=None}" />
+                            <RadioButton Content="Locked"
+                                         AutomationId="Card_Radio_ProtectionLocked"
+                                         GroupName="CardProtectionMode"
+                                         IsChecked="{Binding ProtectionMode, Converter={StaticResource EnumToBool}, ConverterParameter=LockedVisible}" />
+                            <RadioButton Content="Hidden"
+                                         AutomationId="Card_Radio_ProtectionHidden"
+                                         GroupName="CardProtectionMode"
+                                         IsChecked="{Binding ProtectionMode, Converter={StaticResource EnumToBool}, ConverterParameter=Hidden}" />
+                        </HorizontalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+
                 <!-- Delete + Archive — Save is in the navbar, Share is on the expanded card view.
                      Outside the section card (different state, not a row in the group). -->
                 <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
