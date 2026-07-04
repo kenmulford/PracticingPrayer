@@ -242,6 +242,6 @@ public class OnboardingServiceTests
         public bool CollectionsBannerDismissed { get; set; }
         public int ArchivedFolderId { get; set; }
         public string ExpandedSectionIds { get; set; } = string.Empty;
-        public string OnboardingStep { get; set; } = nameof(Models.OnboardingStep.None);
+        public string OnboardingStep { get; set; } = nameof(PrayerApp.Models.OnboardingStep.None);
     }
 }

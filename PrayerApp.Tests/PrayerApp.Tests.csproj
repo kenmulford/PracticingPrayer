@@ -64,6 +64,7 @@
     <Compile Include="../PrayerApp/Models/PrayerCardTag.cs" />
     <Compile Include="../PrayerApp/Models/PrayerTag.cs" />
     <Compile Include="../PrayerApp/Models/PrayerFrequency.cs" />
+    <Compile Include="../PrayerApp/Models/CardProtectionMode.cs" />
     <Compile Include="../PrayerApp/Models/PrayerInteraction.cs" />
     <Compile Include="../PrayerApp/Models/OnboardingStep.cs" />
     <Compile Include="../PrayerApp/Models/UserColor.cs" />
