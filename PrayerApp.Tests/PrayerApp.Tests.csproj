@@ -53,6 +53,7 @@
     <!-- Behaviors -->
     <Compile Include="../PrayerApp/Behaviors/KeyboardAvoidanceBehavior.cs" />
     <Compile Include="../PrayerApp/Behaviors/ChipStripHeightBehavior.cs" />
+    <Compile Include="../PrayerApp/Behaviors/AccessibilityScaleBehavior.cs" />
 
     <!-- Converters -->
     <Compile Include="../PrayerApp/Converters/BoolToMutedColorConverter.cs" />
