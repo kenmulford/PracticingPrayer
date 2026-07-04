@@ -24,5 +24,14 @@ public interface IBoxService
     /// <summary>Ensures System and Archived boxes exist. Called at app startup as a resilience fallback.</summary>
     Task SeedSystemBoxesAsync();
 
+    /// <summary>
+    /// True if the DB currently contains at least one card whose effective protection mode
+    /// (own mode, or box-cascade — see <see cref="Models.PrayerCard.GetEffectiveProtectionMode"/>)
+    /// is not <see cref="Models.CardProtectionMode.None"/>. Drives the background privacy-screen
+    /// gate (#257): platform snapshot-blanking (Android FLAG_SECURE / iOS resign-active overlay)
+    /// only activates for users who actually have confidential content to protect.
+    /// </summary>
+    Task<bool> HasConfidentialCardsAsync();
+
     void InvalidateCache();
 }
