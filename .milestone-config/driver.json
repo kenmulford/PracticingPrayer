@@ -1,6 +1,7 @@
 {
   "integrationBranch": "dev",
   "protectedBranch": "master",
+  "parallel": true,
   "sourceGlobs": ["PrayerApp/**", "PrayerApp.Tests/**", "PrayerApp.UITests/**"],
   "uiSurfaceGlobs": ["PrayerApp/**/*.xaml"],
   "unitTestCmd": "dotnet test PrayerApp.Tests/PrayerApp.Tests.csproj",
