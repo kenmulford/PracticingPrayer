@@ -1,11 +1,13 @@
 using CommunityToolkit.Maui;
 using CommunityToolkit.Maui.Core;
 using CommunityToolkit.Mvvm.Messaging;
+using Maui.Biometric;
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.LifecycleEvents;
 using PrayerApp.Models;
 using Plugin.LocalNotification;
 using PrayerApp.Services;
+using PrayerApp.Services.Confidential;
 using PrayerApp.Shared;
 using PrayerApp.Helpers;
 using PrayerApp.ViewModels;
@@ -58,6 +60,8 @@ namespace PrayerApp
                 });
 
             builder.UseMauiCommunityToolkit();
+            // Issue #251: registers IBiometricAuthentication (Oscore.Maui.Biometric v2.5.1).
+            builder.UseBiometricAuthentication();
 
             builder.UseLocalNotification(config =>
             {
@@ -234,6 +238,13 @@ namespace PrayerApp
             builder.Services.AddSingleton<IAccessibilityService, MauiAccessibilityService>();
             // OS share sheet abstraction (enables unit testing of share logic)
             builder.Services.AddSingleton<IShareService, ShareService>();
+            // Confidential Cards (#251): biometric + PIN-fallback auth primitive.
+            // Seam implementations wrap the Oscore biometric plugin, SecureStorage, and the
+            // PIN-entry popup so ConfidentialAccessService's own logic stays unit-testable.
+            builder.Services.AddSingleton<IBiometricAuthenticator, OscoreBiometricAuthenticator>();
+            builder.Services.AddSingleton<ISecureStore, MauiSecureStore>();
+            builder.Services.AddSingleton<IPinPrompt, MauiPinPrompt>();
+            builder.Services.AddSingleton<IConfidentialAccessService, ConfidentialAccessService>();
             // Deep link sharing service.
             // Inbound deep-link / .prayercard imports stage a structured
             // payload and push ConfirmImportPage modally via

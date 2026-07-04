@@ -197,6 +197,10 @@
 		<PackageReference Include="Microsoft.Maui.Controls" Version="10.0.50" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.5" />
 		<PackageReference Include="Plugin.LocalNotification" Version="14.0.0" />
+		<!-- Issue #251: biometric auth for Confidential Cards (approved one-way door).
+		     MIT-licensed, publisher Oscore Ltd (github.com/oscoreio/Maui.Biometric).
+		     PackageId is "Oscore.Maui.Biometric"; the C# namespace is "Maui.Biometric". -->
+		<PackageReference Include="Oscore.Maui.Biometric" Version="2.5.1" />
 		<!-- sqlite-net-base (not -pcl): same library/author without the bundled SQLitePCLRaw
 		     dependency, so the explicit bundle_e_sqlite3 below is the only provider. The -pcl
 		     metapackage transitively pulls SQLitePCLRaw.bundle_green 2.1.2, which drags the

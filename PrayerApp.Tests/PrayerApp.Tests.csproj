@@ -146,6 +146,17 @@
     <Compile Include="../PrayerApp/Services/IPrayerSelectionService.cs" />
     <Compile Include="../PrayerApp/Services/PrayerSelectionService.cs" />
 
+    <!-- Confidential access (#251): biometric+PIN auth primitive. Platform/UI dependencies
+         (Oscore biometric plugin, SecureStorage, PIN-entry UI) sit behind the seam interfaces
+         below, so ConfidentialAccessService itself has no MAUI runtime dependency. -->
+    <Compile Include="../PrayerApp/Services/IConfidentialAccessService.cs" />
+    <Compile Include="../PrayerApp/Services/ConfidentialAccessService.cs" />
+    <Compile Include="../PrayerApp/Services/Confidential/IBiometricAuthenticator.cs" />
+    <Compile Include="../PrayerApp/Services/Confidential/ISecureStore.cs" />
+    <Compile Include="../PrayerApp/Services/Confidential/IPinPrompt.cs" />
+    <Compile Include="../PrayerApp/Services/Confidential/PinHasher.cs" />
+    <Compile Include="../PrayerApp/Services/Confidential/PinAttemptTracker.cs" />
+
     <!-- TestSeedFixtures: linked from PrayerApp.UITests so the consistency
          test in this project can reference the same canonical constants
          the UI tests use. -->
