@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Maui.Dispatching;
 using NSubstitute;
 using PrayerApp.Models;
 using PrayerApp.Services;
@@ -17,18 +18,21 @@ public class PrayerTimeViewModelTests
     private readonly INotificationService _notificationService = Substitute.For<INotificationService>();
     private readonly ISettings _settings = Substitute.For<ISettings>();
     private readonly IPrayerSelectionService _selectionService = Substitute.For<IPrayerSelectionService>();
+    private readonly IDispatcher _dispatcher = Substitute.For<IDispatcher>();
+    private readonly IDispatcherTimer _autoTimer = Substitute.For<IDispatcherTimer>();
 
     public PrayerTimeViewModelTests()
     {
         _settings.AutoModeIntervalSeconds.Returns(30);
         // Use a non-zero ID so cards with BoxId=0 are not incorrectly treated as archived.
         _settings.ArchivedFolderId.Returns(999);
+        _dispatcher.CreateTimer().Returns(_autoTimer);
     }
 
     private PrayerTimeViewModel CreateSut() =>
         new(_prayerService, _cardService, _tagService, _interactionService,
             _navigationService, _accessibilityService, _notificationService, _settings,
-            _selectionService);
+            _selectionService, _dispatcher);
 
     // ── Construction ──────────────────────────────────────────────────
 
@@ -348,5 +352,37 @@ public class PrayerTimeViewModelTests
         _settings.Received(1).AutoModeIntervalSeconds = 60;
         _settings.Received(1).AutoModeIntervalSeconds = 120;
         _settings.Received(1).AutoModeIntervalSeconds = 30;
+    }
+
+    // ── ToggleAutoModeCommand (issue #218 — IDispatcher injection) ────
+    // StartAutoMode used to reach Application.Current!.Dispatcher directly, which
+    // NullReferenceExceptions off-device. Injecting IDispatcher makes the auto-mode
+    // toggle and its timer unit-testable.
+
+    [Fact]
+    public void ToggleAutoModeCommand_TogglesIsAutoMode_AndButtonText()
+    {
+        var sut = CreateSut();
+        Assert.False(sut.IsAutoMode);
+        Assert.Equal("Auto ▷", sut.AutoModeButtonText);
+
+        sut.ToggleAutoModeCommand.Execute(null);
+        Assert.True(sut.IsAutoMode);
+        Assert.Equal("⏸ Auto", sut.AutoModeButtonText);
+
+        sut.ToggleAutoModeCommand.Execute(null);
+        Assert.False(sut.IsAutoMode);
+        Assert.Equal("Auto ▷", sut.AutoModeButtonText);
+    }
+
+    [Fact]
+    public void ToggleAutoModeCommand_StartingAutoMode_CreatesAndStartsInjectedTimer()
+    {
+        var sut = CreateSut();
+
+        sut.ToggleAutoModeCommand.Execute(null);
+
+        _dispatcher.Received(1).CreateTimer();
+        _autoTimer.Received(1).Start();
     }
 }
