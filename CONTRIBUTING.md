@@ -49,7 +49,7 @@ PRs are squash-merged into `dev`, so your in-branch commit history is for review
 | Surface | Command |
 |---|---|
 | Unit tests | `dotnet test PrayerApp.Tests/PrayerApp.Tests.csproj` |
-| Build | `dotnet build PrayerApp/PrayerApp.csproj` for both `net10.0-android` and `net10.0-ios` (iOS requires macOS + Xcode) |
+| Build | `dotnet build PrayerApp/PrayerApp.csproj` for both `net10.0-android` and `net10.0-ios` (iOS requires macOS + Xcode). For an iOS-**simulator** Debug build, add `-r iossimulator-arm64` — it selects the simulator native-lib slice; without it the link step fails (see issue #150). |
 | UI tests | `PrayerApp.UITests/` — Appium-based, requires emulator/sim and `appium` running locally. Optional for small PRs; required for changes touching navigation, list virtualization, or share/import flows. |
 
 ### Code review expectations

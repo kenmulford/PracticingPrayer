@@ -106,8 +106,11 @@ $env:PRAYER_APK_PATH = "C:\path\to\com.multithreadedllc.prayercards-Signed.apk"
 **Mac (iOS):**
 ```bash
 # Build for iOS Simulator
+# NOTE: -r iossimulator-arm64 is REQUIRED on iOS-simulator Debug builds. It selects the
+# simulator slice of the App-Shortcuts native lib (libHostShortcuts.a); without it the
+# native linker picks the device (iphoneos) slice and the build fails at `ld` (issue #150).
 dotnet build PrayerApp/PrayerApp.csproj -f net10.0-ios -c Debug \
-  -p:_DeviceType=Simulator
+  -r iossimulator-arm64 -p:_DeviceType=Simulator
 
 # Install on booted simulator
 xcrun simctl install booted PrayerApp/bin/Debug/net10.0-ios/iossimulator-arm64/PrayerApp.app
