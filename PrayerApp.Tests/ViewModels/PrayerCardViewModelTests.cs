@@ -666,7 +666,7 @@ public class PrayerCardViewModelTests
 
         var parent = new PrayerCardsViewModel(_cardService, _prayerService, _onboardingService,
             _navigationService, _accessibilityService, Substitute.For<ITagService>(), _settings,
-            _boxService, new WeakReferenceMessenger());
+            _boxService, Substitute.For<IConfidentialAccessService>(), new WeakReferenceMessenger());
         sut.Parent = parent;
         parent.ExpandedCardId = card.Id;
         sut.RaiseIsExpandedChanged();
@@ -1008,7 +1008,7 @@ public class PrayerCardViewModelTests
 
         var parent = new PrayerCardsViewModel(_cardService, _prayerService, _onboardingService,
             _navigationService, _accessibilityService, Substitute.For<ITagService>(), _settings,
-            _boxService, new WeakReferenceMessenger());
+            _boxService, Substitute.For<IConfidentialAccessService>(), new WeakReferenceMessenger());
         sut.Parent = parent;
         parent.ExpandedCardId = card.Id;
         sut.RaiseIsExpandedChanged();
@@ -1028,7 +1028,7 @@ public class PrayerCardViewModelTests
 
         var parent = new PrayerCardsViewModel(_cardService, _prayerService, _onboardingService,
             _navigationService, _accessibilityService, Substitute.For<ITagService>(), _settings,
-            _boxService, new WeakReferenceMessenger());
+            _boxService, Substitute.For<IConfidentialAccessService>(), new WeakReferenceMessenger());
         sut.Parent = parent;
         parent.ExpandedCardId = card.Id;
         sut.RaiseIsExpandedChanged();
@@ -1106,5 +1106,111 @@ public class PrayerCardViewModelTests
 
         sut.ProtectionMode = CardProtectionMode.None;
         Assert.Equal(CardProtectionMode.None, sut.ProtectionMode);
+    }
+
+    // ── DisplayTitle / IsLockedVisible — issue #253 masking ────────────
+    // Strict constraint: while an effectively-LockedVisible card is locked, the
+    // real Title must never be readable through DisplayTitle — cells bind to
+    // DisplayTitle, never Title, so the real string never enters the visual tree.
+
+    [Fact]
+    public void IsLockedVisible_NoParent_False()
+    {
+        // No Parent wired (Parent is null) — can't resolve session lock state,
+        // so treat as not locked-visible rather than throwing.
+        var card = new PrayerCard { Id = 1, Title = "Secret", ProtectionMode = CardProtectionMode.LockedVisible };
+        var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+
+        Assert.False(sut.IsLockedVisible);
+        Assert.Equal("Secret", sut.DisplayTitle);
+    }
+
+    [Fact]
+    public void DisplayTitle_EffectivelyLockedVisible_SessionLocked_ReturnsProtected()
+    {
+        var card = new PrayerCard { Id = 1, Title = "Secret Card", ProtectionMode = CardProtectionMode.LockedVisible };
+        var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+        var confidential = Substitute.For<IConfidentialAccessService>();
+        confidential.IsSessionUnlocked.Returns(false);
+        sut.Parent = new PrayerCardsViewModel(_cardService, _prayerService, _onboardingService,
+            _navigationService, _accessibilityService, Substitute.For<ITagService>(),
+            _settings, _boxService, confidential, new WeakReferenceMessenger());
+
+        Assert.True(sut.IsLockedVisible);
+        Assert.Equal("Protected", sut.DisplayTitle);
+        Assert.DoesNotContain("Secret Card", sut.DisplayTitle);
+    }
+
+    [Fact]
+    public void DisplayTitle_EffectivelyLockedVisible_SessionUnlocked_ReturnsRealTitle()
+    {
+        var card = new PrayerCard { Id = 1, Title = "Secret Card", ProtectionMode = CardProtectionMode.LockedVisible };
+        var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+        var confidential = Substitute.For<IConfidentialAccessService>();
+        confidential.IsSessionUnlocked.Returns(true);
+        sut.Parent = new PrayerCardsViewModel(_cardService, _prayerService, _onboardingService,
+            _navigationService, _accessibilityService, Substitute.For<ITagService>(),
+            _settings, _boxService, confidential, new WeakReferenceMessenger());
+
+        Assert.False(sut.IsLockedVisible);
+        Assert.Equal("Secret Card", sut.DisplayTitle);
+    }
+
+    [Fact]
+    public void DisplayTitle_ProtectionModeNone_AlwaysReturnsRealTitle()
+    {
+        var card = new PrayerCard { Id = 1, Title = "Open Card", ProtectionMode = CardProtectionMode.None };
+        var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+        var confidential = Substitute.For<IConfidentialAccessService>();
+        confidential.IsSessionUnlocked.Returns(false);
+        sut.Parent = new PrayerCardsViewModel(_cardService, _prayerService, _onboardingService,
+            _navigationService, _accessibilityService, Substitute.For<ITagService>(),
+            _settings, _boxService, confidential, new WeakReferenceMessenger());
+
+        Assert.False(sut.IsLockedVisible);
+        Assert.Equal("Open Card", sut.DisplayTitle);
+    }
+
+    [Fact]
+    public void IsLockedVisible_EffectivelyHidden_SessionLocked_False()
+    {
+        // Hidden cards are excluded from the list entirely (PrayerCardsViewModel
+        // section-building) — DisplayTitle's masking is LockedVisible-only, so a
+        // Hidden card's cell (if ever bound) is not masked via this path.
+        var card = new PrayerCard { Id = 1, Title = "Hidden Card", ProtectionMode = CardProtectionMode.Hidden };
+        var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+        var confidential = Substitute.For<IConfidentialAccessService>();
+        confidential.IsSessionUnlocked.Returns(false);
+        sut.Parent = new PrayerCardsViewModel(_cardService, _prayerService, _onboardingService,
+            _navigationService, _accessibilityService, Substitute.For<ITagService>(),
+            _settings, _boxService, confidential, new WeakReferenceMessenger());
+
+        Assert.False(sut.IsLockedVisible);
+    }
+
+    [Fact]
+    public void DisplayTitle_BoxCascadesLockedVisible_SessionLocked_ReturnsProtected()
+    {
+        // Card itself has ProtectionMode.None (defers) but its box cascades
+        // LockedVisible via ProtectAllCards — GetEffectiveProtectionMode(card, box)
+        // resolves this, so DisplayTitle must mask here too.
+        var box = new CardBox { Id = 7, Name = "Family", ProtectAllCards = true, CardProtectionMode = CardProtectionMode.LockedVisible };
+        var card = new PrayerCard { Id = 1, Title = "Cascaded Secret", ProtectionMode = CardProtectionMode.None, BoxId = 7 };
+        var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings);
+        var confidential = Substitute.For<IConfidentialAccessService>();
+        confidential.IsSessionUnlocked.Returns(false);
+        sut.Parent = new PrayerCardsViewModel(_cardService, _prayerService, _onboardingService,
+            _navigationService, _accessibilityService, Substitute.For<ITagService>(),
+            _settings, _boxService, confidential, new WeakReferenceMessenger());
+        sut.Box = box;
+
+        Assert.True(sut.IsLockedVisible);
+        Assert.Equal("Protected", sut.DisplayTitle);
     }
 }

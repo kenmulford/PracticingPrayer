@@ -100,6 +100,7 @@ namespace PrayerApp.ViewModels
                     _prayerCard.Title = value;
                     OnPropertyChanged();
                     OnPropertyChanged(nameof(AccessibleCardHeader));
+                    OnPropertyChanged(nameof(DisplayTitle));
                 }
             }
         }
@@ -120,6 +121,59 @@ namespace PrayerApp.ViewModels
         }
 
         /// <summary>
+        /// The owning box, threaded in by <c>PrayerCardsViewModel.RebuildSections</c> at
+        /// section-build time (issue #253) so <see cref="IsLockedVisible"/> can resolve
+        /// <see cref="PrayerCard.GetEffectiveProtectionMode"/>, which needs the box for
+        /// box-cascaded protection. Null until the first RebuildSections after construction
+        /// (or in tests that don't wire it — box-less cards simply can't cascade).
+        /// </summary>
+        private CardBox? _box;
+        public CardBox? Box
+        {
+            get => _box;
+            set
+            {
+                if (!ReferenceEquals(_box, value))
+                {
+                    _box = value;
+                    RaiseLockStateChanged();
+                }
+            }
+        }
+
+        /// <summary>
+        /// True while this card's effective protection is <see cref="CardProtectionMode.LockedVisible"/>
+        /// and the confidential-access session is locked (issue #253). Drives the cell's masked
+        /// rendering (lock glyph + "Protected") via <see cref="DisplayTitle"/> — this property
+        /// itself never exposes <see cref="Title"/>.
+        /// </summary>
+        public bool IsLockedVisible =>
+            Parent is not null
+            && !Parent.IsSessionUnlocked
+            && PrayerCard.GetEffectiveProtectionMode(_prayerCard, _box) == CardProtectionMode.LockedVisible;
+
+        /// <summary>
+        /// Projected display value the cell binds to instead of <see cref="Title"/> (issue #253).
+        /// Returns the literal "Protected" while <see cref="IsLockedVisible"/> is true so the
+        /// real title never enters the visual tree while the session is locked — a stricter
+        /// constraint than binding <see cref="Title"/> and toggling <c>IsVisible</c>, which
+        /// would still place the real string in the compiled binding / element tree.
+        /// </summary>
+        public string DisplayTitle => IsLockedVisible ? "Protected" : Title;
+
+        /// <summary>
+        /// Re-raises the lock-state-derived projections. Called by <see cref="Box"/>'s setter
+        /// and by <c>PrayerCardsViewModel.ShowConfidentialAsync</c> after a successful
+        /// "Show confidential" authentication, so masked cells unmask immediately without
+        /// a full cell re-template.
+        /// </summary>
+        internal void RaiseLockStateChanged()
+        {
+            OnPropertyChanged(nameof(IsLockedVisible));
+            OnPropertyChanged(nameof(DisplayTitle));
+        }
+
+        /// <summary>
         /// Card-level protection mode (Off/Locked/Hidden). Pure UI binding — no auth
         /// gating happens here (see #253/#254/#255); saving persists via the existing
         /// SaveCommand → SaveCardAsync path.
@@ -133,6 +187,7 @@ namespace PrayerApp.ViewModels
                 {
                     _prayerCard.ProtectionMode = value;
                     OnPropertyChanged();
+                    RaiseLockStateChanged();
                 }
             }
         }

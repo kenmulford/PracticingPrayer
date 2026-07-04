@@ -258,27 +258,50 @@
 
                         <VerticalStackLayout Spacing="0">
 
-                            <!-- Card header: title + system badge + imported icon + count badge + favorite star -->
-                            <!-- A11Y: Description on the Grid (single tappable unit), not the Label (avoids double-read) -->
+                            <!-- Card header: lock glyph (masked cards) + title + system badge + imported icon + count badge + favorite star -->
+                            <!-- A11Y: Description on the Grid (single tappable unit), not the Label (avoids double-read).
+                                 Issue #253: a masked (effectively-LockedVisible, session-locked) card overrides both the
+                                 description and hint to the design-system's verbatim masked-card copy, replacing the
+                                 normal AccessibleCardHeader/expand-collapse hint. -->
                             <Grid
                                 Padding="12,10"
-                                ColumnDefinitions="*,Auto,Auto,Auto,Auto"
-                                SemanticProperties.Description="{Binding AccessibleCardHeader}"
-                                SemanticProperties.Hint="Double tap to expand or collapse"
+                                ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto"
                                 Loaded="OnCardHeaderLoaded">
                                 <Grid.GestureRecognizers>
                                     <TapGestureRecognizer Tapped="OnCardHeaderTapped" />
                                 </Grid.GestureRecognizers>
+                                <Grid.Triggers>
+                                    <DataTrigger TargetType="Grid" Binding="{Binding IsLockedVisible}" Value="True">
+                                        <Setter Property="SemanticProperties.Description" Value="Protected card, locked" />
+                                        <Setter Property="SemanticProperties.Hint" Value="Double tap to unlock" />
+                                    </DataTrigger>
+                                    <DataTrigger TargetType="Grid" Binding="{Binding IsLockedVisible}" Value="False">
+                                        <Setter Property="SemanticProperties.Description" Value="{Binding AccessibleCardHeader}" />
+                                        <Setter Property="SemanticProperties.Hint" Value="Double tap to expand or collapse" />
+                                    </DataTrigger>
+                                </Grid.Triggers>
+                                <!-- Lock glyph — shown only while the card renders masked. No dedicated lock
+                                     icon asset exists in Resources/Images (checked); a Unicode glyph Label
+                                     mirrors the codebase's existing convention for un-asseted glyphs (★ favorite,
+                                     ✕ close — see PrayerCardsPage.xaml Cards_Btn_DismissBanner). -->
                                 <Label
                                     Grid.Column="0"
-                                    Text="{Binding Title}"
+                                    Text="🔒"
+                                    FontSize="{StaticResource FontBody}"
+                                    IsVisible="{Binding IsLockedVisible}"
+                                    AutomationProperties.IsInAccessibleTree="False"
+                                    VerticalOptions="Center"
+                                    Margin="0,0,6,0" />
+                                <Label
+                                    Grid.Column="1"
+                                    Text="{Binding DisplayTitle}"
                                     Style="{StaticResource CardTitle}"
                                     AutomationProperties.IsInAccessibleTree="False"
                                     TextColor="{AppThemeBinding Light={StaticResource Tertiary}, Dark={StaticResource TextPrimaryDark}}"
                                     VerticalOptions="Center" />
                                 <!-- System badge -->
                                 <Label
-                                    Grid.Column="1"
+                                    Grid.Column="2"
                                     Text="System"
                                     FontSize="{StaticResource FontMicro}"
                                     IsVisible="{Binding IsSystem}"
@@ -288,7 +311,7 @@
                                     Margin="6,0,6,0" />
                                 <!-- Imported icon (shared content) -->
                                 <Image
-                                    Grid.Column="2"
+                                    Grid.Column="3"
                                     Source="imported.png"
                                     HeightRequest="18"
                                     WidthRequest="18"
@@ -303,7 +326,7 @@
                                 <!-- Active prayer count — parenthetical muted text on collapsed cards (issue #33 P3).
                                      HasAnyPrayer hides the Label entirely when count is zero or the card is expanded. -->
                                 <Label
-                                    Grid.Column="3"
+                                    Grid.Column="4"
                                     Style="{StaticResource MutedText}"
                                     Text="{Binding ActivePrayerCount, StringFormat='({0})'}"
                                     IsVisible="{Binding HasAnyPrayer}"
@@ -313,7 +336,7 @@
                                     Margin="0,0,8,0"
                                     AutomationProperties.IsInAccessibleTree="False" />
                                 <Label
-                                    Grid.Column="4"
+                                    Grid.Column="5"
                                     Text="★"
                                     FontSize="{StaticResource FontHeadline}"
                                     AutomationProperties.IsInAccessibleTree="False"

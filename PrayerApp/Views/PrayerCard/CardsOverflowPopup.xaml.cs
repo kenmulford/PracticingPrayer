@@ -33,4 +33,13 @@ public partial class CardsOverflowPopup : Popup
         await CloseAsync(CancellationToken.None);
         _vm.EnterMultiSelectCommand.Execute(null);
     }
+
+    // Close-before-execute (see class summary above): ShowConfidentialCommand drives
+    // a biometric/PIN prompt (IConfidentialAccessService.AuthenticateAsync), which
+    // should not compete with the popup for the presentation stack.
+    private async void OnShowConfidentialTapped(object? sender, TappedEventArgs e)
+    {
+        await CloseAsync(CancellationToken.None);
+        _vm.ShowConfidentialCommand.Execute(null);
+    }
 }

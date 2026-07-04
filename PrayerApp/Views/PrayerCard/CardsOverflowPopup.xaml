@@ -119,6 +119,35 @@
                        AutomationProperties.IsInAccessibleTree="False" />
             </Grid>
 
+            <BoxView Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource CardBorderDark}}"
+                     HeightRequest="1"
+                     AutomationProperties.IsInAccessibleTree="False" />
+
+            <!-- Show confidential — auth-gated reveal of hidden/locked cards (issue #253).
+                 Invokes IConfidentialAccessService.AuthenticateAsync via ShowConfidentialCommand;
+                 on success the session unlocks and the list rebuilds to reveal/unmask. -->
+            <Grid AutomationId="Cards_Btn_ShowConfidential"
+                  SemanticProperties.Description="Show confidential"
+                  SemanticProperties.Hint="Authenticate to reveal hidden and locked cards"
+                  Padding="16,14"
+                  ColumnDefinitions="Auto,*"
+                  ColumnSpacing="14">
+                <Grid.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="OnShowConfidentialTapped" />
+                </Grid.GestureRecognizers>
+                <Label Grid.Column="0"
+                       Text="🔒"
+                       FontSize="18"
+                       VerticalOptions="Center"
+                       AutomationProperties.IsInAccessibleTree="False" />
+                <Label Grid.Column="1"
+                       Text="Show Confidential"
+                       FontSize="{StaticResource FontBodyLg}"
+                       VerticalOptions="Center"
+                       TextColor="{AppThemeBinding Light={StaticResource Tertiary}, Dark={StaticResource TextPrimaryDark}}"
+                       AutomationProperties.IsInAccessibleTree="False" />
+            </Grid>
+
         </VerticalStackLayout>
     </Border>
 </toolkit:Popup>
