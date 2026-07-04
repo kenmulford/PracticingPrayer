@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<toolkit:Popup xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+               xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+               xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+               x:Class="PrayerApp.Views.Confidential.PassphrasePromptPopup">
+
+    <Border StrokeShape="RoundRectangle 12"
+            BackgroundColor="{AppThemeBinding Light={StaticResource CardLight}, Dark={StaticResource CardDark}}"
+            Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource CardBorderDark}}"
+            WidthRequest="320"
+            Padding="16">
+        <VerticalStackLayout Spacing="12">
+
+            <Label Text="Protect with a passphrase"
+                   SemanticProperties.HeadingLevel="Level1"
+                   Style="{StaticResource FormLabel}" />
+
+            <Label Text="Choose a passphrase to encrypt your confidential cards in this backup. You'll need it to restore them later — we can't recover it for you."
+                   Style="{StaticResource MutedText}" />
+
+            <Entry x:Name="PassphraseEntry"
+                   AutomationId="PassphrasePrompt_Entry_Passphrase"
+                   Placeholder="Passphrase (at least 12 characters)"
+                   IsPassword="True"
+                   SemanticProperties.Hint="Enter a passphrase of at least 12 characters"
+                   TextChanged="OnPassphraseTextChanged"
+                   HorizontalOptions="Fill" />
+
+            <Label x:Name="StrengthLabel"
+                   AutomationId="PassphrasePrompt_Label_Strength"
+                   Style="{StaticResource MutedText}"
+                   IsVisible="False" />
+
+            <Label x:Name="ErrorLabel"
+                   Text="Passphrase must be at least 12 characters"
+                   TextColor="{StaticResource DangerRed}"
+                   Style="{StaticResource MutedText}"
+                   IsVisible="False" />
+
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="8" Padding="0,4,0,0">
+                <Button Grid.Column="0"
+                        Text="Cancel"
+                        AutomationId="PassphrasePrompt_Btn_Cancel"
+                        Style="{StaticResource GhostButton}"
+                        Clicked="OnCancel"
+                        HorizontalOptions="Fill" />
+                <Button x:Name="ConfirmButton"
+                        Grid.Column="1"
+                        Text="Protect Backup"
+                        AutomationId="PassphrasePrompt_Btn_Confirm"
+                        Clicked="OnConfirm"
+                        IsEnabled="False"
+                        HorizontalOptions="Fill" />
+            </Grid>
+
+        </VerticalStackLayout>
+    </Border>
+
+</toolkit:Popup>

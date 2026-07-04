@@ -158,6 +158,14 @@
     <Compile Include="../PrayerApp/Services/Confidential/PinHasher.cs" />
     <Compile Include="../PrayerApp/Services/Confidential/PinAttemptTracker.cs" />
 
+    <!-- Confidential-aware backup export (#256): crypto envelope, payload schema/scrub-split,
+         and passphrase policy are pure (no MAUI runtime dependency), so they link into the
+         test project. BackupService.cs itself stays MAUI-only (FileSystem/Share/Shell) and is
+         NOT linked here — its orchestration is exercised via these testable seams. -->
+    <Compile Include="../PrayerApp/Services/Confidential/ConfidentialBackupCrypto.cs" />
+    <Compile Include="../PrayerApp/Services/Confidential/ConfidentialExportPayload.cs" />
+    <Compile Include="../PrayerApp/Services/Confidential/PassphrasePolicy.cs" />
+
     <!-- TestSeedFixtures: linked from PrayerApp.UITests so the consistency
          test in this project can reference the same canonical constants
          the UI tests use. -->
