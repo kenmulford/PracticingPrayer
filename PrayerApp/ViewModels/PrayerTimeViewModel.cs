@@ -23,6 +23,7 @@ public class PrayerTimeViewModel : ObservableObject, IQueryAttributable
     private readonly INotificationService _notificationService;
     private readonly ISettings _settings;
     private readonly IPrayerSelectionService _selectionService;
+    private readonly IDispatcher _dispatcher;
     private CancellationTokenSource _loadCts = new();
     private int? _recentlyNotifiedTagId;
 
@@ -195,7 +196,7 @@ public class PrayerTimeViewModel : ObservableObject, IQueryAttributable
         ITagService tagService, IPrayerInteractionService interactionService,
         INavigationService navigationService, IAccessibilityService accessibilityService,
         INotificationService notificationService, ISettings settings,
-        IPrayerSelectionService selectionService)
+        IPrayerSelectionService selectionService, IDispatcher dispatcher)
     {
         _prayerService = prayerService;
         _cardService = cardService;
@@ -206,6 +207,7 @@ public class PrayerTimeViewModel : ObservableObject, IQueryAttributable
         _notificationService = notificationService;
         _settings = settings;
         _selectionService = selectionService;
+        _dispatcher = dispatcher;
 
         _selectedIntervalSeconds = _settings.AutoModeIntervalSeconds;
 
@@ -227,7 +229,8 @@ public class PrayerTimeViewModel : ObservableObject, IQueryAttributable
         IPlatformApplication.Current!.Services.GetRequiredService<IAccessibilityService>(),
         IPlatformApplication.Current!.Services.GetRequiredService<INotificationService>(),
         IPlatformApplication.Current!.Services.GetRequiredService<ISettings>(),
-        IPlatformApplication.Current!.Services.GetRequiredService<IPrayerSelectionService>())
+        IPlatformApplication.Current!.Services.GetRequiredService<IPrayerSelectionService>(),
+        IPlatformApplication.Current!.Services.GetRequiredService<IDispatcher>())
     { }
 
     public void ApplyQueryAttributes(IDictionary<string, object> query)
@@ -463,7 +466,7 @@ public class PrayerTimeViewModel : ObservableObject, IQueryAttributable
         IsPaused = false;
         CountdownSeconds = SelectedIntervalSeconds;
 
-        _autoTimer = Application.Current!.Dispatcher.CreateTimer();
+        _autoTimer = _dispatcher.CreateTimer();
         _autoTimer.Interval = TimeSpan.FromSeconds(1);
         _autoTimer.Tick += OnAutoTimerTick;
         _autoTimer.Start();
