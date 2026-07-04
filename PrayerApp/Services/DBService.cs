@@ -124,6 +124,21 @@ namespace PrayerApp.Services
             await _db.CreateTableAsync<CardBox>();
             await EnsureCardBoxMigrationAsync();
 
+            // Confidential Cards (#250): box-level cascade — protect every card in the box
+            // that doesn't already set its own ProtectionMode. Must run after CardBox table
+            // creation above (EnsurePrayerCardColumnsAsync runs before CardBox exists).
+            try
+            {
+                await _db.ExecuteAsync("ALTER TABLE CardBox ADD COLUMN ProtectAllCards INTEGER DEFAULT 0");
+            }
+            catch { /* Column already exists */ }
+
+            try
+            {
+                await _db.ExecuteAsync("ALTER TABLE CardBox ADD COLUMN CardProtectionMode INTEGER DEFAULT 0");
+            }
+            catch { /* Column already exists */ }
+
             try
             {
                 await _db.ExecuteAsync("DROP TABLE IF EXISTS PrayerRequestTag");
@@ -465,6 +480,16 @@ namespace PrayerApp.Services
             try
             {
                 await _db!.ExecuteAsync("ALTER TABLE PrayerCard ADD COLUMN IsFavorite INTEGER DEFAULT 0");
+            }
+            catch
+            {
+            }
+
+            // Confidential Cards (#250): per-card protection mode. Enums persist as INTEGER
+            // via sqlite-net; None = 0 is the safe no-op default for existing rows.
+            try
+            {
+                await _db!.ExecuteAsync("ALTER TABLE PrayerCard ADD COLUMN ProtectionMode INTEGER DEFAULT 0");
             }
             catch
             {

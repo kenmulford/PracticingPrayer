@@ -37,6 +37,14 @@ namespace PrayerApp.Models
         [Column("SortOrder")]
         public int SortOrder { get; set; }
 
+        /// <summary>When true, cascades <see cref="CardProtectionMode"/> to every card in this box that has no explicit protection mode of its own.</summary>
+        [Column("ProtectAllCards")]
+        public bool ProtectAllCards { get; set; }
+
+        /// <summary>The protection mode cascaded to cards in this box when <see cref="ProtectAllCards"/> is true.</summary>
+        [Column("CardProtectionMode")]
+        public CardProtectionMode CardProtectionMode { get; set; }
+
         [Column("CreatedAt")]
         public DateTime CreatedAt { get; set; } = DateTime.Now;
 

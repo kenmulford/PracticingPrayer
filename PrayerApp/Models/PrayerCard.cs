@@ -41,6 +41,9 @@ namespace PrayerApp.Models
         [Column("IsImported")]
         public bool IsImported { get; set; } = false;
 
+        [Column("ProtectionMode")]
+        public CardProtectionMode ProtectionMode { get; set; } = CardProtectionMode.None;
+
         /// <summary>FK to CardBox.Id. 0 = Unboxed (no box assigned).</summary>
         [Column("BoxId")]
         public int BoxId { get; set; }
@@ -75,6 +78,24 @@ namespace PrayerApp.Models
         public static void SetDBService(IDBService dbService)
         {
             _dbService = dbService;
+        }
+
+        /// <summary>
+        /// Computes the effective protection mode for a card at read time. Not persisted —
+        /// derived from the card's own <see cref="ProtectionMode"/> and, when the card defers
+        /// (<see cref="CardProtectionMode.None"/>), the owning box's cascade settings.
+        /// A card with an explicit mode always wins over the box. A card with no box
+        /// (<paramref name="box"/> is null) falls back to the card's own mode.
+        /// </summary>
+        public static CardProtectionMode GetEffectiveProtectionMode(PrayerCard card, CardBox? box)
+        {
+            if (card.ProtectionMode != CardProtectionMode.None)
+                return card.ProtectionMode;
+
+            if (box != null && box.ProtectAllCards)
+                return box.CardProtectionMode;
+
+            return CardProtectionMode.None;
         }
         #endregion
 
