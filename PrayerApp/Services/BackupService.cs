@@ -2,6 +2,8 @@ using System.IO.Compression;
 using CommunityToolkit.Maui.Alerts;
 using CommunityToolkit.Mvvm.Messaging;
 using PrayerApp.Messages;
+using PrayerApp.Models;
+using PrayerApp.Services.Confidential;
 
 namespace PrayerApp.Services;
 
@@ -11,19 +13,27 @@ public class BackupService : IBackupService
     private readonly ICardService _cardService;
     private readonly IPrayerService _prayerService;
     private readonly ITagService _tagService;
+    private readonly IBoxService _boxService;
     private readonly INotificationService _notificationService;
+    private readonly IPassphrasePrompt _passphrasePrompt;
     private readonly IMessenger _messenger;
     private readonly string _dbPath;
 
+    private const string ProtectAction = "Protect with a Passphrase";
+    private const string UnencryptedAction = "Continue Unencrypted";
+
     public BackupService(IDBService dbService, ICardService cardService,
-        IPrayerService prayerService, ITagService tagService,
-        INotificationService notificationService, IMessenger messenger)
+        IPrayerService prayerService, ITagService tagService, IBoxService boxService,
+        INotificationService notificationService, IPassphrasePrompt passphrasePrompt,
+        IMessenger messenger)
     {
         _dbService = dbService;
         _cardService = cardService;
         _prayerService = prayerService;
         _tagService = tagService;
+        _boxService = boxService;
         _notificationService = notificationService;
+        _passphrasePrompt = passphrasePrompt;
         _messenger = messenger;
         _dbPath = Path.Combine(FileSystem.AppDataDirectory, "prayer_app.db");
     }
@@ -33,6 +43,7 @@ public class BackupService : IBackupService
         var today = DateTime.Now.ToString("yyyy-MM-dd");
         var fileName = $"practicing_prayer_{today}.pcrd";
         var tempZipPath = Path.Combine(FileSystem.CacheDirectory, fileName);
+        var tempScrubbedDbPath = Path.Combine(FileSystem.CacheDirectory, $"prayer_app_scrub_{Guid.NewGuid():N}.db");
 
         try
         {
@@ -43,6 +54,42 @@ public class BackupService : IBackupService
             foreach (var old in Directory.GetFiles(FileSystem.CacheDirectory, "*.pcrd"))
                 File.Delete(old);
 
+            // Confidential-card detection (#256, depends on #250's GetEffectiveProtectionMode):
+            // load cards + boxes to resolve each card's effective protection mode. Cards and
+            // boxes are cheap, cached reads — no DB close needed for this check.
+            var cards = await _cardService.GetCardsAsync();
+            var boxes = await _boxService.GetBoxesAsync();
+            var hasConfidentialCards = ConfidentialExportSplitter.HasAnyConfidentialCard(cards, boxes);
+
+            string? passphrase = null;
+            if (hasConfidentialCards)
+            {
+                var choice = await Shell.Current.DisplayActionSheetAsync(
+                    "This backup includes confidential cards",
+                    "Cancel", null, ProtectAction, UnencryptedAction);
+
+                if (choice is null or "Cancel")
+                    return false;
+
+                if (choice == ProtectAction)
+                {
+                    passphrase = await _passphrasePrompt.PromptForExportPassphraseAsync();
+                    if (passphrase is null)
+                        return false; // user canceled the passphrase entry
+                }
+                else
+                {
+                    // Unencrypted path: warm, plain notice before the OS share sheet — the user
+                    // must see this before their confidential cards leave the device in plaintext.
+                    var confirmed = await Shell.Current.DisplayAlertAsync(
+                        "Backup Will Include Confidential Cards",
+                        "Your confidential cards will be saved in this backup as plain text, just like the rest of your data. Anyone who opens the backup file can read them.",
+                        "Continue", "Cancel");
+                    if (!confirmed)
+                        return false;
+                }
+            }
+
             // Close DB with WAL checkpoint to ensure the .db file is complete
             await _dbService.CloseAsync();
 
@@ -52,13 +99,47 @@ public class BackupService : IBackupService
             // Reopen the DB immediately — connection is unavailable for milliseconds only
             await _dbService.ReinitializeAsync(_dbPath);
 
+            byte[]? confidentialBlob = null;
+            byte[] dbEntryBytes = dbBytes;
+
+            if (passphrase is not null)
+            {
+                // Passphrase path: operate on a COPY of the db bytes — the live DB (already
+                // reopened above) is never touched. Scrub the copy of confidential rows, and
+                // encrypt those same rows into the confidential.enc sidecar payload.
+                var prayers = await _prayerService.GetAllPrayersAsync();
+                var interactions = await _dbService.GetAllAsync<PrayerInteraction>();
+                var tagJunctions = await _dbService.GetAllAsync<PrayerCardTag>();
+
+                var split = ConfidentialExportSplitter.Split(cards, boxes, prayers, interactions, tagJunctions);
+
+                var payload = new ConfidentialExportPayload
+                {
+                    Cards = split.ConfidentialCards,
+                    Prayers = split.ConfidentialPrayers,
+                    Interactions = split.ConfidentialInteractions,
+                    TagJunctions = split.ConfidentialTagJunctions
+                };
+                confidentialBlob = ConfidentialBackupCrypto.Encrypt(payload.ToJson(), passphrase);
+
+                dbEntryBytes = await BuildScrubbedDbBytesAsync(dbBytes, tempScrubbedDbPath, split);
+            }
+
             // Build the .pcrd ZIP in the cache directory
             await using (var zipStream = new FileStream(tempZipPath, FileMode.Create, FileAccess.Write))
             {
                 using var archive = new ZipArchive(zipStream, ZipArchiveMode.Create);
-                var entry = archive.CreateEntry("prayer_app.db", CompressionLevel.Optimal);
-                await using var entryStream = entry.Open();
-                await entryStream.WriteAsync(dbBytes);
+
+                var dbEntry = archive.CreateEntry("prayer_app.db", CompressionLevel.Optimal);
+                await using (var dbEntryStream = dbEntry.Open())
+                    await dbEntryStream.WriteAsync(dbEntryBytes);
+
+                if (confidentialBlob is not null)
+                {
+                    var encEntry = archive.CreateEntry("confidential.enc", CompressionLevel.Optimal);
+                    await using var encEntryStream = encEntry.Open();
+                    await encEntryStream.WriteAsync(confidentialBlob);
+                }
             }
 
             // Share via OS share sheet — lets user save to Google Drive, Files, email, etc.
@@ -80,6 +161,49 @@ public class BackupService : IBackupService
             await Toast.Make("Backup failed").Show();
             return false;
         }
+        finally
+        {
+            if (File.Exists(tempScrubbedDbPath))
+                File.Delete(tempScrubbedDbPath);
+        }
+    }
+
+    /// <summary>
+    /// Writes <paramref name="sourceDbBytes"/> to a temp file, opens a SEPARATE connection to
+    /// that copy (the live DB, already reopened by the caller, is never touched), deletes the
+    /// confidential rows identified by <paramref name="split"/>, checkpoints, and returns the
+    /// scrubbed bytes. This is what becomes the ZIP's <c>prayer_app.db</c> entry when a
+    /// passphrase sidecar is present.
+    /// </summary>
+    private static async Task<byte[]> BuildScrubbedDbBytesAsync(
+        byte[] sourceDbBytes, string scrubDbPath,
+        ConfidentialExportSplitter.SplitResult split)
+    {
+        await File.WriteAllBytesAsync(scrubDbPath, sourceDbBytes);
+
+        var scrubConnection = new SQLite.SQLiteAsyncConnection(scrubDbPath);
+        try
+        {
+            foreach (var card in split.ConfidentialCards)
+                await scrubConnection.ExecuteAsync("DELETE FROM PrayerCard WHERE Id = ?", card.Id);
+            foreach (var prayer in split.ConfidentialPrayers)
+                await scrubConnection.ExecuteAsync("DELETE FROM PrayerRequest WHERE Id = ?", prayer.Id);
+            foreach (var interaction in split.ConfidentialInteractions)
+                await scrubConnection.ExecuteAsync("DELETE FROM PrayerInteraction WHERE Id = ?", interaction.Id);
+            foreach (var junction in split.ConfidentialTagJunctions)
+                await scrubConnection.ExecuteAsync("DELETE FROM PrayerCardTag WHERE Id = ?", junction.Id);
+
+            // Checkpoint so the scrubbed rows are flushed from WAL into the main file before
+            // it's read back off disk (same PRAGMA gotcha as DBService.CloseAsync — this PRAGMA
+            // returns a result row, so it must use ExecuteScalarAsync, not ExecuteAsync).
+            await scrubConnection.ExecuteScalarAsync<int>("PRAGMA wal_checkpoint(TRUNCATE)");
+        }
+        finally
+        {
+            await scrubConnection.CloseAsync();
+        }
+
+        return await File.ReadAllBytesAsync(scrubDbPath);
     }
 
     public async Task<bool> ImportAsync()

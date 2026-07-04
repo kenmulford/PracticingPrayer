@@ -245,6 +245,9 @@ namespace PrayerApp
             builder.Services.AddSingleton<ISecureStore, MauiSecureStore>();
             builder.Services.AddSingleton<IPinPrompt, MauiPinPrompt>();
             builder.Services.AddSingleton<IConfidentialAccessService, ConfidentialAccessService>();
+            // Confidential-aware backup export (#256): passphrase-entry popup seam, mirroring
+            // IPinPrompt's separation so BackupService.ExportAsync's branching stays testable.
+            builder.Services.AddSingleton<IPassphrasePrompt, MauiPassphrasePrompt>();
             // Deep link sharing service.
             // Inbound deep-link / .prayercard imports stage a structured
             // payload and push ConfirmImportPage modally via
