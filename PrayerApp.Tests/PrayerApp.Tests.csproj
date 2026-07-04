@@ -101,6 +101,7 @@
     <Compile Include="../PrayerApp/ViewModels/PrayerListViewModel.cs" />
     <Compile Include="../PrayerApp/ViewModels/PrayerCardViewModel.cs" />
     <Compile Include="../PrayerApp/ViewModels/PrayerRequestDetailViewModel.cs" />
+    <Compile Include="../PrayerApp/ViewModels/ProtectionPolicy.cs" />
     <Compile Include="../PrayerApp/ViewModels/TagFilterChipViewModel.cs" />
     <Compile Include="../PrayerApp/ViewModels/TagChipViewModel.cs" />
     <Compile Include="../PrayerApp/ViewModels/TagPickerViewModel.cs" />

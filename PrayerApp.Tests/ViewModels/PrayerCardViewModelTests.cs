@@ -219,6 +219,101 @@ public class PrayerCardViewModelTests
         Assert.True(raised);
     }
 
+    // ── CanShare — issue #255 share-block on effective-protection + lock state ──
+    // Gates the affordance (disable, don't hide) per .project/design-system.md
+    // "Required states — Disabled: dim / disable the control … reflect state, don't hide it."
+
+    [Fact]
+    public void CanShare_ProtectedAndLocked_ReturnsFalseEvenWithActivePrayers()
+    {
+        var card = new PrayerCard { Id = 1, Title = "Secret", ProtectionMode = CardProtectionMode.LockedVisible };
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
+        sut.ActivePrayerCount = 3;
+
+        Assert.False(sut.CanShare);
+    }
+
+    [Fact]
+    public void CanShare_ProtectedButUnlocked_ReturnsTrueWithActivePrayers()
+    {
+        var card = new PrayerCard { Id = 1, Title = "Secret", ProtectionMode = CardProtectionMode.LockedVisible };
+        _confidentialAccessService.IsSessionUnlocked.Returns(true);
+        var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
+        sut.ActivePrayerCount = 3;
+
+        Assert.True(sut.CanShare);
+    }
+
+    [Fact]
+    public void CanShare_UnprotectedAndLocked_ReturnsTrueWithActivePrayers()
+    {
+        var card = new PrayerCard { Id = 1, Title = "Open", ProtectionMode = CardProtectionMode.None };
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
+        sut.ActivePrayerCount = 3;
+
+        Assert.True(sut.CanShare);
+    }
+
+    [Fact]
+    public void CanShare_ProtectedViaBoxCascade_Locked_ReturnsFalse()
+    {
+        var box = new CardBox { Id = 7, Name = "Family", ProtectAllCards = true, CardProtectionMode = CardProtectionMode.LockedVisible };
+        var card = new PrayerCard { Id = 1, Title = "Cascaded", ProtectionMode = CardProtectionMode.None, BoxId = 7 };
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService)
+        {
+            Box = box
+        };
+        sut.ActivePrayerCount = 3;
+
+        Assert.False(sut.CanShare);
+    }
+
+    [Fact]
+    public void CanShare_ProtectionModeChange_RaisesPropertyChanged()
+    {
+        var card = new PrayerCard { Id = 1, Title = "Open", ProtectionMode = CardProtectionMode.None };
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
+        sut.ActivePrayerCount = 3;
+        var raised = false;
+        sut.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(PrayerCardViewModel.CanShare)) raised = true;
+        };
+
+        sut.ProtectionMode = CardProtectionMode.LockedVisible;
+
+        Assert.True(raised);
+        Assert.False(sut.CanShare);
+    }
+
+    [Fact]
+    public async Task ShareAsync_ProtectedAndLocked_NoOpGuard_DoesNotThrow()
+    {
+        // Defense in depth (per issue #255): ShareAsync itself guards even if somehow
+        // invoked while blocked. The unguarded body reaches IPlatformApplication.Current
+        // (untestable service-locator resolution) — a no-op return before that line means
+        // this completes without exception.
+        var card = new PrayerCard { Id = 1, Title = "Secret", ProtectionMode = CardProtectionMode.LockedVisible };
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
+        sut.ActivePrayerCount = 3;
+
+        await ((IAsyncRelayCommand)sut.ShareCommand).ExecuteAsync(null);
+
+        // No exception — the guard returned before the untestable service-locator call.
+        await _prayerService.DidNotReceive().GetPrayersByCardAsync(Arg.Any<int>());
+    }
+
     // ── CanPray ───────────────────────────────────────────────────────
 
     [Fact]

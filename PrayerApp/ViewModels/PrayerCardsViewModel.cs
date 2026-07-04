@@ -1011,12 +1011,19 @@ namespace PrayerApp.ViewModels
             var hasTagFilter = selectedTagIds.Count > 0;
             var hasAnyFilter = hasSearch || hasTagFilter;
 
-            // Issue #253: same hidden-exclusion as RebuildSections — a search/tag filter
-            // must not surface an effectively-Hidden card while the session is locked.
+            // Issue #255: an ACTIVE search/tag filter drops ALL effectively-protected cards
+            // (Hidden AND LockedVisible) while locked — a masked "Protected" row surfacing
+            // as a search hit would defeat the point of typing a search term. But when NO
+            // filter is active, this must match RebuildSections' base-list exclusion
+            // (Hidden only — LockedVisible stays in the list, masked) — otherwise clearing
+            // a search (or deselecting the last tag) while locked would incorrectly drop
+            // LockedVisible cards from the default list, regressing #253.
             var renderableCards = IsSessionUnlocked
                 ? AllPrayerCards
-                : AllPrayerCards.Where(c =>
-                    PrayerCard.GetEffectiveProtectionMode(c.Card, c.Box) != CardProtectionMode.Hidden);
+                : hasAnyFilter
+                    ? AllPrayerCards.Where(c => !ProtectionPolicy.IsAccessBlocked(c.Card, c.Box, IsSessionUnlocked))
+                    : AllPrayerCards.Where(c =>
+                        PrayerCard.GetEffectiveProtectionMode(c.Card, c.Box) != CardProtectionMode.Hidden);
 
             // Group once, look up per section — O(cards + sections) instead of O(sections × cards)
             var cardsByBox = renderableCards

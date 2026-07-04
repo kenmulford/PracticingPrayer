@@ -166,12 +166,16 @@ namespace PrayerApp.ViewModels
         /// Re-raises the lock-state-derived projections. Called by <see cref="Box"/>'s setter
         /// and by <c>PrayerCardsViewModel.ShowConfidentialAsync</c> after a successful
         /// "Show confidential" authentication, so masked cells unmask immediately without
-        /// a full cell re-template.
+        /// a full cell re-template. Also re-evaluates <see cref="CanShare"/> (issue #255) so
+        /// the Share button's disabled state tracks lock-state changes, not just
+        /// ActivePrayerCount/ProtectionMode changes.
         /// </summary>
         internal void RaiseLockStateChanged()
         {
             OnPropertyChanged(nameof(IsLockedVisible));
             OnPropertyChanged(nameof(DisplayTitle));
+            OnPropertyChanged(nameof(CanShare));
+            ((IRelayCommand)ShareCommand).NotifyCanExecuteChanged();
         }
 
         /// <summary>
@@ -220,7 +224,15 @@ namespace PrayerApp.ViewModels
         public int BoxId => _prayerCard.BoxId;
         public bool IsNew => _prayerCard.Id == 0;
         public bool CanDelete => !IsSystem && !IsNew;
-        public bool CanShare => !IsSystem && ActivePrayerCount > 0;
+
+        /// <summary>
+        /// Gates the Share action (issue #255): disabled (not hidden — per
+        /// .project/design-system.md "Required states") when this card is effectively
+        /// protected and the confidential-access session is locked, in addition to the
+        /// pre-existing IsSystem/has-active-prayers checks.
+        /// </summary>
+        public bool CanShare => !IsSystem && ActivePrayerCount > 0
+            && !ProtectionPolicy.IsAccessBlocked(_prayerCard, _box, _confidentialAccessService.IsSessionUnlocked);
         /// <summary>Gates the "Pray" action chip — only meaningful when the card has active prayers.</summary>
         public bool CanPray => ActivePrayerCount > 0;
         public bool ShowActionChips => IsExpanded && !IsSystem;
@@ -647,6 +659,10 @@ namespace PrayerApp.ViewModels
         private async Task ShareAsync()
         {
             if (_prayerCard.IsSystem) return;
+            // Issue #255 defense in depth: CanShare already gates ShareCommand's
+            // canExecute (disabling the button), but guard the action itself in case it's
+            // ever invoked directly (e.g. ExecuteAsync bypassing canExecute).
+            if (!CanShare) return;
             var allPrayers = await _prayerService.GetPrayersByCardAsync(_prayerCard.Id);
             var activePrayers = allPrayers
                 .Where(p => !p.IsAnswered && !string.IsNullOrWhiteSpace(p.Title))
