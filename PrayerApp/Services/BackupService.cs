@@ -16,6 +16,7 @@ public class BackupService : IBackupService
     private readonly IBoxService _boxService;
     private readonly INotificationService _notificationService;
     private readonly IPassphrasePrompt _passphrasePrompt;
+    private readonly IConfidentialAccessService _confidentialAccessService;
     private readonly IMessenger _messenger;
     private readonly string _dbPath;
 
@@ -25,7 +26,7 @@ public class BackupService : IBackupService
     public BackupService(IDBService dbService, ICardService cardService,
         IPrayerService prayerService, ITagService tagService, IBoxService boxService,
         INotificationService notificationService, IPassphrasePrompt passphrasePrompt,
-        IMessenger messenger)
+        IConfidentialAccessService confidentialAccessService, IMessenger messenger)
     {
         _dbService = dbService;
         _cardService = cardService;
@@ -34,6 +35,7 @@ public class BackupService : IBackupService
         _boxService = boxService;
         _notificationService = notificationService;
         _passphrasePrompt = passphrasePrompt;
+        _confidentialAccessService = confidentialAccessService;
         _messenger = messenger;
         _dbPath = Path.Combine(FileSystem.AppDataDirectory, "prayer_app.db");
     }
@@ -215,8 +217,11 @@ public class BackupService : IBackupService
         });
         if (picked is null) return false;
 
-        // Validate: must be a ZIP containing prayer_app.db
+        // Validate: must be a ZIP containing prayer_app.db. Also grab confidential.enc (#256's
+        // sidecar) if present, while the archive is open — absent is fine and backward-compatible;
+        // the whole confidential-restore path below is simply skipped in that case.
         byte[] dbBytes;
+        byte[]? confidentialBlob = null;
         try
         {
             await using var pickedStream = await picked.OpenReadAsync();
@@ -232,6 +237,15 @@ public class BackupService : IBackupService
             using var ms = new MemoryStream();
             await entryStream.CopyToAsync(ms);
             dbBytes = ms.ToArray();
+
+            var encEntry = archive.GetEntry("confidential.enc");
+            if (encEntry is not null)
+            {
+                await using var encEntryStream = encEntry.Open();
+                using var encMs = new MemoryStream();
+                await encEntryStream.CopyToAsync(encMs);
+                confidentialBlob = encMs.ToArray();
+            }
         }
         catch
         {
@@ -268,6 +282,13 @@ public class BackupService : IBackupService
             // Single summary signal — restore touched every entity table.
             _messenger.Send(new BulkChangedMessage());
 
+            // Confidential restore (#258) — OWN try/catch: the main DB above is already
+            // fully restored and must stand no matter what happens here. A wrong/canceled
+            // passphrase or a corrupt/absent sidecar just skips this block; it never rolls
+            // back or corrupts the main restore.
+            if (confidentialBlob is not null)
+                await TryRestoreConfidentialAsync(confidentialBlob);
+
             // Phase 4 — Reschedule notifications for restored prayers
             try
             {
@@ -297,6 +318,90 @@ public class BackupService : IBackupService
             await Shell.Current.DisplayAlertAsync("Restore Failed",
                 "Restore failed. Please restart the app.", "OK");
             return false;
+        }
+    }
+
+    /// <summary>
+    /// Confidential-restore step for issue #258, run AFTER the main DB restore has already
+    /// succeeded (Phase 3 above). Prompts for the export-time passphrase, decrypts + inserts the
+    /// confidential rows via <see cref="ConfidentialBackupImporter"/> (preserving their original
+    /// primary-key IDs so junctions resolve — see that class for why a raw connection with
+    /// explicit-PK INSERTs is required instead of IDBService.InsertAsync), then — if any
+    /// confidential cards were restored — ensures a new device has a PIN configured before its
+    /// first access to them. Never throws: every failure path here just skips the confidential
+    /// restore and toasts which rows were excluded, leaving the already-restored main DB standing.
+    /// </summary>
+    private async Task TryRestoreConfidentialAsync(byte[] confidentialBlob)
+    {
+        try
+        {
+            var passphrase = await _passphrasePrompt.PromptForImportPassphraseAsync();
+            if (passphrase is null)
+            {
+                await Toast.Make("Confidential cards were not restored (no passphrase entered)").Show();
+                return;
+            }
+
+            // Close the app's live connection before the importer opens its own raw connection to
+            // the SAME db file — avoids two writers open on one SQLite file at once (the same
+            // concern BuildScrubbedDbBytesAsync sidesteps on export by operating on a separate
+            // copy of the bytes). Decrypt/deserialize happen first so a bad passphrase never even
+            // requires closing the live connection.
+            ConfidentialBackupImporter.ImportResult result;
+            try
+            {
+                ConfidentialBackupCrypto.Decrypt(confidentialBlob, passphrase); // fail fast, connection still open
+            }
+            catch (Exception)
+            {
+                await Toast.Make("Confidential cards were not restored (incorrect passphrase or corrupt backup)").Show();
+                return;
+            }
+
+            await _dbService.CloseAsync();
+            try
+            {
+                result = await ConfidentialBackupImporter.ImportAsync(_dbPath, confidentialBlob, passphrase);
+            }
+            finally
+            {
+                await _dbService.ReinitializeAsync(_dbPath);
+            }
+
+            if (!result.Success)
+            {
+                await Toast.Make("Confidential cards were not restored (incorrect passphrase or corrupt backup)").Show();
+                return;
+            }
+
+            // The importer wrote directly to the db file via its own raw connection — reload the
+            // app's live connection's caches so the UI reflects the newly-inserted rows.
+            _cardService.InvalidateCache();
+            _prayerService.InvalidateCache();
+            _messenger.Send(new BulkChangedMessage());
+
+            await Toast.Make("Confidential cards restored").Show();
+
+            // New-device auth setup: protected cards now exist, so ensure the PIN gate is
+            // configured before the user's first access to them. Cancelling is allowed —
+            // biometric may still work, and the gate will prompt again on first access.
+            if (result.CardsRestored > 0)
+                await _confidentialAccessService.EnsurePinConfiguredAsync();
+        }
+        catch (Exception ex)
+        {
+            // Belt-and-suspenders: ConfidentialBackupImporter.ImportAsync already catches its own
+            // decrypt/deserialize/insert failures and returns Success=false rather than throwing,
+            // but this outer catch guarantees NOTHING from the confidential path can ever
+            // propagate up and threaten the main DB restore that already succeeded.
+            System.Diagnostics.Debug.WriteLine($"[BackupService.TryRestoreConfidentialAsync] {ex}");
+
+            // The live connection may have been closed above when the failure occurred inside the
+            // importer step — make sure the app is left with a usable connection either way.
+            try { await _dbService.ReinitializeAsync(_dbPath); }
+            catch { /* DB may be gone — the outer ImportAsync catch already handles this case */ }
+
+            await Toast.Make("Confidential cards were not restored").Show();
         }
     }
 }

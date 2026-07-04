@@ -13,4 +13,11 @@ public interface IPassphrasePrompt
     /// Returns the chosen passphrase, or null if the user canceled.
     /// </summary>
     Task<string?> PromptForExportPassphraseAsync();
+
+    /// <summary>
+    /// Shows a plain passphrase-ENTRY popup for import (issue #258) — no minimum-length gate and
+    /// no strength meter, since the caller is entering a passphrase chosen at export time, not
+    /// choosing a new one. Returns the entered passphrase, or null if the user canceled.
+    /// </summary>
+    Task<string?> PromptForImportPassphraseAsync();
 }

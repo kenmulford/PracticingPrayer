@@ -187,6 +187,59 @@ public class ConfidentialAccessServiceTests
         Assert.True(await sut.AuthenticateAsync(Reason));
     }
 
+    // ── EnsurePinConfiguredAsync (issue #258: new-device PIN setup after restore) ──
+
+    [Fact]
+    public async Task EnsurePinConfiguredAsync_NoPinSet_PromptsSetupAndStoresHash()
+    {
+        _pinPrompt.SetPinToReturn = "123456";
+        var sut = CreateSut();
+
+        var result = await sut.EnsurePinConfiguredAsync();
+
+        Assert.True(result);
+        Assert.True(_pinPrompt.SetPinWasPrompted);
+        var stored = await _secureStore.GetAsync("confidential_access_pin");
+        Assert.NotNull(stored);
+        Assert.DoesNotContain("123456", stored); // never stores plaintext
+    }
+
+    [Fact]
+    public async Task EnsurePinConfiguredAsync_NoPinSet_UserCancels_ReturnsFalse()
+    {
+        _pinPrompt.SetPinToReturn = null;
+        var sut = CreateSut();
+
+        var result = await sut.EnsurePinConfiguredAsync();
+
+        Assert.False(result);
+        Assert.Null(await _secureStore.GetAsync("confidential_access_pin"));
+    }
+
+    [Fact]
+    public async Task EnsurePinConfiguredAsync_PinAlreadySet_NoOpsAndReturnsTrue()
+    {
+        _secureStore.Seed("confidential_access_pin", PinHasher.Hash("654321"));
+        var sut = CreateSut();
+
+        var result = await sut.EnsurePinConfiguredAsync();
+
+        Assert.True(result);
+        Assert.False(_pinPrompt.SetPinWasPrompted); // no re-onboarding when a PIN exists
+    }
+
+    [Fact]
+    public async Task EnsurePinConfiguredAsync_NeverTouchesBiometricOrSessionState()
+    {
+        _pinPrompt.SetPinToReturn = "123456";
+        var sut = CreateSut();
+
+        await sut.EnsurePinConfiguredAsync();
+
+        // Unlike AuthenticateAsync, this must never unlock the session.
+        Assert.False(sut.IsSessionUnlocked);
+    }
+
     // ── fakes ────────────────────────────────────────────────────────
 
     private sealed class FakeBiometricAuthenticator : IBiometricAuthenticator

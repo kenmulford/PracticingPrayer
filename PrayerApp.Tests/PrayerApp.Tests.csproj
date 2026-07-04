@@ -166,6 +166,11 @@
     <Compile Include="../PrayerApp/Services/Confidential/ConfidentialExportPayload.cs" />
     <Compile Include="../PrayerApp/Services/Confidential/PassphrasePolicy.cs" />
 
+    <!-- Confidential-aware backup import (#258): decrypt + explicit-PK insert seam. Opens its own
+         raw SQLiteAsyncConnection against a db path (not IDBService — see the class doc for why),
+         so it links here and is unit-tested against a real temp SQLite file. -->
+    <Compile Include="../PrayerApp/Services/Confidential/ConfidentialBackupImporter.cs" />
+
     <!-- TestSeedFixtures: linked from PrayerApp.UITests so the consistency
          test in this project can reference the same canonical constants
          the UI tests use. -->
