@@ -24,6 +24,7 @@ namespace PrayerApp.ViewModels
         private readonly IAccessibilityService _accessibilityService;
         private readonly IBoxService _boxService;
         private readonly ISettings _settings;
+        private readonly IConfidentialAccessService _confidentialAccessService;
 
         // Single-expand invariant lives on PrayerCardsViewModel.ExpandedCardId.
         // Per-card IsExpanded is a read-only projection over that — see the
@@ -375,7 +376,8 @@ namespace PrayerApp.ViewModels
 
         public PrayerCardViewModel(ICardService cardService, IPrayerService prayerService,
             IOnboardingService onboardingService, INavigationService navigationService,
-            IAccessibilityService accessibilityService, IBoxService boxService, ISettings settings)
+            IAccessibilityService accessibilityService, IBoxService boxService, ISettings settings,
+            IConfidentialAccessService confidentialAccessService)
         {
             _prayerCard = new PrayerCard();
             _cardService = cardService;
@@ -385,6 +387,7 @@ namespace PrayerApp.ViewModels
             _accessibilityService = accessibilityService;
             _boxService = boxService;
             _settings = settings;
+            _confidentialAccessService = confidentialAccessService;
             SaveCommand = new AsyncRelayCommand(SaveAsync, () => !IsBusy);
             DeleteCommand = new AsyncRelayCommand(DeleteAsync, () => !IsSystem);
             ArchiveCommand = new AsyncRelayCommand(ArchiveAsync, () => !IsSystem);
@@ -405,7 +408,8 @@ namespace PrayerApp.ViewModels
             IPlatformApplication.Current!.Services.GetRequiredService<INavigationService>(),
             IPlatformApplication.Current!.Services.GetRequiredService<IAccessibilityService>(),
             IPlatformApplication.Current!.Services.GetRequiredService<IBoxService>(),
-            IPlatformApplication.Current!.Services.GetRequiredService<ISettings>())
+            IPlatformApplication.Current!.Services.GetRequiredService<ISettings>(),
+            IPlatformApplication.Current!.Services.GetRequiredService<IConfidentialAccessService>())
         { }
 
         public PrayerCardViewModel(PrayerCard pc) : this()
@@ -420,8 +424,9 @@ namespace PrayerApp.ViewModels
         /// </summary>
         public PrayerCardViewModel(PrayerCard pc, ICardService cardService, IPrayerService prayerService,
             IOnboardingService onboardingService, INavigationService navigationService,
-            IAccessibilityService accessibilityService, IBoxService boxService, ISettings settings)
-            : this(cardService, prayerService, onboardingService, navigationService, accessibilityService, boxService, settings)
+            IAccessibilityService accessibilityService, IBoxService boxService, ISettings settings,
+            IConfidentialAccessService confidentialAccessService)
+            : this(cardService, prayerService, onboardingService, navigationService, accessibilityService, boxService, settings, confidentialAccessService)
         {
             _prayerCard = pc;
             LoadActivePrayerCountAsync().SafeFireAndForget();
@@ -505,9 +510,35 @@ namespace PrayerApp.ViewModels
             await _navigationService.GoToAsync($"..?{Routes.QueryKeys.Deleted}={Identifier}");
         }
 
+        /// <summary>
+        /// Issue #254 auth gate — mirrors the <see cref="_prayerCard"/>.IsSystem short-circuit
+        /// pattern above SelectPrayerCardAsync/DeleteAsync, but for confidential cards. When
+        /// this card is effectively protected (own <see cref="PrayerCard.ProtectionMode"/> or a
+        /// box cascade) AND the confidential-access session is locked, prompts for
+        /// authentication before letting the caller proceed. Returns true immediately for an
+        /// unprotected card or an already-unlocked session (no auth prompt). Shared by both
+        /// <see cref="SelectPrayerCardAsync"/> (open-card navigation) and
+        /// <see cref="ToggleExpandedAsync"/> (in-place expand) so the condition is expressed once.
+        /// Reads <see cref="_confidentialAccessService"/> directly rather than
+        /// <c>Parent.IsSessionUnlocked</c> — it's the same singleton instance (see
+        /// <see cref="PrayerCardsViewModel.CreateCardViewModel"/>), and this keeps the gate usable
+        /// even before <see cref="Parent"/> is wired (e.g. <see cref="SelectCardCommand"/>'s
+        /// canExecute-bypassed direct-execute tests).
+        /// </summary>
+        private async Task<bool> EnsureUnlockedForAccessAsync(string reason)
+        {
+            var isProtectedAndLocked =
+                PrayerCard.GetEffectiveProtectionMode(_prayerCard, _box) != CardProtectionMode.None
+                && !_confidentialAccessService.IsSessionUnlocked;
+            if (!isProtectedAndLocked) return true;
+
+            return await _confidentialAccessService.AuthenticateAsync(reason);
+        }
+
         private async Task SelectPrayerCardAsync()
         {
             if (_prayerCard.IsSystem) return;
+            if (!await EnsureUnlockedForAccessAsync("Open protected card")) return;
             await _navigationService.GoToAsync($"{Routes.PrayerCardPage}?load={Identifier}");
         }
 
@@ -518,6 +549,13 @@ namespace PrayerApp.ViewModels
             // is enforced structurally instead of via a cascade handler.
             if (Parent is null) return;
             var nowExpanded = Parent.ExpandedCardId == _prayerCard.Id;
+
+            // Issue #254: only the EXPAND direction reveals real content (LoadPrayersAsync +
+            // ExpandedCardId), so the gate runs strictly before both when about to expand.
+            // Collapsing a card never needs auth.
+            if (!nowExpanded && !await EnsureUnlockedForAccessAsync("Expand protected card"))
+                return;
+
             if (!nowExpanded && !_prayersLoaded)
             {
                 // Load first, then reveal — avoids empty flash

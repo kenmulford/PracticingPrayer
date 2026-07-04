@@ -419,7 +419,7 @@ public class PrayerCardsViewModelTests
         // Simulate SyncAsync's diff loop having added the new card
         var newCard = new PrayerCard { Id = 42, Title = "Just Created", BoxId = 0 };
         var newVm = new PrayerCardViewModel(newCard, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings)
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService)
         { Parent = sut };
         sut.AllPrayerCards.Add(newVm);
 
@@ -1322,7 +1322,7 @@ public class PrayerCardsViewModelTests
         // and ConsumePendingSavedAsync (the order Shell + OnAppearing produce).
         var newCard = new PrayerCard { Id = 42, Title = "Just Created", BoxId = 0 };
         var newVm = new PrayerCardViewModel(newCard, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings)
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService)
         { Parent = sut };
         sut.AllPrayerCards.Add(newVm);
 
@@ -1492,7 +1492,7 @@ public class PrayerCardsViewModelTests
         // and ConsumePendingSavedAsync (the new-via-sync branch).
         var newCard = new PrayerCard { Id = 42, Title = "Imported May 2", BoxId = 0, IsImported = true };
         var newVm = new PrayerCardViewModel(newCard, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings)
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService)
         {
             PrayerRowFactory = BuildStubPrayerRowVm,
             Parent = sut
@@ -1536,7 +1536,7 @@ public class PrayerCardsViewModelTests
             _navigationService, _accessibilityService, _tagService, _settings, _boxService,
             _confidentialAccessService, _messenger,
             cardVmFactory: pc => new PrayerCardViewModel(pc, _cardService, _prayerService,
-                _onboardingService, _navigationService, _accessibilityService, _boxService, _settings)
+                _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService)
             {
                 PrayerRowFactory = BuildStubPrayerRowVm
             });
@@ -1573,7 +1573,7 @@ public class PrayerCardsViewModelTests
             _navigationService, _accessibilityService, _tagService, _settings, _boxService,
             _confidentialAccessService, _messenger,
             cardVmFactory: pc => new PrayerCardViewModel(pc, _cardService, _prayerService,
-                _onboardingService, _navigationService, _accessibilityService, _boxService, _settings)
+                _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService)
             {
                 PrayerRowFactory = BuildStubPrayerRowVm
             });
@@ -2237,6 +2237,104 @@ public class PrayerCardsViewModelTests
         await ((IAsyncRelayCommand)sut.ShowConfidentialCommand).ExecuteAsync(null);
 
         Assert.DoesNotContain(GetAllSectionMemberCards(sut), c => c.Id == 2);
+    }
+
+    // ── Issue #254: SessionRelockedMessage — re-lock visible on resume ──────
+    // App.xaml.cs publishes SessionRelockedMessage right after RelockSession() on
+    // Window.Deactivated. These tests fire the same message over the fixture's
+    // shared _messenger (mirrors how the other EntityChangedMessage handlers are
+    // exercised elsewhere in this file) and assert the VM re-derives its lock-gated
+    // projections without a DB re-sync.
+
+    [Fact]
+    public async Task SessionRelockedMessage_HiddenCardWasRevealed_ReExcludedAfterRelock()
+    {
+        SetupSystemBoxes();
+        _confidentialAccessService.IsSessionUnlocked.Returns(true);
+        var hiddenCard = new PrayerCard { Id = 2, Title = "Hidden Secret", BoxId = 0, ProtectionMode = CardProtectionMode.Hidden };
+        _cardService.GetCardsAsync().Returns(new List<PrayerCard> { hiddenCard }.AsReadOnly());
+        _tagService.GetTagsAsync().Returns(new List<PrayerTag>().AsReadOnly());
+        _prayerService.GetAllPrayersAsync().Returns(new List<Prayer>().AsReadOnly());
+        SetupDbMocks(new List<PrayerCardTag>());
+        var sut = CreateSut();
+        await sut.SyncAsync();
+        Assert.Contains(GetAllSectionMemberCards(sut), c => c.Id == 2);
+
+        // Simulate App.xaml.cs's Window.Deactivated handler: RelockSession() flips the
+        // shared singleton's reported state, then the message is broadcast.
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        _messenger.Send(new PrayerApp.Messages.SessionRelockedMessage());
+
+        Assert.DoesNotContain(GetAllSectionMemberCards(sut), c => c.Id == 2);
+    }
+
+    [Fact]
+    public void SessionRelockedMessage_LockedVisibleCardWasUnmasked_ReMaskedAfterRelock()
+    {
+        SetupSystemBoxes();
+        _confidentialAccessService.IsSessionUnlocked.Returns(true);
+        var card = new PrayerCard { Id = 3, Title = "Secret Card", BoxId = 0, ProtectionMode = CardProtectionMode.LockedVisible };
+        var sut = CreateSut();
+        var vm = new PrayerCardViewModel(card, _cardService, _prayerService, _onboardingService,
+            _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService)
+        { Parent = sut };
+        sut.AllPrayerCards.Add(vm);
+        Assert.False(vm.IsLockedVisible);
+        Assert.Equal("Secret Card", vm.DisplayTitle);
+
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        _messenger.Send(new PrayerApp.Messages.SessionRelockedMessage());
+
+        Assert.True(vm.IsLockedVisible);
+        Assert.Equal("Protected", vm.DisplayTitle);
+    }
+
+    [Fact]
+    public async Task SessionRelockedMessage_ExpandedProtectedCard_CollapsesAndHidesRealContent()
+    {
+        SetupSystemBoxes();
+        _confidentialAccessService.IsSessionUnlocked.Returns(true);
+        var card = new PrayerCard { Id = 4, Title = "Secret Card", BoxId = 0, ProtectionMode = CardProtectionMode.LockedVisible };
+        _cardService.GetCardsAsync().Returns(new List<PrayerCard> { card }.AsReadOnly());
+        _tagService.GetTagsAsync().Returns(new List<PrayerTag>().AsReadOnly());
+        _prayerService.GetAllPrayersAsync().Returns(new List<Prayer>().AsReadOnly());
+        _prayerService.GetPrayersByCardAsync(4).Returns(new List<Prayer>());
+        SetupDbMocks(new List<PrayerCardTag>());
+        var sut = CreateSut();
+        await sut.SyncAsync();
+        sut.ExpandedCardId = 4; // already unlocked — expand directly, no gate involved here
+        var cardVm = sut.AllPrayerCards.Single(c => c.Id == 4);
+        Assert.True(cardVm.IsExpanded);
+
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        _messenger.Send(new PrayerApp.Messages.SessionRelockedMessage());
+
+        Assert.Null(sut.ExpandedCardId);
+        Assert.False(cardVm.IsExpanded);
+    }
+
+    [Fact]
+    public async Task SessionRelockedMessage_ExpandedUnprotectedCard_StaysExpanded()
+    {
+        SetupSystemBoxes();
+        _confidentialAccessService.IsSessionUnlocked.Returns(true);
+        var card = new PrayerCard { Id = 5, Title = "Open Card", BoxId = 0, ProtectionMode = CardProtectionMode.None };
+        _cardService.GetCardsAsync().Returns(new List<PrayerCard> { card }.AsReadOnly());
+        _tagService.GetTagsAsync().Returns(new List<PrayerTag>().AsReadOnly());
+        _prayerService.GetAllPrayersAsync().Returns(new List<Prayer>().AsReadOnly());
+        _prayerService.GetPrayersByCardAsync(5).Returns(new List<Prayer>());
+        SetupDbMocks(new List<PrayerCardTag>());
+        var sut = CreateSut();
+        await sut.SyncAsync();
+        sut.ExpandedCardId = 5;
+        var cardVm = sut.AllPrayerCards.Single(c => c.Id == 5);
+
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        _messenger.Send(new PrayerApp.Messages.SessionRelockedMessage());
+
+        // Unprotected card — relock has nothing to hide, so it stays expanded.
+        Assert.Equal(5, sut.ExpandedCardId);
+        Assert.True(cardVm.IsExpanded);
     }
 
     // ── Helper ──────────────────────────────────────────────────────────
