@@ -544,7 +544,16 @@ namespace PrayerApp.ViewModels
                 && !_confidentialAccessService.IsSessionUnlocked;
             if (!isProtectedAndLocked) return true;
 
-            return await _confidentialAccessService.AuthenticateAsync(reason);
+            var unlocked = await _confidentialAccessService.AuthenticateAsync(reason);
+            // Issue #296: the session just transitioned to unlocked via this in-path gate
+            // (tap-to-expand or open-card) — re-raise every card's lock-derived projections
+            // through the same mechanism ShowConfidentialAsync uses, so the bound cell (this
+            // card's DisplayTitle/IsLockedVisible) refreshes immediately instead of staying
+            // stale until some other event rebuilds the list. Parent is null-conditional:
+            // this gate is intentionally usable before Parent is wired (see the doc comment
+            // above), so a null Parent must remain a safe no-op.
+            if (unlocked) Parent?.RefreshAfterUnlock();
+            return unlocked;
         }
 
         private async Task SelectPrayerCardAsync()

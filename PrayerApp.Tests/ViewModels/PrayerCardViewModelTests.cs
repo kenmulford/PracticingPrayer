@@ -1337,6 +1337,38 @@ public class PrayerCardViewModelTests
     }
 
     [Fact]
+    public async Task SelectCardCommand_ProtectedAndLocked_AuthSucceeds_RaisesDisplayTitleChanged()
+    {
+        // Issue #296: open-card is the other in-path unlock call site (alongside
+        // tap-to-expand) that must funnel through EnsureUnlockedForAccessAsync's shared
+        // RefreshAfterUnlock call so the card's bound cell refreshes immediately.
+        var card = new PrayerCard { Id = 13, Title = "Secret", ProtectionMode = CardProtectionMode.LockedVisible };
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        _confidentialAccessService.AuthenticateAsync(Arg.Any<string>())
+            .Returns(callInfo =>
+            {
+                _confidentialAccessService.IsSessionUnlocked.Returns(true);
+                return Task.FromResult(true);
+            });
+        var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
+        var parent = new PrayerCardsViewModel(_cardService, _prayerService, _onboardingService,
+            _navigationService, _accessibilityService, Substitute.For<ITagService>(), _settings,
+            _boxService, _confidentialAccessService, new WeakReferenceMessenger());
+        sut.Parent = parent;
+        parent.AllPrayerCards.Add(sut);
+
+        var raisedProperties = new List<string?>();
+        sut.PropertyChanged += (_, e) => raisedProperties.Add(e.PropertyName);
+
+        await ((IAsyncRelayCommand)sut.SelectCardCommand).ExecuteAsync(null);
+
+        Assert.Contains(nameof(PrayerCardViewModel.DisplayTitle), raisedProperties);
+        Assert.Contains(nameof(PrayerCardViewModel.IsLockedVisible), raisedProperties);
+        await _navigationService.Received(1).GoToAsync($"{Routes.PrayerCardPage}?load=13");
+    }
+
+    [Fact]
     public async Task SelectCardCommand_ProtectedAndLocked_AuthDenied_DoesNotNavigate()
     {
         var card = new PrayerCard { Id = 12, Title = "Secret", ProtectionMode = CardProtectionMode.LockedVisible };
@@ -1457,6 +1489,41 @@ public class PrayerCardViewModelTests
 
         await _confidentialAccessService.DidNotReceive().AuthenticateAsync(Arg.Any<string>());
         Assert.True(sut.IsExpanded);
+    }
+
+    [Fact]
+    public async Task ToggleExpandedCommand_ProtectedAndLocked_AuthSucceeds_RaisesDisplayTitleChanged()
+    {
+        // Issue #296: in-path unlock via ToggleExpandedAsync (in-place expand) must
+        // re-raise the card's lock-derived projections (DisplayTitle/IsLockedVisible)
+        // so the bound cell refreshes from "Protected" to the real title without a
+        // separate refresh event. DisplayTitle/IsLockedVisible are LIVE getters, so
+        // reading them after the unlock would pass even without the fix — the only
+        // proof of the fix is that PropertyChanged actually fires for them.
+        var card = new PrayerCard { Id = 26, Title = "Secret", ProtectionMode = CardProtectionMode.LockedVisible };
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        _confidentialAccessService.AuthenticateAsync(Arg.Any<string>())
+            .Returns(callInfo =>
+            {
+                _confidentialAccessService.IsSessionUnlocked.Returns(true);
+                return Task.FromResult(true);
+            });
+        var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
+        var parent = CreateParentForExpandTests(sut);
+        parent.AllPrayerCards.Add(sut);
+        _prayerService.GetPrayersByCardAsync(26).Returns(new List<Prayer>());
+
+        var raisedProperties = new List<string?>();
+        sut.PropertyChanged += (_, e) => raisedProperties.Add(e.PropertyName);
+
+        await ((IAsyncRelayCommand)sut.ToggleExpandedCommand).ExecuteAsync(null);
+
+        Assert.Contains(nameof(PrayerCardViewModel.DisplayTitle), raisedProperties);
+        Assert.Contains(nameof(PrayerCardViewModel.IsLockedVisible), raisedProperties);
+        Assert.Equal("Secret", sut.DisplayTitle);
+        Assert.True(sut.IsExpanded);
+        await _prayerService.Received(1).GetPrayersByCardAsync(26);
     }
 
     [Fact]
