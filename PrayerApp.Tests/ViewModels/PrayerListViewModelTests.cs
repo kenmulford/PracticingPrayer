@@ -320,6 +320,49 @@ public class PrayerListViewModelTests
         Assert.True(((IRelayCommand)sut.StartPrayerTimeCommand).CanExecute(null));
     }
 
+    // ── Issue #298 regression fix — HasActiveInView must be public + notify, so the
+    // Prayers overflow popup's Pray row can bind IsEnabled/Opacity to it and get the same
+    // disabled affordance the old Pray ToolbarItem got for free from Command/CanExecute. ──
+
+    [Fact]
+    public async Task HasActiveInView_False_AndNotifiesPropertyChanged_WhenNoActivePrayersInView()
+    {
+        // Answered filter over an answered-only set → 0 active in view.
+        SetupSync(new[]
+        {
+            new Prayer { Id = 20, Title = "Done1", IsAnswered = true },
+            new Prayer { Id = 21, Title = "Done2", IsAnswered = true },
+        });
+
+        var sut = CreateSut();
+        await sut.SyncAsync();
+
+        // Subscribe before the act — the Pray row's disabled/dim binding depends on the
+        // notification firing, not just the getter returning the right value.
+        var notified = false;
+        sut.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(PrayerListViewModel.HasActiveInView))
+                notified = true;
+        };
+
+        sut.SetStatusCommand.Execute("Answered"); // both answered rows visible, none active
+
+        Assert.True(notified, "HasActiveInView should raise PropertyChanged when ApplyFilter runs");
+        Assert.False(sut.HasActiveInView);
+    }
+
+    [Fact]
+    public async Task HasActiveInView_True_WhenAtLeastOneActiveInView()
+    {
+        SetupSync(new[] { new Prayer { Id = 30, Title = "Active", IsAnswered = false } });
+
+        var sut = CreateSut();
+        await sut.SyncAsync();
+
+        Assert.True(sut.HasActiveInView);
+    }
+
     [Fact]
     public async Task StartPrayerTimeCommand_HonorsCombinedTextStatusTagFilter()
     {
@@ -452,6 +495,54 @@ public class PrayerListViewModelTests
         // no fresh navigation.
         _confidentialAccessService.IsSessionUnlocked.Returns(false);
         _messenger.Send(new SessionRelockedMessage());
+
+        Assert.DoesNotContain(sut.FilteredPrayers, p => p.Id == 100);
+    }
+
+    // ── Issue #298 — ShowConfidentialCommand reveal from the Prayers overflow menu ──
+
+    [Fact]
+    public async Task ShowConfidentialCommand_AuthenticateSucceeds_ProtectedPrayerAppearsInFilteredView()
+    {
+        var protectedCard = new PrayerCard { Id = 1, Title = "Secret", ProtectionMode = CardProtectionMode.LockedVisible };
+        SetupSync(new[]
+        {
+            new Prayer { Id = 100, Title = "Protected Prayer", PrayerCardId = 1, IsAnswered = false }
+        }, cards: new[] { protectedCard });
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+
+        var sut = CreateSut();
+        await sut.SyncAsync();
+
+        // Precondition: locked session excludes the protected prayer.
+        Assert.DoesNotContain(sut.FilteredPrayers, p => p.Id == 100);
+
+        _confidentialAccessService.AuthenticateAsync(Arg.Any<string>()).Returns(true);
+        _confidentialAccessService.IsSessionUnlocked.Returns(true);
+
+        await ((IAsyncRelayCommand)sut.ShowConfidentialCommand).ExecuteAsync(null);
+
+        Assert.Contains(sut.FilteredPrayers, p => p.Id == 100);
+    }
+
+    [Fact]
+    public async Task ShowConfidentialCommand_AuthenticateCanceled_ProtectedPrayerStaysExcluded()
+    {
+        var protectedCard = new PrayerCard { Id = 1, Title = "Secret", ProtectionMode = CardProtectionMode.LockedVisible };
+        SetupSync(new[]
+        {
+            new Prayer { Id = 100, Title = "Protected Prayer", PrayerCardId = 1, IsAnswered = false }
+        }, cards: new[] { protectedCard });
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+
+        var sut = CreateSut();
+        await sut.SyncAsync();
+
+        Assert.DoesNotContain(sut.FilteredPrayers, p => p.Id == 100);
+
+        _confidentialAccessService.AuthenticateAsync(Arg.Any<string>()).Returns(false);
+
+        await ((IAsyncRelayCommand)sut.ShowConfidentialCommand).ExecuteAsync(null);
 
         Assert.DoesNotContain(sut.FilteredPrayers, p => p.Id == 100);
     }
