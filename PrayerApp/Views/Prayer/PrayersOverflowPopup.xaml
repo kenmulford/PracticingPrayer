@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<toolkit:Popup xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+               xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+               xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+               xmlns:viewModels="clr-namespace:PrayerApp.ViewModels"
+               x:Class="PrayerApp.Views.Prayer.PrayersOverflowPopup"
+               x:DataType="viewModels:PrayerListViewModel"
+               Padding="0"
+               BackgroundColor="Transparent"
+               CanBeDismissedByTappingOutsideOfPopup="True">
+
+    <!-- CT.Maui v14 Popup presents in a detached visual tree that does NOT
+         inherit App.Resources — StaticResource lookup for Colors.xaml tokens
+         returns null from inside the Popup, which makes every AppThemeBinding
+         silently fall back to defaults (stuck in "light"). Explicitly merge
+         Colors.xaml into the popup's own Resources so tokens resolve and the
+         theme bindings flip correctly with system dark mode. Mirrors
+         CardsOverflowPopup.xaml:12-24 (issue #298). -->
+    <toolkit:Popup.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="../../Resources/Styles/Colors.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </toolkit:Popup.Resources>
+
+    <Border BackgroundColor="{AppThemeBinding Light={StaticResource CardLight}, Dark={StaticResource CardDark}}"
+            Stroke="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryBtnDark}}"
+            StrokeThickness="1.5"
+            MinimumWidthRequest="240">
+        <Border.StrokeShape>
+            <RoundRectangle CornerRadius="8" />
+        </Border.StrokeShape>
+
+        <VerticalStackLayout Spacing="0">
+
+            <!-- Pray — disabled + dimmed when the filtered view has no active (unanswered)
+                 prayers, mirroring the disabled affordance the old Pray ToolbarItem got for
+                 free from Command/CanExecute binding (issue #298 regression fix). No
+                 bool→opacity converter exists in this app (App.xaml:13-19), so a DataTrigger
+                 drives the dim instead. -->
+            <Grid AutomationId="List_Btn_Pray"
+                  SemanticProperties.Description="Pray"
+                  SemanticProperties.Hint="Pray through the prayers in the current view"
+                  Padding="16,14"
+                  ColumnDefinitions="Auto,*"
+                  ColumnSpacing="14"
+                  IsEnabled="{Binding HasActiveInView}">
+                <Grid.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="OnPrayTapped" />
+                </Grid.GestureRecognizers>
+                <Grid.Triggers>
+                    <DataTrigger TargetType="Grid" Binding="{Binding HasActiveInView}" Value="False">
+                        <Setter Property="Opacity" Value="0.4" />
+                    </DataTrigger>
+                </Grid.Triggers>
+                <Image Source="hands_praying_solid_full.png"
+                       HeightRequest="18" WidthRequest="18"
+                       VerticalOptions="Center"
+                       AutomationProperties.IsInAccessibleTree="False">
+                    <Image.Behaviors>
+                        <toolkit:IconTintColorBehavior TintColor="{AppThemeBinding Light={StaticResource Tertiary}, Dark={StaticResource TextPrimaryDark}}" />
+                    </Image.Behaviors>
+                </Image>
+                <Label Grid.Column="1"
+                       Text="Pray"
+                       FontSize="{StaticResource FontBodyLg}"
+                       VerticalOptions="Center"
+                       TextColor="{AppThemeBinding Light={StaticResource Tertiary}, Dark={StaticResource TextPrimaryDark}}"
+                       AutomationProperties.IsInAccessibleTree="False" />
+            </Grid>
+
+            <BoxView Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource CardBorderDark}}"
+                     HeightRequest="1"
+                     AutomationProperties.IsInAccessibleTree="False" />
+
+            <!-- Add -->
+            <Grid AutomationId="Add"
+                  SemanticProperties.Description="Add"
+                  SemanticProperties.Hint="Add a new prayer request"
+                  Padding="16,14"
+                  ColumnDefinitions="Auto,*"
+                  ColumnSpacing="14">
+                <Grid.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="OnAddTapped" />
+                </Grid.GestureRecognizers>
+                <Image Source="plus_solid_full.png"
+                       HeightRequest="18" WidthRequest="18"
+                       VerticalOptions="Center"
+                       AutomationProperties.IsInAccessibleTree="False">
+                    <Image.Behaviors>
+                        <toolkit:IconTintColorBehavior TintColor="{AppThemeBinding Light={StaticResource Tertiary}, Dark={StaticResource TextPrimaryDark}}" />
+                    </Image.Behaviors>
+                </Image>
+                <Label Grid.Column="1"
+                       Text="Add"
+                       FontSize="{StaticResource FontBodyLg}"
+                       VerticalOptions="Center"
+                       TextColor="{AppThemeBinding Light={StaticResource Tertiary}, Dark={StaticResource TextPrimaryDark}}"
+                       AutomationProperties.IsInAccessibleTree="False" />
+            </Grid>
+
+            <BoxView Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource CardBorderDark}}"
+                     HeightRequest="1"
+                     AutomationProperties.IsInAccessibleTree="False" />
+
+            <!-- Show confidential — auth-gated reveal of hidden/locked prayers (issue #298).
+                 Invokes IConfidentialAccessService.AuthenticateAsync via ShowConfidentialCommand;
+                 on success the session unlocks and ApplyFilter re-runs to reveal protected
+                 prayers. Mirrors CardsOverflowPopup's Cards_Btn_ShowConfidential row exactly. -->
+            <Grid AutomationId="List_Btn_ShowConfidential"
+                  SemanticProperties.Description="Show confidential"
+                  SemanticProperties.Hint="Authenticate to reveal hidden and locked prayers"
+                  Padding="16,14"
+                  ColumnDefinitions="Auto,*"
+                  ColumnSpacing="14">
+                <Grid.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="OnShowConfidentialTapped" />
+                </Grid.GestureRecognizers>
+                <Label Grid.Column="0"
+                       Text="🔒"
+                       FontSize="18"
+                       VerticalOptions="Center"
+                       AutomationProperties.IsInAccessibleTree="False" />
+                <Label Grid.Column="1"
+                       Text="Show Confidential"
+                       FontSize="{StaticResource FontBodyLg}"
+                       VerticalOptions="Center"
+                       TextColor="{AppThemeBinding Light={StaticResource Tertiary}, Dark={StaticResource TextPrimaryDark}}"
+                       AutomationProperties.IsInAccessibleTree="False" />
+            </Grid>
+
+        </VerticalStackLayout>
+    </Border>
+</toolkit:Popup>

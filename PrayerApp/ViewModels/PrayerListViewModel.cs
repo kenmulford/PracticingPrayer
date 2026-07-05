@@ -79,8 +79,10 @@ namespace PrayerApp.ViewModels
 
         // True when the filtered view holds at least one active (unanswered) prayer —
         // gates StartPrayerTimeCommand. Recomputed in ApplyFilter (the single place
-        // FilteredPrayers is rebuilt).
-        private bool HasActiveInView => FilteredPrayers.Any(p => !p.IsAnswered);
+        // FilteredPrayers is rebuilt). Public (issue #298 regression fix): the Prayers
+        // overflow popup's "Pray" row binds IsEnabled/Opacity to this so it shows the
+        // same disabled affordance the old ToolbarItem got for free from CanExecute.
+        public bool HasActiveInView => FilteredPrayers.Any(p => !p.IsAnswered);
 
         // Tag chips
         public ObservableCollection<TagFilterChipViewModel> AvailableTags { get; } = new();
@@ -119,6 +121,7 @@ namespace PrayerApp.ViewModels
         public ICommand NewCommand { get; }
         public ICommand SetStatusCommand { get; }
         public ICommand StartPrayerTimeCommand { get; }
+        public ICommand ShowConfidentialCommand { get; }
 
         /// <summary>
         /// Factory for the prayer-row view models built in <see cref="BuildViewModel"/>.
@@ -152,6 +155,7 @@ namespace PrayerApp.ViewModels
             // Commands
             NewCommand = new AsyncRelayCommand(NewPrayerAsync);
             StartPrayerTimeCommand = new AsyncRelayCommand(StartPrayerTimeAsync, () => HasActiveInView);
+            ShowConfidentialCommand = new AsyncRelayCommand(ShowConfidentialAsync);
             SetStatusCommand = new RelayCommand<string>(s =>
             {
                 StatusFilter = s switch
@@ -469,6 +473,7 @@ namespace PrayerApp.ViewModels
             // FilteredPrayers was just rebuilt — re-evaluate whether a Prayer Time
             // session can launch (false when 0 active prayers are in view).
             ((IRelayCommand)StartPrayerTimeCommand).NotifyCanExecuteChanged();
+            OnPropertyChanged(nameof(HasActiveInView));
 
             if (!_suppressAnnounce)
             {
@@ -508,6 +513,21 @@ namespace PrayerApp.ViewModels
         private async Task NewPrayerAsync()
         {
             await _navigationService.GoToAsync($"{Routes.PrayerDetailPage}?new=true");
+        }
+
+        /// <summary>
+        /// "Show confidential" overflow action (issue #298), mirroring
+        /// <c>PrayerCardsViewModel.ShowConfidentialAsync</c>. Authenticates via the injected
+        /// <see cref="IConfidentialAccessService"/>; on success, re-runs <see cref="ApplyFilter"/>,
+        /// which already reads <see cref="IConfidentialAccessService.IsSessionUnlocked"/> live, so
+        /// effectively-protected prayers reappear immediately. On cancel/deny, nothing changes.
+        /// </summary>
+        private async Task ShowConfidentialAsync()
+        {
+            var unlocked = await _confidentialAccessService.AuthenticateAsync("Show confidential prayers");
+            if (!unlocked) return;
+
+            ApplyFilter();
         }
 
         private async Task StartPrayerTimeAsync()
