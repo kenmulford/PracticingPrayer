@@ -38,6 +38,7 @@
     <Compile Include="../PrayerApp/Models/PrayerInteraction.cs" />
     <Compile Include="../PrayerApp/Models/UserColor.cs" />
     <Compile Include="../PrayerApp/Models/CardBox.cs" />
+    <Compile Include="../PrayerApp/Models/CardProtectionMode.cs" />
 
     <!-- Database service (unit tests skip this; UI tests need a real SQLite file) -->
     <Compile Include="../PrayerApp/Services/IDBService.cs" />
