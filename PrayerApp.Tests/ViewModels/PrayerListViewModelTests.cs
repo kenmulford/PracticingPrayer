@@ -429,4 +429,30 @@ public class PrayerListViewModelTests
 
         Assert.DoesNotContain(sut.FilteredPrayers, p => p.Id == 100);
     }
+
+    // ── Issue #297 — re-mask on SessionRelockedMessage while page is on screen ──
+
+    [Fact]
+    public async Task SessionRelockedMessage_ProtectedPrayerVisibleWhileUnlocked_ExcludedAfterRelock()
+    {
+        var protectedCard = new PrayerCard { Id = 1, Title = "Secret", ProtectionMode = CardProtectionMode.LockedVisible };
+        SetupSync(new[]
+        {
+            new Prayer { Id = 100, Title = "Protected Prayer", PrayerCardId = 1, IsAnswered = false }
+        }, cards: new[] { protectedCard });
+        _confidentialAccessService.IsSessionUnlocked.Returns(true);
+
+        var sut = CreateSut();
+        await sut.SyncAsync();
+
+        // Precondition: protected prayer is visible while the session is unlocked.
+        Assert.Contains(sut.FilteredPrayers, p => p.Id == 100);
+
+        // Session re-locks while the Prayers page is on screen — no data-change event,
+        // no fresh navigation.
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        _messenger.Send(new SessionRelockedMessage());
+
+        Assert.DoesNotContain(sut.FilteredPrayers, p => p.Id == 100);
+    }
 }

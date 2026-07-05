@@ -169,6 +169,13 @@ namespace PrayerApp.ViewModels
             _messenger.Register<PrayerListViewModel, PrayerCardChangedMessage>(this, (vm, _) => vm.SyncAsync().SafeFireAndForget());
             _messenger.Register<PrayerListViewModel, TagChangedMessage>(this, (vm, _) => vm.SyncAsync().SafeFireAndForget());
             _messenger.Register<PrayerListViewModel, BulkChangedMessage>(this, (vm, _) => vm.SyncAsync().SafeFireAndForget());
+
+            // Issue #297: re-lock while this page is on screen must re-exclude effectively
+            // protected prayers immediately. ApplyFilter already reads
+            // _confidentialAccessService.IsSessionUnlocked live, and no underlying data
+            // changed — a synchronous re-filter (no DB round-trip) mirrors
+            // PrayerCardsViewModel.OnSessionRelocked (PrayerCardsViewModel.cs:332).
+            _messenger.Register<PrayerListViewModel, SessionRelockedMessage>(this, (vm, _) => vm.ApplyFilter());
         }
 
         public PrayerListViewModel() : this(
