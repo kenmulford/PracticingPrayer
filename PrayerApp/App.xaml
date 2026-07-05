@@ -1,4 +1,4 @@
-﻿<?xml version = "1.0" encoding = "UTF-8" ?>
+<?xml version = "1.0" encoding = "UTF-8" ?>
 <Application xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:local="clr-namespace:PrayerApp"
@@ -16,6 +16,7 @@
             <converters:StringToBoolConverter x:Key="StringToBool" />
             <converters:BoolToChevronConverter x:Key="BoolToChevron" />
             <converters:BoolToTriangleConverter x:Key="BoolToTriangle" />
+            <converters:EnumToBoolConverter x:Key="EnumToBool" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>

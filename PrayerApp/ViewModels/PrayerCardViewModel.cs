@@ -24,6 +24,7 @@ namespace PrayerApp.ViewModels
         private readonly IAccessibilityService _accessibilityService;
         private readonly IBoxService _boxService;
         private readonly ISettings _settings;
+        private readonly IConfidentialAccessService _confidentialAccessService;
 
         // Single-expand invariant lives on PrayerCardsViewModel.ExpandedCardId.
         // Per-card IsExpanded is a read-only projection over that — see the
@@ -100,6 +101,7 @@ namespace PrayerApp.ViewModels
                     _prayerCard.Title = value;
                     OnPropertyChanged();
                     OnPropertyChanged(nameof(AccessibleCardHeader));
+                    OnPropertyChanged(nameof(DisplayTitle));
                 }
             }
         }
@@ -115,6 +117,82 @@ namespace PrayerApp.ViewModels
                     OnPropertyChanged();
                     OnPropertyChanged(nameof(FavoriteLabel));
                     OnPropertyChanged(nameof(AccessibleCardHeader));
+                }
+            }
+        }
+
+        /// <summary>
+        /// The owning box, threaded in by <c>PrayerCardsViewModel.RebuildSections</c> at
+        /// section-build time (issue #253) so <see cref="IsLockedVisible"/> can resolve
+        /// <see cref="PrayerCard.GetEffectiveProtectionMode"/>, which needs the box for
+        /// box-cascaded protection. Null until the first RebuildSections after construction
+        /// (or in tests that don't wire it — box-less cards simply can't cascade).
+        /// </summary>
+        private CardBox? _box;
+        public CardBox? Box
+        {
+            get => _box;
+            set
+            {
+                if (!ReferenceEquals(_box, value))
+                {
+                    _box = value;
+                    RaiseLockStateChanged();
+                }
+            }
+        }
+
+        /// <summary>
+        /// True while this card's effective protection is <see cref="CardProtectionMode.LockedVisible"/>
+        /// and the confidential-access session is locked (issue #253). Drives the cell's masked
+        /// rendering (lock glyph + "Protected") via <see cref="DisplayTitle"/> — this property
+        /// itself never exposes <see cref="Title"/>.
+        /// </summary>
+        public bool IsLockedVisible =>
+            Parent is not null
+            && !Parent.IsSessionUnlocked
+            && PrayerCard.GetEffectiveProtectionMode(_prayerCard, _box) == CardProtectionMode.LockedVisible;
+
+        /// <summary>
+        /// Projected display value the cell binds to instead of <see cref="Title"/> (issue #253).
+        /// Returns the literal "Protected" while <see cref="IsLockedVisible"/> is true so the
+        /// real title never enters the visual tree while the session is locked — a stricter
+        /// constraint than binding <see cref="Title"/> and toggling <c>IsVisible</c>, which
+        /// would still place the real string in the compiled binding / element tree.
+        /// </summary>
+        public string DisplayTitle => IsLockedVisible ? "Protected" : Title;
+
+        /// <summary>
+        /// Re-raises the lock-state-derived projections. Called by <see cref="Box"/>'s setter
+        /// and by <c>PrayerCardsViewModel.ShowConfidentialAsync</c> after a successful
+        /// "Show confidential" authentication, so masked cells unmask immediately without
+        /// a full cell re-template. Also re-evaluates <see cref="CanShare"/> (issue #255) so
+        /// the Share button's disabled state tracks lock-state changes, not just
+        /// ActivePrayerCount/ProtectionMode changes.
+        /// </summary>
+        internal void RaiseLockStateChanged()
+        {
+            OnPropertyChanged(nameof(IsLockedVisible));
+            OnPropertyChanged(nameof(DisplayTitle));
+            OnPropertyChanged(nameof(CanShare));
+            ((IRelayCommand)ShareCommand).NotifyCanExecuteChanged();
+        }
+
+        /// <summary>
+        /// Card-level protection mode (Off/Locked/Hidden). Pure UI binding — no auth
+        /// gating happens here (see #253/#254/#255); saving persists via the existing
+        /// SaveCommand → SaveCardAsync path.
+        /// </summary>
+        public CardProtectionMode ProtectionMode
+        {
+            get => _prayerCard.ProtectionMode;
+            set
+            {
+                if (_prayerCard.ProtectionMode != value)
+                {
+                    _prayerCard.ProtectionMode = value;
+                    OnPropertyChanged();
+                    RaiseLockStateChanged();
                 }
             }
         }
@@ -146,7 +224,15 @@ namespace PrayerApp.ViewModels
         public int BoxId => _prayerCard.BoxId;
         public bool IsNew => _prayerCard.Id == 0;
         public bool CanDelete => !IsSystem && !IsNew;
-        public bool CanShare => !IsSystem && ActivePrayerCount > 0;
+
+        /// <summary>
+        /// Gates the Share action (issue #255): disabled (not hidden — per
+        /// .project/design-system.md "Required states") when this card is effectively
+        /// protected and the confidential-access session is locked, in addition to the
+        /// pre-existing IsSystem/has-active-prayers checks.
+        /// </summary>
+        public bool CanShare => !IsSystem && ActivePrayerCount > 0
+            && !ProtectionPolicy.IsAccessBlocked(_prayerCard, _box, _confidentialAccessService.IsSessionUnlocked);
         /// <summary>Gates the "Pray" action chip — only meaningful when the card has active prayers.</summary>
         public bool CanPray => ActivePrayerCount > 0;
         public bool ShowActionChips => IsExpanded && !IsSystem;
@@ -302,7 +388,8 @@ namespace PrayerApp.ViewModels
 
         public PrayerCardViewModel(ICardService cardService, IPrayerService prayerService,
             IOnboardingService onboardingService, INavigationService navigationService,
-            IAccessibilityService accessibilityService, IBoxService boxService, ISettings settings)
+            IAccessibilityService accessibilityService, IBoxService boxService, ISettings settings,
+            IConfidentialAccessService confidentialAccessService)
         {
             _prayerCard = new PrayerCard();
             _cardService = cardService;
@@ -312,6 +399,7 @@ namespace PrayerApp.ViewModels
             _accessibilityService = accessibilityService;
             _boxService = boxService;
             _settings = settings;
+            _confidentialAccessService = confidentialAccessService;
             SaveCommand = new AsyncRelayCommand(SaveAsync, () => !IsBusy);
             DeleteCommand = new AsyncRelayCommand(DeleteAsync, () => !IsSystem);
             ArchiveCommand = new AsyncRelayCommand(ArchiveAsync, () => !IsSystem);
@@ -332,7 +420,8 @@ namespace PrayerApp.ViewModels
             IPlatformApplication.Current!.Services.GetRequiredService<INavigationService>(),
             IPlatformApplication.Current!.Services.GetRequiredService<IAccessibilityService>(),
             IPlatformApplication.Current!.Services.GetRequiredService<IBoxService>(),
-            IPlatformApplication.Current!.Services.GetRequiredService<ISettings>())
+            IPlatformApplication.Current!.Services.GetRequiredService<ISettings>(),
+            IPlatformApplication.Current!.Services.GetRequiredService<IConfidentialAccessService>())
         { }
 
         public PrayerCardViewModel(PrayerCard pc) : this()
@@ -347,8 +436,9 @@ namespace PrayerApp.ViewModels
         /// </summary>
         public PrayerCardViewModel(PrayerCard pc, ICardService cardService, IPrayerService prayerService,
             IOnboardingService onboardingService, INavigationService navigationService,
-            IAccessibilityService accessibilityService, IBoxService boxService, ISettings settings)
-            : this(cardService, prayerService, onboardingService, navigationService, accessibilityService, boxService, settings)
+            IAccessibilityService accessibilityService, IBoxService boxService, ISettings settings,
+            IConfidentialAccessService confidentialAccessService)
+            : this(cardService, prayerService, onboardingService, navigationService, accessibilityService, boxService, settings, confidentialAccessService)
         {
             _prayerCard = pc;
             LoadActivePrayerCountAsync().SafeFireAndForget();
@@ -432,9 +522,35 @@ namespace PrayerApp.ViewModels
             await _navigationService.GoToAsync($"..?{Routes.QueryKeys.Deleted}={Identifier}");
         }
 
+        /// <summary>
+        /// Issue #254 auth gate — mirrors the <see cref="_prayerCard"/>.IsSystem short-circuit
+        /// pattern above SelectPrayerCardAsync/DeleteAsync, but for confidential cards. When
+        /// this card is effectively protected (own <see cref="PrayerCard.ProtectionMode"/> or a
+        /// box cascade) AND the confidential-access session is locked, prompts for
+        /// authentication before letting the caller proceed. Returns true immediately for an
+        /// unprotected card or an already-unlocked session (no auth prompt). Shared by both
+        /// <see cref="SelectPrayerCardAsync"/> (open-card navigation) and
+        /// <see cref="ToggleExpandedAsync"/> (in-place expand) so the condition is expressed once.
+        /// Reads <see cref="_confidentialAccessService"/> directly rather than
+        /// <c>Parent.IsSessionUnlocked</c> — it's the same singleton instance (see
+        /// <see cref="PrayerCardsViewModel.CreateCardViewModel"/>), and this keeps the gate usable
+        /// even before <see cref="Parent"/> is wired (e.g. <see cref="SelectCardCommand"/>'s
+        /// canExecute-bypassed direct-execute tests).
+        /// </summary>
+        private async Task<bool> EnsureUnlockedForAccessAsync(string reason)
+        {
+            var isProtectedAndLocked =
+                PrayerCard.GetEffectiveProtectionMode(_prayerCard, _box) != CardProtectionMode.None
+                && !_confidentialAccessService.IsSessionUnlocked;
+            if (!isProtectedAndLocked) return true;
+
+            return await _confidentialAccessService.AuthenticateAsync(reason);
+        }
+
         private async Task SelectPrayerCardAsync()
         {
             if (_prayerCard.IsSystem) return;
+            if (!await EnsureUnlockedForAccessAsync("Open protected card")) return;
             await _navigationService.GoToAsync($"{Routes.PrayerCardPage}?load={Identifier}");
         }
 
@@ -445,6 +561,13 @@ namespace PrayerApp.ViewModels
             // is enforced structurally instead of via a cascade handler.
             if (Parent is null) return;
             var nowExpanded = Parent.ExpandedCardId == _prayerCard.Id;
+
+            // Issue #254: only the EXPAND direction reveals real content (LoadPrayersAsync +
+            // ExpandedCardId), so the gate runs strictly before both when about to expand.
+            // Collapsing a card never needs auth.
+            if (!nowExpanded && !await EnsureUnlockedForAccessAsync("Expand protected card"))
+                return;
+
             if (!nowExpanded && !_prayersLoaded)
             {
                 // Load first, then reveal — avoids empty flash
@@ -536,6 +659,10 @@ namespace PrayerApp.ViewModels
         private async Task ShareAsync()
         {
             if (_prayerCard.IsSystem) return;
+            // Issue #255 defense in depth: CanShare already gates ShareCommand's
+            // canExecute (disabling the button), but guard the action itself in case it's
+            // ever invoked directly (e.g. ExecuteAsync bypassing canExecute).
+            if (!CanShare) return;
             var allPrayers = await _prayerService.GetPrayersByCardAsync(_prayerCard.Id);
             var activePrayers = allPrayers
                 .Where(p => !p.IsAnswered && !string.IsNullOrWhiteSpace(p.Title))
@@ -636,6 +763,7 @@ namespace PrayerApp.ViewModels
             OnPropertyChanged(nameof(Id));
             OnPropertyChanged(nameof(Title));
             OnPropertyChanged(nameof(IsFavorite));
+            OnPropertyChanged(nameof(ProtectionMode));
             OnPropertyChanged(nameof(IsSystem));
             OnPropertyChanged(nameof(IsImported));
             OnPropertyChanged(nameof(BoxId));

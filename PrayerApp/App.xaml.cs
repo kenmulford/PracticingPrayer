@@ -1,7 +1,8 @@
-#if IOS
-using Microsoft.Extensions.DependencyInjection;
-using PrayerApp.Helpers;
+using CommunityToolkit.Mvvm.Messaging;
+using PrayerApp.Messages;
 using PrayerApp.Services;
+#if IOS
+using PrayerApp.Helpers;
 #endif
 
 namespace PrayerApp
@@ -30,6 +31,14 @@ namespace PrayerApp
             // safely PushModalAsync.
             window.Activated += SignalShellReadyOnce;
 
+            // Issue #254 — strict re-lock: ANY Deactivated (even a brief app-switcher
+            // peek) re-locks the confidential-access session immediately, not just a
+            // full Stopped/backgrounded transition. Static handler — no captured state,
+            // so no unsubscribe needed when the Window is destroyed (GC clears the
+            // delegate when the Window itself is collected), matching the iOS
+            // OnWindowActivated pattern below.
+            window.Deactivated += OnWindowDeactivated;
+
 #if IOS
             // Static handler — no captured state, so no need to unsubscribe
             // when the Window is destroyed (the GC clears the delegate when
@@ -37,6 +46,24 @@ namespace PrayerApp
             window.Activated += OnWindowActivated;
 #endif
             return window;
+        }
+
+        private static void OnWindowDeactivated(object? sender, EventArgs e)
+        {
+            var services = IPlatformApplication.Current?.Services;
+            var confidentialAccessService = services?.GetService<IConfidentialAccessService>();
+            if (confidentialAccessService is null) return;
+
+            confidentialAccessService.RelockSession();
+
+            // Broadcast so the currently-loaded PrayerCardsViewModel (if any) re-masks
+            // LockedVisible cards, re-excludes Hidden cards, and collapses an expanded
+            // protected card — see PrayerCardsViewModel.OnSessionRelocked. OnAppearing does
+            // NOT re-fire on foreground resume in MAUI (Shell page lifecycle is orthogonal
+            // to app backgrounding), so the messenger broadcast — not a page lifecycle hook —
+            // is what makes the re-lock visible the instant the app returns to foreground.
+            var messenger = services?.GetService<IMessenger>();
+            messenger?.Send(new SessionRelockedMessage());
         }
 
         private static void SignalShellReadyOnce(object? sender, EventArgs e)

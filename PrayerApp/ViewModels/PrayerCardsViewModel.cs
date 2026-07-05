@@ -23,6 +23,7 @@ namespace PrayerApp.ViewModels
         private readonly INavigationService _navigationService;
         private readonly IAccessibilityService _accessibilityService;
         private readonly ISettings _settings;
+        private readonly IConfidentialAccessService _confidentialAccessService;
         private readonly IMessenger _messenger;
         private Dictionary<int, HashSet<int>> _cardTagIds = new();
         public ObservableCollection<PrayerCardViewModel> AllPrayerCards { get; }
@@ -168,6 +169,17 @@ namespace PrayerApp.ViewModels
 
         public ICommand DismissCollectionsBannerCommand { get; }
 
+        /// <summary>
+        /// True once the confidential-access session is unlocked (issue #253). Cards page
+        /// consults this (via each card's <see cref="PrayerCardViewModel.IsLockedVisible"/>
+        /// projection) to decide whether LockedVisible cards render masked, and
+        /// <see cref="RebuildSections"/> consults it directly to decide whether
+        /// effectively-Hidden cards are included in the list at all.
+        /// </summary>
+        public bool IsSessionUnlocked => _confidentialAccessService.IsSessionUnlocked;
+
+        public ICommand ShowConfidentialCommand { get; }
+
         private string _searchText = string.Empty;
         public string SearchText
         {
@@ -260,7 +272,7 @@ namespace PrayerApp.ViewModels
         public PrayerCardsViewModel(ICardService cardService, IPrayerService prayerService,
             IOnboardingService onboardingService, INavigationService navigationService,
             IAccessibilityService accessibilityService, ITagService tagService, ISettings settings,
-            IBoxService boxService, IMessenger messenger,
+            IBoxService boxService, IConfidentialAccessService confidentialAccessService, IMessenger messenger,
             Func<PrayerCard, PrayerCardViewModel>? cardVmFactory = null)
         {
             _cardService = cardService;
@@ -271,6 +283,7 @@ namespace PrayerApp.ViewModels
             _tagService = tagService;
             _settings = settings;
             _boxService = boxService;
+            _confidentialAccessService = confidentialAccessService;
             _messenger = messenger;
             _cardVmFactory = cardVmFactory;
 
@@ -292,6 +305,7 @@ namespace PrayerApp.ViewModels
                 _settings.CollectionsBannerDismissed = true;
                 ShowCollectionsBanner = false;
             });
+            ShowConfidentialCommand = new AsyncRelayCommand(ShowConfidentialAsync);
 
             // Cross-page CRUD signals — Cards displays counts and tag chips that derive
             // from every entity type, so subscribe to all of them. Weak refs auto-clean
@@ -311,6 +325,11 @@ namespace PrayerApp.ViewModels
             _messenger.Register<PrayerCardsViewModel, TagChangedMessage>(this, (vm, _) => vm.SyncAsync(null, skipExpandedPrayerReload: true).SafeFireAndForget());
             _messenger.Register<PrayerCardsViewModel, CardBoxChangedMessage>(this, (vm, _) => vm.SyncAsync(null, skipExpandedPrayerReload: true).SafeFireAndForget());
             _messenger.Register<PrayerCardsViewModel, BulkChangedMessage>(this, (vm, _) => vm.SyncAsync().SafeFireAndForget());
+            // Issue #254: App.xaml.cs publishes this right after RelockSession() on Window.Deactivated
+            // (strict re-lock — fires on any deactivation, including a brief app-switcher peek).
+            // Synchronous, no re-sync: IsSessionUnlocked already flipped false on the shared
+            // singleton, so OnSessionRelocked() only needs to re-derive already-loaded state.
+            _messenger.Register<PrayerCardsViewModel, SessionRelockedMessage>(this, (vm, _) => vm.OnSessionRelocked());
         }
 
         public PrayerCardsViewModel() : this(
@@ -322,6 +341,7 @@ namespace PrayerApp.ViewModels
             IPlatformApplication.Current!.Services.GetRequiredService<ITagService>(),
             IPlatformApplication.Current!.Services.GetRequiredService<ISettings>(),
             IPlatformApplication.Current!.Services.GetRequiredService<IBoxService>(),
+            IPlatformApplication.Current!.Services.GetRequiredService<IConfidentialAccessService>(),
             IPlatformApplication.Current!.Services.GetRequiredService<IMessenger>())
         { }
 
@@ -363,7 +383,8 @@ namespace PrayerApp.ViewModels
         {
             var vm = _cardVmFactory?.Invoke(pc)
                 ?? new PrayerCardViewModel(pc, _cardService, _prayerService, _onboardingService,
-                    _navigationService, _accessibilityService, _boxService, _settings);
+                    _navigationService, _accessibilityService, _boxService, _settings,
+                    _confidentialAccessService);
             // Wire the back-reference so per-card IsExpanded can project over
             // ExpandedCardId, and ToggleExpandedAsync can write back through.
             vm.Parent = this;
@@ -374,6 +395,55 @@ namespace PrayerApp.ViewModels
         {
             _onboardingService.Advance(); // CreateCard → NameCard (no-op if not at CreateCard)
             await _navigationService.GoToAsync(Routes.PrayerCardPage);
+        }
+
+        /// <summary>
+        /// "Show confidential" overflow action (issue #253). Authenticates via the injected
+        /// <see cref="IConfidentialAccessService"/>; on success the session unlocks and
+        /// <see cref="RebuildSections"/> re-runs so effectively-Hidden cards reveal and
+        /// effectively-LockedVisible cards unmask immediately. Re-locking (Window.Deactivated)
+        /// is #254 — out of scope here.
+        /// </summary>
+        private async Task ShowConfidentialAsync()
+        {
+            var unlocked = await _confidentialAccessService.AuthenticateAsync("Show confidential cards");
+            if (!unlocked) return;
+
+            OnPropertyChanged(nameof(IsSessionUnlocked));
+            foreach (var card in AllPrayerCards)
+                card.RaiseLockStateChanged();
+            RebuildSections();
+        }
+
+        /// <summary>
+        /// Handles <see cref="SessionRelockedMessage"/> (issue #254) — the mirror image of
+        /// <see cref="ShowConfidentialAsync"/>'s post-unlock refresh. <see cref="IsSessionUnlocked"/>
+        /// already reads live off the shared <see cref="IConfidentialAccessService"/> singleton, so
+        /// re-raising it plus each card's lock-state projections and rebuilding sections is enough
+        /// to re-mask LockedVisible cards and re-exclude Hidden cards immediately — no re-sync
+        /// (DB round-trip) needed, since no underlying data changed. Also collapses the expanded
+        /// card if it is now effectively protected, so its real content (already loaded into
+        /// <see cref="PrayerCardViewModel.Prayers"/> from the earlier gated expand) does not remain
+        /// on screen after re-lock.
+        /// </summary>
+        private void OnSessionRelocked()
+        {
+            OnPropertyChanged(nameof(IsSessionUnlocked));
+            foreach (var card in AllPrayerCards)
+                card.RaiseLockStateChanged();
+
+            if (_expandedCardId is int expandedId)
+            {
+                var expandedCard = AllPrayerCards.FirstOrDefault(c => c.Id == expandedId);
+                if (expandedCard is not null &&
+                    PrayerCard.GetEffectiveProtectionMode(expandedCard.Card, expandedCard.Box) != CardProtectionMode.None)
+                {
+                    ExpandedCardId = null; // setter re-raises IsExpanded + re-runs RebuildSections
+                    return;
+                }
+            }
+
+            RebuildSections();
         }
 
         #endregion
@@ -822,7 +892,20 @@ namespace PrayerApp.ViewModels
             // PerfLog.Log($"RebuildSections.entry cards={AllPrayerCards.Count}");
             try
             {
-                var cardsByBox = AllPrayerCards
+                // Issue #253: thread each card's owning box in (Box drives
+                // GetEffectiveProtectionMode for box-cascaded protection), then exclude
+                // effectively-Hidden cards from the list entirely while the confidential
+                // session is locked. LockedVisible cards stay in the list — DisplayTitle
+                // (on PrayerCardViewModel) handles their masked rendering.
+                foreach (var card in AllPrayerCards)
+                    card.Box = _boxes.FirstOrDefault(b => b.Id == card.BoxId);
+
+                var renderableCards = IsSessionUnlocked
+                    ? AllPrayerCards
+                    : AllPrayerCards.Where(c =>
+                        PrayerCard.GetEffectiveProtectionMode(c.Card, c.Box) != CardProtectionMode.Hidden);
+
+                var cardsByBox = renderableCards
                     .GroupBy(c => c.BoxId)
                     .ToDictionary(g => g.Key, g => SortCards(g).ToList());
 
@@ -928,8 +1011,22 @@ namespace PrayerApp.ViewModels
             var hasTagFilter = selectedTagIds.Count > 0;
             var hasAnyFilter = hasSearch || hasTagFilter;
 
+            // Issue #255: an ACTIVE search/tag filter drops ALL effectively-protected cards
+            // (Hidden AND LockedVisible) while locked — a masked "Protected" row surfacing
+            // as a search hit would defeat the point of typing a search term. But when NO
+            // filter is active, this must match RebuildSections' base-list exclusion
+            // (Hidden only — LockedVisible stays in the list, masked) — otherwise clearing
+            // a search (or deselecting the last tag) while locked would incorrectly drop
+            // LockedVisible cards from the default list, regressing #253.
+            var renderableCards = IsSessionUnlocked
+                ? AllPrayerCards
+                : hasAnyFilter
+                    ? AllPrayerCards.Where(c => !ProtectionPolicy.IsAccessBlocked(c.Card, c.Box, IsSessionUnlocked))
+                    : AllPrayerCards.Where(c =>
+                        PrayerCard.GetEffectiveProtectionMode(c.Card, c.Box) != CardProtectionMode.Hidden);
+
             // Group once, look up per section — O(cards + sections) instead of O(sections × cards)
-            var cardsByBox = AllPrayerCards
+            var cardsByBox = renderableCards
                 .GroupBy(c => c.BoxId)
                 .ToDictionary(g => g.Key, g => SortCards(g).ToList());
 

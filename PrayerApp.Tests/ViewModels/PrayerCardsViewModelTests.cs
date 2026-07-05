@@ -21,6 +21,11 @@ public class PrayerCardsViewModelTests
     private readonly ISettings _settings = Substitute.For<ISettings>();
     private readonly IBoxService _boxService = Substitute.For<IBoxService>();
     private readonly INotificationService _notificationService = Substitute.For<INotificationService>();
+    // Issue #253: gates hidden-exclusion + locked-masking. Fake mirrors the #251
+    // seam-faking approach — defaults to locked (IsSessionUnlocked=false) so
+    // existing tests that don't care about confidentiality see the pre-#253
+    // "everything visible/unmasked" behavior only when they explicitly opt in.
+    private readonly IConfidentialAccessService _confidentialAccessService = Substitute.For<IConfidentialAccessService>();
     // Fresh WeakReferenceMessenger per fixture so messenger-driven tests can fire
     // real Send/Register without leaking across tests via the .Default singleton.
     private readonly IMessenger _messenger = new WeakReferenceMessenger();
@@ -42,7 +47,8 @@ public class PrayerCardsViewModelTests
 
     private PrayerCardsViewModel CreateSut() =>
         new(_cardService, _prayerService, _onboardingService, _navigationService,
-            _accessibilityService, _tagService, _settings, _boxService, _messenger);
+            _accessibilityService, _tagService, _settings, _boxService,
+            _confidentialAccessService, _messenger);
 
     /// <summary>Sets up standard system boxes so sections can be built.</summary>
     private void SetupSystemBoxes()
@@ -59,6 +65,23 @@ public class PrayerCardsViewModelTests
     /// <summary>Helper to get all visible cards across all sections.</summary>
     private List<PrayerCardViewModel> GetAllVisibleCards(PrayerCardsViewModel sut) =>
         sut.BoxSections.SelectMany(s => s).ToList();
+
+    /// <summary>
+    /// Helper for issue #253 hidden-exclusion tests. Reads section *membership*
+    /// (backing list, via CardCount + the section's expanded contents when expanded)
+    /// rather than only-when-expanded rendered contents — GetAllVisibleCards returns
+    /// empty for a collapsed section (the BoxSectionViewModel clears its observable
+    /// collection while collapsed), which is irrelevant to whether a card was excluded
+    /// from the box's card set at RebuildSections time. Expand every section first so
+    /// the collection reflects the backing list, mirroring EnsureAllSectionsExpanded's
+    /// UITest pattern of forcing expansion before reading contents.
+    /// </summary>
+    private List<PrayerCardViewModel> GetAllSectionMemberCards(PrayerCardsViewModel sut)
+    {
+        foreach (var section in sut.BoxSections)
+            section.IsExpanded = true;
+        return sut.BoxSections.SelectMany(s => s).ToList();
+    }
 
     // ── Construction ──────────────────────────────────────────────────
 
@@ -396,7 +419,7 @@ public class PrayerCardsViewModelTests
         // Simulate SyncAsync's diff loop having added the new card
         var newCard = new PrayerCard { Id = 42, Title = "Just Created", BoxId = 0 };
         var newVm = new PrayerCardViewModel(newCard, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings)
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService)
         { Parent = sut };
         sut.AllPrayerCards.Add(newVm);
 
@@ -1299,7 +1322,7 @@ public class PrayerCardsViewModelTests
         // and ConsumePendingSavedAsync (the order Shell + OnAppearing produce).
         var newCard = new PrayerCard { Id = 42, Title = "Just Created", BoxId = 0 };
         var newVm = new PrayerCardViewModel(newCard, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings)
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService)
         { Parent = sut };
         sut.AllPrayerCards.Add(newVm);
 
@@ -1440,7 +1463,8 @@ public class PrayerCardsViewModelTests
 
     private PrayerRequestDetailViewModel BuildStubPrayerRowVm(Prayer p)
         => new(p, _prayerService, _tagService, _cardService, _onboardingService,
-            _notificationService, _navigationService, _accessibilityService, _settings);
+            _notificationService, _navigationService, _accessibilityService, _settings,
+            _boxService, _confidentialAccessService);
 
     private void SetupBug78EmptySync(int cardId, params Prayer[] prayers)
     {
@@ -1469,7 +1493,7 @@ public class PrayerCardsViewModelTests
         // and ConsumePendingSavedAsync (the new-via-sync branch).
         var newCard = new PrayerCard { Id = 42, Title = "Imported May 2", BoxId = 0, IsImported = true };
         var newVm = new PrayerCardViewModel(newCard, _cardService, _prayerService,
-            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings)
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService)
         {
             PrayerRowFactory = BuildStubPrayerRowVm,
             Parent = sut
@@ -1510,9 +1534,10 @@ public class PrayerCardsViewModelTests
 
         // Inject the stub row factory so the in-place insert avoids the DI-bound ctor.
         var sut = new PrayerCardsViewModel(_cardService, _prayerService, _onboardingService,
-            _navigationService, _accessibilityService, _tagService, _settings, _boxService, _messenger,
+            _navigationService, _accessibilityService, _tagService, _settings, _boxService,
+            _confidentialAccessService, _messenger,
             cardVmFactory: pc => new PrayerCardViewModel(pc, _cardService, _prayerService,
-                _onboardingService, _navigationService, _accessibilityService, _boxService, _settings)
+                _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService)
             {
                 PrayerRowFactory = BuildStubPrayerRowVm
             });
@@ -1546,9 +1571,10 @@ public class PrayerCardsViewModelTests
         // Override the factory at the SUT-construction site so the new-via-db
         // branch (which builds its own VM via CreateCardViewModel) gets the stub.
         var sut = new PrayerCardsViewModel(_cardService, _prayerService, _onboardingService,
-            _navigationService, _accessibilityService, _tagService, _settings, _boxService, _messenger,
+            _navigationService, _accessibilityService, _tagService, _settings, _boxService,
+            _confidentialAccessService, _messenger,
             cardVmFactory: pc => new PrayerCardViewModel(pc, _cardService, _prayerService,
-                _onboardingService, _navigationService, _accessibilityService, _boxService, _settings)
+                _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService)
             {
                 PrayerRowFactory = BuildStubPrayerRowVm
             });
@@ -2094,6 +2120,316 @@ public class PrayerCardsViewModelTests
         // Only the non-system card should be assigned
         await _cardService.Received(1).AssignBoxAsync(Arg.Is<PrayerCard>(c => !c.IsSystem), 20);
         await _cardService.DidNotReceive().AssignBoxAsync(Arg.Is<PrayerCard>(c => c.IsSystem), Arg.Any<int>());
+    }
+
+    // ── Issue #253 — hidden-exclusion + "Show confidential" reveal ────
+
+    [Fact]
+    public async Task SyncAsync_EffectivelyHiddenCard_SessionLocked_ExcludedFromSections()
+    {
+        SetupSystemBoxes();
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        var visibleCard = new PrayerCard { Id = 1, Title = "Visible", BoxId = 0 };
+        var hiddenCard = new PrayerCard { Id = 2, Title = "Hidden Secret", BoxId = 0, ProtectionMode = CardProtectionMode.Hidden };
+        _cardService.GetCardsAsync().Returns(new List<PrayerCard> { visibleCard, hiddenCard }.AsReadOnly());
+        _tagService.GetTagsAsync().Returns(new List<PrayerTag>().AsReadOnly());
+        _prayerService.GetAllPrayersAsync().Returns(new List<Prayer>().AsReadOnly());
+        SetupDbMocks(new List<PrayerCardTag>());
+
+        var sut = CreateSut();
+        await sut.SyncAsync();
+
+        var visible = GetAllSectionMemberCards(sut);
+        Assert.Contains(visible, c => c.Id == 1);
+        Assert.DoesNotContain(visible, c => c.Id == 2);
+    }
+
+    [Fact]
+    public async Task SyncAsync_EffectivelyHiddenCard_SessionUnlocked_IncludedInSections()
+    {
+        SetupSystemBoxes();
+        _confidentialAccessService.IsSessionUnlocked.Returns(true);
+        var hiddenCard = new PrayerCard { Id = 2, Title = "Hidden Secret", BoxId = 0, ProtectionMode = CardProtectionMode.Hidden };
+        _cardService.GetCardsAsync().Returns(new List<PrayerCard> { hiddenCard }.AsReadOnly());
+        _tagService.GetTagsAsync().Returns(new List<PrayerTag>().AsReadOnly());
+        _prayerService.GetAllPrayersAsync().Returns(new List<Prayer>().AsReadOnly());
+        SetupDbMocks(new List<PrayerCardTag>());
+
+        var sut = CreateSut();
+        await sut.SyncAsync();
+
+        var visible = GetAllSectionMemberCards(sut);
+        Assert.Contains(visible, c => c.Id == 2);
+    }
+
+    [Fact]
+    public async Task SyncAsync_BoxCascadesHidden_SessionLocked_ExcludesDeferringCard()
+    {
+        // Card defers (ProtectionMode.None) but the box cascades Hidden via
+        // ProtectAllCards — GetEffectiveProtectionMode(card, box) must be consulted
+        // at section-build time, not just the card's own ProtectionMode.
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        var cascadeBox = new CardBox { Id = 7, Name = "Family", ProtectAllCards = true, CardProtectionMode = CardProtectionMode.Hidden };
+        _boxService.GetBoxesAsync().Returns(new List<CardBox> { cascadeBox }.AsReadOnly());
+        var card = new PrayerCard { Id = 1, Title = "Cascaded Secret", BoxId = 7, ProtectionMode = CardProtectionMode.None };
+        _cardService.GetCardsAsync().Returns(new List<PrayerCard> { card }.AsReadOnly());
+        _tagService.GetTagsAsync().Returns(new List<PrayerTag>().AsReadOnly());
+        _prayerService.GetAllPrayersAsync().Returns(new List<Prayer>().AsReadOnly());
+        SetupDbMocks(new List<PrayerCardTag>());
+
+        var sut = CreateSut();
+        await sut.SyncAsync();
+
+        Assert.DoesNotContain(GetAllSectionMemberCards(sut), c => c.Id == 1);
+    }
+
+    [Fact]
+    public void IsSessionUnlocked_ReflectsConfidentialAccessService()
+    {
+        _confidentialAccessService.IsSessionUnlocked.Returns(true);
+        var sut = CreateSut();
+
+        Assert.True(sut.IsSessionUnlocked);
+    }
+
+    [Fact]
+    public async Task ShowConfidentialCommand_AuthenticateSucceeds_RebuildsSectionsToRevealHidden()
+    {
+        SetupSystemBoxes();
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        var hiddenCard = new PrayerCard { Id = 2, Title = "Hidden Secret", BoxId = 0, ProtectionMode = CardProtectionMode.Hidden };
+        _cardService.GetCardsAsync().Returns(new List<PrayerCard> { hiddenCard }.AsReadOnly());
+        _tagService.GetTagsAsync().Returns(new List<PrayerTag>().AsReadOnly());
+        _prayerService.GetAllPrayersAsync().Returns(new List<Prayer>().AsReadOnly());
+        SetupDbMocks(new List<PrayerCardTag>());
+        var sut = CreateSut();
+        await sut.SyncAsync();
+        Assert.DoesNotContain(GetAllSectionMemberCards(sut), c => c.Id == 2);
+
+        // Authenticate succeeds — flip the fake's reported unlock state (mirrors how
+        // the real ConfidentialAccessService.IsSessionUnlocked flips after a
+        // successful AuthenticateAsync) and invoke the command.
+        _confidentialAccessService.AuthenticateAsync(Arg.Any<string>())
+            .Returns(callInfo =>
+            {
+                _confidentialAccessService.IsSessionUnlocked.Returns(true);
+                return Task.FromResult(true);
+            });
+
+        await ((IAsyncRelayCommand)sut.ShowConfidentialCommand).ExecuteAsync(null);
+
+        Assert.Contains(GetAllSectionMemberCards(sut), c => c.Id == 2);
+    }
+
+    [Fact]
+    public async Task ShowConfidentialCommand_AuthenticateFails_DoesNotReveal()
+    {
+        SetupSystemBoxes();
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        var hiddenCard = new PrayerCard { Id = 2, Title = "Hidden Secret", BoxId = 0, ProtectionMode = CardProtectionMode.Hidden };
+        _cardService.GetCardsAsync().Returns(new List<PrayerCard> { hiddenCard }.AsReadOnly());
+        _tagService.GetTagsAsync().Returns(new List<PrayerTag>().AsReadOnly());
+        _prayerService.GetAllPrayersAsync().Returns(new List<Prayer>().AsReadOnly());
+        SetupDbMocks(new List<PrayerCardTag>());
+        var sut = CreateSut();
+        await sut.SyncAsync();
+        _confidentialAccessService.AuthenticateAsync(Arg.Any<string>()).Returns(false);
+
+        await ((IAsyncRelayCommand)sut.ShowConfidentialCommand).ExecuteAsync(null);
+
+        Assert.DoesNotContain(GetAllSectionMemberCards(sut), c => c.Id == 2);
+    }
+
+    // ── Issue #254: SessionRelockedMessage — re-lock visible on resume ──────
+    // App.xaml.cs publishes SessionRelockedMessage right after RelockSession() on
+    // Window.Deactivated. These tests fire the same message over the fixture's
+    // shared _messenger (mirrors how the other EntityChangedMessage handlers are
+    // exercised elsewhere in this file) and assert the VM re-derives its lock-gated
+    // projections without a DB re-sync.
+
+    [Fact]
+    public async Task SessionRelockedMessage_HiddenCardWasRevealed_ReExcludedAfterRelock()
+    {
+        SetupSystemBoxes();
+        _confidentialAccessService.IsSessionUnlocked.Returns(true);
+        var hiddenCard = new PrayerCard { Id = 2, Title = "Hidden Secret", BoxId = 0, ProtectionMode = CardProtectionMode.Hidden };
+        _cardService.GetCardsAsync().Returns(new List<PrayerCard> { hiddenCard }.AsReadOnly());
+        _tagService.GetTagsAsync().Returns(new List<PrayerTag>().AsReadOnly());
+        _prayerService.GetAllPrayersAsync().Returns(new List<Prayer>().AsReadOnly());
+        SetupDbMocks(new List<PrayerCardTag>());
+        var sut = CreateSut();
+        await sut.SyncAsync();
+        Assert.Contains(GetAllSectionMemberCards(sut), c => c.Id == 2);
+
+        // Simulate App.xaml.cs's Window.Deactivated handler: RelockSession() flips the
+        // shared singleton's reported state, then the message is broadcast.
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        _messenger.Send(new PrayerApp.Messages.SessionRelockedMessage());
+
+        Assert.DoesNotContain(GetAllSectionMemberCards(sut), c => c.Id == 2);
+    }
+
+    [Fact]
+    public void SessionRelockedMessage_LockedVisibleCardWasUnmasked_ReMaskedAfterRelock()
+    {
+        SetupSystemBoxes();
+        _confidentialAccessService.IsSessionUnlocked.Returns(true);
+        var card = new PrayerCard { Id = 3, Title = "Secret Card", BoxId = 0, ProtectionMode = CardProtectionMode.LockedVisible };
+        var sut = CreateSut();
+        var vm = new PrayerCardViewModel(card, _cardService, _prayerService, _onboardingService,
+            _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService)
+        { Parent = sut };
+        sut.AllPrayerCards.Add(vm);
+        Assert.False(vm.IsLockedVisible);
+        Assert.Equal("Secret Card", vm.DisplayTitle);
+
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        _messenger.Send(new PrayerApp.Messages.SessionRelockedMessage());
+
+        Assert.True(vm.IsLockedVisible);
+        Assert.Equal("Protected", vm.DisplayTitle);
+    }
+
+    [Fact]
+    public async Task SessionRelockedMessage_ExpandedProtectedCard_CollapsesAndHidesRealContent()
+    {
+        SetupSystemBoxes();
+        _confidentialAccessService.IsSessionUnlocked.Returns(true);
+        var card = new PrayerCard { Id = 4, Title = "Secret Card", BoxId = 0, ProtectionMode = CardProtectionMode.LockedVisible };
+        _cardService.GetCardsAsync().Returns(new List<PrayerCard> { card }.AsReadOnly());
+        _tagService.GetTagsAsync().Returns(new List<PrayerTag>().AsReadOnly());
+        _prayerService.GetAllPrayersAsync().Returns(new List<Prayer>().AsReadOnly());
+        _prayerService.GetPrayersByCardAsync(4).Returns(new List<Prayer>());
+        SetupDbMocks(new List<PrayerCardTag>());
+        var sut = CreateSut();
+        await sut.SyncAsync();
+        sut.ExpandedCardId = 4; // already unlocked — expand directly, no gate involved here
+        var cardVm = sut.AllPrayerCards.Single(c => c.Id == 4);
+        Assert.True(cardVm.IsExpanded);
+
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        _messenger.Send(new PrayerApp.Messages.SessionRelockedMessage());
+
+        Assert.Null(sut.ExpandedCardId);
+        Assert.False(cardVm.IsExpanded);
+    }
+
+    [Fact]
+    public async Task SessionRelockedMessage_ExpandedUnprotectedCard_StaysExpanded()
+    {
+        SetupSystemBoxes();
+        _confidentialAccessService.IsSessionUnlocked.Returns(true);
+        var card = new PrayerCard { Id = 5, Title = "Open Card", BoxId = 0, ProtectionMode = CardProtectionMode.None };
+        _cardService.GetCardsAsync().Returns(new List<PrayerCard> { card }.AsReadOnly());
+        _tagService.GetTagsAsync().Returns(new List<PrayerTag>().AsReadOnly());
+        _prayerService.GetAllPrayersAsync().Returns(new List<Prayer>().AsReadOnly());
+        _prayerService.GetPrayersByCardAsync(5).Returns(new List<Prayer>());
+        SetupDbMocks(new List<PrayerCardTag>());
+        var sut = CreateSut();
+        await sut.SyncAsync();
+        sut.ExpandedCardId = 5;
+        var cardVm = sut.AllPrayerCards.Single(c => c.Id == 5);
+
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        _messenger.Send(new PrayerApp.Messages.SessionRelockedMessage());
+
+        // Unprotected card — relock has nothing to hide, so it stays expanded.
+        Assert.Equal(5, sut.ExpandedCardId);
+        Assert.True(cardVm.IsExpanded);
+    }
+
+    // ── Issue #255 — search exclusion of effectively-protected cards while locked ──
+    // Unlike #253's RebuildSections (which only excludes Hidden — LockedVisible cards
+    // stay in the list, masked), a search/tag filter must drop ALL effectively-protected
+    // cards (Hidden AND LockedVisible) while locked — a masked "Protected" row surfacing
+    // as a search hit would defeat the point of typing a search term.
+
+    [Fact]
+    public async Task ApplyFilter_SearchMatchesLockedVisibleCard_SessionLocked_ExcludedFromResults()
+    {
+        SetupSystemBoxes();
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        var protectedCard = new PrayerCard { Id = 3, Title = "Secret Diagnosis", BoxId = 0, ProtectionMode = CardProtectionMode.LockedVisible };
+        var openCard = new PrayerCard { Id = 4, Title = "Secret Recipe", BoxId = 0, ProtectionMode = CardProtectionMode.None };
+        _cardService.GetCardsAsync().Returns(new List<PrayerCard> { protectedCard, openCard }.AsReadOnly());
+        _tagService.GetTagsAsync().Returns(new List<PrayerTag>().AsReadOnly());
+        _prayerService.GetAllPrayersAsync().Returns(new List<Prayer>().AsReadOnly());
+        SetupDbMocks(new List<PrayerCardTag>());
+        var sut = CreateSut();
+        await sut.SyncAsync();
+
+        sut.SearchText = "Secret";
+
+        var visible = GetAllSectionMemberCards(sut);
+        Assert.DoesNotContain(visible, c => c.Id == 3);
+        Assert.Contains(visible, c => c.Id == 4);
+    }
+
+    [Fact]
+    public async Task ApplyFilter_SearchMatchesLockedVisibleCard_SessionUnlocked_IncludedInResults()
+    {
+        SetupSystemBoxes();
+        _confidentialAccessService.IsSessionUnlocked.Returns(true);
+        var protectedCard = new PrayerCard { Id = 3, Title = "Secret Diagnosis", BoxId = 0, ProtectionMode = CardProtectionMode.LockedVisible };
+        _cardService.GetCardsAsync().Returns(new List<PrayerCard> { protectedCard }.AsReadOnly());
+        _tagService.GetTagsAsync().Returns(new List<PrayerTag>().AsReadOnly());
+        _prayerService.GetAllPrayersAsync().Returns(new List<Prayer>().AsReadOnly());
+        SetupDbMocks(new List<PrayerCardTag>());
+        var sut = CreateSut();
+        await sut.SyncAsync();
+
+        sut.SearchText = "Secret";
+
+        Assert.Contains(GetAllSectionMemberCards(sut), c => c.Id == 3);
+    }
+
+    [Fact]
+    public async Task ApplyFilter_NoActiveFilter_SessionLocked_LockedVisibleCardStaysInDefaultList()
+    {
+        // Regression guard: clearing a search (or deselecting the last tag) while locked
+        // must NOT drop LockedVisible cards from the default (no-filter) list — that list
+        // must match RebuildSections' base exclusion (Hidden only), per #253. Only an
+        // ACTIVE filter applies the stricter "drop LockedVisible too" rule.
+        SetupSystemBoxes();
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        var lockedVisibleCard = new PrayerCard { Id = 3, Title = "Secret Diagnosis", BoxId = 0, ProtectionMode = CardProtectionMode.LockedVisible };
+        var hiddenCard = new PrayerCard { Id = 4, Title = "Hidden Secret", BoxId = 0, ProtectionMode = CardProtectionMode.Hidden };
+        _cardService.GetCardsAsync().Returns(new List<PrayerCard> { lockedVisibleCard, hiddenCard }.AsReadOnly());
+        _tagService.GetTagsAsync().Returns(new List<PrayerTag>().AsReadOnly());
+        _prayerService.GetAllPrayersAsync().Returns(new List<Prayer>().AsReadOnly());
+        SetupDbMocks(new List<PrayerCardTag>());
+        var sut = CreateSut();
+        await sut.SyncAsync();
+
+        // Set a search (excludes LockedVisible too), then clear it back to empty.
+        sut.SearchText = "Secret";
+        sut.SearchText = string.Empty;
+
+        var visible = GetAllSectionMemberCards(sut);
+        Assert.Contains(visible, c => c.Id == 3); // LockedVisible stays, masked
+        Assert.DoesNotContain(visible, c => c.Id == 4); // Hidden stays excluded
+    }
+
+    [Fact]
+    public async Task ApplyFilter_TagToggledOffAfterOn_SessionLocked_LockedVisibleCardStaysInDefaultList()
+    {
+        SetupSystemBoxes();
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        var lockedVisibleCard = new PrayerCard { Id = 3, Title = "Secret Diagnosis", BoxId = 0, ProtectionMode = CardProtectionMode.LockedVisible };
+        var tag = new PrayerTag { Id = 100, Name = "Health" };
+        _cardService.GetCardsAsync().Returns(new List<PrayerCard> { lockedVisibleCard }.AsReadOnly());
+        _tagService.GetTagsAsync().Returns(new List<PrayerTag> { tag }.AsReadOnly());
+        _prayerService.GetAllPrayersAsync().Returns(new List<Prayer>().AsReadOnly());
+        SetupDbMocks(new List<PrayerCardTag>());
+        var sut = CreateSut();
+        await sut.SyncAsync();
+
+        var chip = sut.AvailableTags.Single(c => c.Tag.Id == 100);
+        chip.ToggleCommand.Execute(null); // select — active filter now, LockedVisible excluded
+        chip.ToggleCommand.Execute(null); // deselect — back to no-filter
+
+        var visible = GetAllSectionMemberCards(sut);
+        Assert.Contains(visible, c => c.Id == 3);
     }
 
     // ── Helper ──────────────────────────────────────────────────────────

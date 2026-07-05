@@ -24,6 +24,8 @@ public class PrayerTimeViewModel : ObservableObject, IQueryAttributable
     private readonly ISettings _settings;
     private readonly IPrayerSelectionService _selectionService;
     private readonly IDispatcher _dispatcher;
+    private readonly IBoxService _boxService;
+    private readonly IConfidentialAccessService _confidentialAccessService;
     private CancellationTokenSource _loadCts = new();
     private int? _recentlyNotifiedTagId;
 
@@ -196,7 +198,8 @@ public class PrayerTimeViewModel : ObservableObject, IQueryAttributable
         ITagService tagService, IPrayerInteractionService interactionService,
         INavigationService navigationService, IAccessibilityService accessibilityService,
         INotificationService notificationService, ISettings settings,
-        IPrayerSelectionService selectionService, IDispatcher dispatcher)
+        IPrayerSelectionService selectionService, IDispatcher dispatcher,
+        IBoxService boxService, IConfidentialAccessService confidentialAccessService)
     {
         _prayerService = prayerService;
         _cardService = cardService;
@@ -208,6 +211,8 @@ public class PrayerTimeViewModel : ObservableObject, IQueryAttributable
         _settings = settings;
         _selectionService = selectionService;
         _dispatcher = dispatcher;
+        _boxService = boxService;
+        _confidentialAccessService = confidentialAccessService;
 
         _selectedIntervalSeconds = _settings.AutoModeIntervalSeconds;
 
@@ -230,7 +235,9 @@ public class PrayerTimeViewModel : ObservableObject, IQueryAttributable
         IPlatformApplication.Current!.Services.GetRequiredService<INotificationService>(),
         IPlatformApplication.Current!.Services.GetRequiredService<ISettings>(),
         IPlatformApplication.Current!.Services.GetRequiredService<IPrayerSelectionService>(),
-        IPlatformApplication.Current!.Services.GetRequiredService<IDispatcher>())
+        IPlatformApplication.Current!.Services.GetRequiredService<IDispatcher>(),
+        IPlatformApplication.Current!.Services.GetRequiredService<IBoxService>(),
+        IPlatformApplication.Current!.Services.GetRequiredService<IConfidentialAccessService>())
     { }
 
     public void ApplyQueryAttributes(IDictionary<string, object> query)
@@ -284,7 +291,11 @@ public class PrayerTimeViewModel : ObservableObject, IQueryAttributable
             var allActive = await _prayerService.GetAllActivePrayersAsync();
             token.ThrowIfCancellationRequested();
 
-            var cards = await _cardService.GetCardsAsync();
+            var cardsTask = _cardService.GetCardsAsync();
+            var boxesTask = _boxService.GetBoxesAsync();
+            await Task.WhenAll(cardsTask, boxesTask);
+            var cards = cardsTask.Result;
+            var boxes = boxesTask.Result;
             token.ThrowIfCancellationRequested();
 
             IEnumerable<Prayer> filtered;
@@ -321,6 +332,32 @@ public class PrayerTimeViewModel : ObservableObject, IQueryAttributable
             }
 
             var cardLookup = cards.ToDictionary(c => c.Id, c => c.Title);
+
+            // Issue #255: Prayer Time is an exposed landscape view, so it re-authenticates
+            // UNCONDITIONALLY whenever the session would include any effectively-protected
+            // prayer — stricter than the search/share gates, which skip the prompt once
+            // IsSessionUnlocked is already true. Resolve each prayer's owning card (+ that
+            // card's box, for box-cascaded protection) via one dictionary built from the
+            // already-loaded cards/boxes, then batch-check before building entries. On
+            // deny, protected prayers are dropped and the session proceeds with the rest.
+            var cardById = cards.ToDictionary(c => c.Id);
+            var boxById = boxes.ToDictionary(b => b.Id);
+            filtered = filtered.ToList();
+            var hasProtected = filtered.Any(p =>
+                cardById.TryGetValue(p.PrayerCardId, out var owningCard) &&
+                ProtectionPolicy.IsAccessBlocked(owningCard, boxById.GetValueOrDefault(owningCard.BoxId), isSessionUnlocked: false));
+
+            if (hasProtected)
+            {
+                var authorized = await _confidentialAccessService.AuthenticateAsync("Start Prayer Time with protected prayers");
+                token.ThrowIfCancellationRequested();
+                if (!authorized)
+                {
+                    filtered = filtered.Where(p =>
+                        !(cardById.TryGetValue(p.PrayerCardId, out var owningCard) &&
+                          ProtectionPolicy.IsAccessBlocked(owningCard, boxById.GetValueOrDefault(owningCard.BoxId), isSessionUnlocked: false)));
+                }
+            }
 
             var entries = filtered
                 .Select(p => new PrayerTimeEntry(

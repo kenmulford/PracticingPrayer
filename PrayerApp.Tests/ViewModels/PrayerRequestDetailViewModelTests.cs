@@ -17,6 +17,12 @@ public class PrayerRequestDetailViewModelTests
     private readonly IAccessibilityService _accessibilityService = Substitute.For<IAccessibilityService>();
     private readonly ISettings _settings = Substitute.For<ISettings>();
     private readonly IDBService _db = Substitute.For<IDBService>();
+    private readonly IBoxService _boxService = Substitute.For<IBoxService>();
+    // Issue #255: gates ShareCommand on effective-protection + lock state. Fake mirrors
+    // the #251/#253/#254 seam-faking approach — defaults to locked (IsSessionUnlocked=false)
+    // so existing tests exercise the unprotected path unless a card explicitly sets
+    // ProtectionMode.
+    private readonly IConfidentialAccessService _confidentialAccessService = Substitute.For<IConfidentialAccessService>();
 
     public PrayerRequestDetailViewModelTests()
     {
@@ -26,11 +32,13 @@ public class PrayerRequestDetailViewModelTests
         PrayerCardTag.SetDBService(_db);
         _settings.DefaultNotifyHour.Returns(9);
         _settings.DefaultNotifyMinute.Returns(0);
+        _boxService.GetBoxesAsync().Returns(new List<CardBox>().AsReadOnly());
     }
 
     private PrayerRequestDetailViewModel CreateSut() =>
         new(_prayerService, _tagService, _cardService, _onboardingService,
-            _notificationService, _navigationService, _accessibilityService, _settings);
+            _notificationService, _navigationService, _accessibilityService, _settings,
+            _boxService, _confidentialAccessService);
 
     // ── Construction ──────────────────────────────────────────────────
 
@@ -895,5 +903,116 @@ public class PrayerRequestDetailViewModelTests
 
         await _prayerService.Received(1).SavePrayerAsync(Arg.Is<Prayer>(p => p.PrayerCardId == 7));
         Assert.Equal(7, saved!.PrayerCardId);
+    }
+
+    // ── CanShare / ShareCommand — issue #255 share-block on effective-protection + lock ──
+    // Gates the affordance (disable, don't hide) per .project/design-system.md
+    // "Required states — Disabled: dim / disable the control … reflect state, don't hide it."
+    // Card + box are resolved from AvailableCards (already loaded by LoadCardsAsync) and a
+    // single GetBoxesAsync lookup — no extra per-share service round-trip.
+
+    private void SetupLoadWithCard(int prayerId, PrayerCard card)
+    {
+        _db.GetByIdAsync<Prayer>(prayerId)
+            .Returns(Task.FromResult(new Prayer { Id = prayerId, Title = "Test", PrayerCardId = card.Id, CreatedAt = DateTime.Today }));
+        _prayerService.GetInteractionCountByPrayerAsync(prayerId).Returns(Task.FromResult(0));
+        _cardService.GetCardsAsync().Returns(Task.FromResult<IReadOnlyList<PrayerCard>>(new List<PrayerCard> { card }));
+        _tagService.GetTagsAsync().Returns(Task.FromResult<IReadOnlyList<PrayerTag>>(new List<PrayerTag>()));
+        _tagService.GetTagsByRequestIdAsync(prayerId).Returns(Task.FromResult<IReadOnlyList<PrayerTag>>(new List<PrayerTag>()));
+    }
+
+    private async Task LoadAndDrainAsync(PrayerRequestDetailViewModel sut, int prayerId)
+    {
+        ((IQueryAttributable)sut).ApplyQueryAttributes(
+            new Dictionary<string, object> { ["load"] = prayerId.ToString(), ["viewOnly"] = "true" });
+        for (int i = 0; i < 20 && sut.SelectedCard is null; i++)
+            await Task.Yield();
+    }
+
+    [Fact]
+    public async Task CanShare_ProtectedAndLocked_ReturnsFalse()
+    {
+        var card = new PrayerCard { Id = 3, Title = "Secret", ProtectionMode = CardProtectionMode.LockedVisible };
+        SetupLoadWithCard(50, card);
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        var sut = CreateSut();
+
+        await LoadAndDrainAsync(sut, 50);
+
+        Assert.False(sut.CanShare);
+    }
+
+    [Fact]
+    public async Task CanShare_ProtectedButUnlocked_ReturnsTrue()
+    {
+        var card = new PrayerCard { Id = 3, Title = "Secret", ProtectionMode = CardProtectionMode.LockedVisible };
+        SetupLoadWithCard(51, card);
+        _confidentialAccessService.IsSessionUnlocked.Returns(true);
+        var sut = CreateSut();
+
+        await LoadAndDrainAsync(sut, 51);
+
+        Assert.True(sut.CanShare);
+    }
+
+    [Fact]
+    public async Task CanShare_UnprotectedAndLocked_ReturnsTrue()
+    {
+        var card = new PrayerCard { Id = 3, Title = "Open", ProtectionMode = CardProtectionMode.None };
+        SetupLoadWithCard(52, card);
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        var sut = CreateSut();
+
+        await LoadAndDrainAsync(sut, 52);
+
+        Assert.True(sut.CanShare);
+    }
+
+    [Fact]
+    public async Task CanShare_ProtectedViaBoxCascade_Locked_ReturnsFalse()
+    {
+        var box = new CardBox { Id = 9, Name = "Family", ProtectAllCards = true, CardProtectionMode = CardProtectionMode.Hidden };
+        _boxService.GetBoxesAsync().Returns(new List<CardBox> { box }.AsReadOnly());
+        var card = new PrayerCard { Id = 3, Title = "Cascaded", ProtectionMode = CardProtectionMode.None, BoxId = 9 };
+        SetupLoadWithCard(53, card);
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        var sut = CreateSut();
+
+        await LoadAndDrainAsync(sut, 53);
+
+        Assert.False(sut.CanShare);
+    }
+
+    [Fact]
+    public async Task ShareCommand_ProtectedAndLocked_CanExecuteFalse()
+    {
+        var card = new PrayerCard { Id = 3, Title = "Secret", ProtectionMode = CardProtectionMode.LockedVisible };
+        SetupLoadWithCard(54, card);
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        var sut = CreateSut();
+
+        await LoadAndDrainAsync(sut, 54);
+
+        Assert.False(((IRelayCommand)sut.ShareCommand).CanExecute(null));
+    }
+
+    [Fact]
+    public async Task ShareAsync_ProtectedAndLocked_NoOpGuard_DoesNotThrow()
+    {
+        // Defense in depth (per issue #255): ShareAsync itself guards even if somehow
+        // invoked while blocked (e.g. direct ExecuteAsync bypassing canExecute). The
+        // unguarded body reaches IPlatformApplication.Current (untestable service-locator
+        // resolution) — a no-op return before that line means this completes without
+        // exception.
+        var card = new PrayerCard { Id = 3, Title = "Secret", ProtectionMode = CardProtectionMode.LockedVisible };
+        SetupLoadWithCard(55, card);
+        _confidentialAccessService.IsSessionUnlocked.Returns(false);
+        var sut = CreateSut();
+        await LoadAndDrainAsync(sut, 55);
+
+        await ((IAsyncRelayCommand)sut.ShareCommand).ExecuteAsync(null);
+
+        // Reaching this line without an exception proves the guard returned early.
+        Assert.False(sut.CanShare);
     }
 }

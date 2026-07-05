@@ -309,4 +309,67 @@ public class BoxServiceTests
         Assert.Single(_bulkMessages);
         Assert.Empty(_boxMessages);
     }
+
+    // ── HasConfidentialCardsAsync (#257 — background privacy screen gate) ─────
+    // The platform snapshot-blanking code (Android FLAG_SECURE / iOS resign-active
+    // overlay) only activates when this predicate is true, so it must correctly
+    // fold in the box-cascade rule from PrayerCard.GetEffectiveProtectionMode.
+
+    [Fact]
+    public async Task HasConfidentialCardsAsync_NoCards_ReturnsFalse()
+    {
+        _cardService.GetCardsAsync().Returns(Task.FromResult<IReadOnlyList<PrayerCard>>(new List<PrayerCard>()));
+        _db.GetAllAsync<CardBox>().Returns(Task.FromResult(new List<CardBox>()));
+
+        var result = await _service.HasConfidentialCardsAsync();
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public async Task HasConfidentialCardsAsync_CardWithOwnProtection_ReturnsTrue()
+    {
+        var cards = new List<PrayerCard>
+        {
+            new() { Id = 1, Title = "Private", BoxId = 0, ProtectionMode = CardProtectionMode.Hidden }
+        };
+        _cardService.GetCardsAsync().Returns(Task.FromResult<IReadOnlyList<PrayerCard>>(cards));
+        _db.GetAllAsync<CardBox>().Returns(Task.FromResult(new List<CardBox>()));
+
+        var result = await _service.HasConfidentialCardsAsync();
+
+        Assert.True(result);
+    }
+
+    [Fact]
+    public async Task HasConfidentialCardsAsync_CardProtectedViaBoxCascade_ReturnsTrue()
+    {
+        var box = new CardBox { Id = 5, Name = "Family", ProtectAllCards = true, CardProtectionMode = CardProtectionMode.LockedVisible };
+        var cards = new List<PrayerCard>
+        {
+            new() { Id = 1, Title = "Deferred to box", BoxId = 5, ProtectionMode = CardProtectionMode.None }
+        };
+        _cardService.GetCardsAsync().Returns(Task.FromResult<IReadOnlyList<PrayerCard>>(cards));
+        _db.GetAllAsync<CardBox>().Returns(Task.FromResult(new List<CardBox> { box }));
+
+        var result = await _service.HasConfidentialCardsAsync();
+
+        Assert.True(result);
+    }
+
+    [Fact]
+    public async Task HasConfidentialCardsAsync_NoCardsOrBoxesProtected_ReturnsFalse()
+    {
+        var box = new CardBox { Id = 5, Name = "Family", ProtectAllCards = false };
+        var cards = new List<PrayerCard>
+        {
+            new() { Id = 1, Title = "Open", BoxId = 5, ProtectionMode = CardProtectionMode.None }
+        };
+        _cardService.GetCardsAsync().Returns(Task.FromResult<IReadOnlyList<PrayerCard>>(cards));
+        _db.GetAllAsync<CardBox>().Returns(Task.FromResult(new List<CardBox> { box }));
+
+        var result = await _service.HasConfidentialCardsAsync();
+
+        Assert.False(result);
+    }
 }

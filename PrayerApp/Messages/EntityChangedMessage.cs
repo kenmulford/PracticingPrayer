@@ -45,3 +45,13 @@ public sealed record CardBoxChangedMessage(int BoxId, ChangeKind Kind);
 /// only cause subscribers to resync N+1 times for one logical change.
 /// </summary>
 public sealed record BulkChangedMessage();
+
+/// <summary>
+/// Published by <c>App.xaml.cs</c> immediately after <see cref="Services.IConfidentialAccessService.RelockSession"/>
+/// (issue #254 — strict re-lock on ANY <c>Window.Deactivated</c>, including a brief app-switcher
+/// peek). Subscribers must re-derive any lock-gated projection so the re-lock is visible the
+/// instant the app returns to foreground — re-mask <c>LockedVisible</c> cards, re-exclude
+/// <c>Hidden</c> cards, and collapse any currently-expanded card that is now effectively
+/// protected (its real content must not remain on screen after re-lock).
+/// </summary>
+public sealed record SessionRelockedMessage();

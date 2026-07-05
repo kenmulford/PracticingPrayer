@@ -64,6 +64,7 @@
     <Compile Include="../PrayerApp/Models/PrayerCardTag.cs" />
     <Compile Include="../PrayerApp/Models/PrayerTag.cs" />
     <Compile Include="../PrayerApp/Models/PrayerFrequency.cs" />
+    <Compile Include="../PrayerApp/Models/CardProtectionMode.cs" />
     <Compile Include="../PrayerApp/Models/PrayerInteraction.cs" />
     <Compile Include="../PrayerApp/Models/OnboardingStep.cs" />
     <Compile Include="../PrayerApp/Models/UserColor.cs" />
@@ -100,6 +101,7 @@
     <Compile Include="../PrayerApp/ViewModels/PrayerListViewModel.cs" />
     <Compile Include="../PrayerApp/ViewModels/PrayerCardViewModel.cs" />
     <Compile Include="../PrayerApp/ViewModels/PrayerRequestDetailViewModel.cs" />
+    <Compile Include="../PrayerApp/ViewModels/ProtectionPolicy.cs" />
     <Compile Include="../PrayerApp/ViewModels/TagFilterChipViewModel.cs" />
     <Compile Include="../PrayerApp/ViewModels/TagChipViewModel.cs" />
     <Compile Include="../PrayerApp/ViewModels/TagPickerViewModel.cs" />
@@ -144,6 +146,30 @@
     <Compile Include="../PrayerApp/Services/BoxService.cs" />
     <Compile Include="../PrayerApp/Services/IPrayerSelectionService.cs" />
     <Compile Include="../PrayerApp/Services/PrayerSelectionService.cs" />
+
+    <!-- Confidential access (#251): biometric+PIN auth primitive. Platform/UI dependencies
+         (Oscore biometric plugin, SecureStorage, PIN-entry UI) sit behind the seam interfaces
+         below, so ConfidentialAccessService itself has no MAUI runtime dependency. -->
+    <Compile Include="../PrayerApp/Services/IConfidentialAccessService.cs" />
+    <Compile Include="../PrayerApp/Services/ConfidentialAccessService.cs" />
+    <Compile Include="../PrayerApp/Services/Confidential/IBiometricAuthenticator.cs" />
+    <Compile Include="../PrayerApp/Services/Confidential/ISecureStore.cs" />
+    <Compile Include="../PrayerApp/Services/Confidential/IPinPrompt.cs" />
+    <Compile Include="../PrayerApp/Services/Confidential/PinHasher.cs" />
+    <Compile Include="../PrayerApp/Services/Confidential/PinAttemptTracker.cs" />
+
+    <!-- Confidential-aware backup export (#256): crypto envelope, payload schema/scrub-split,
+         and passphrase policy are pure (no MAUI runtime dependency), so they link into the
+         test project. BackupService.cs itself stays MAUI-only (FileSystem/Share/Shell) and is
+         NOT linked here — its orchestration is exercised via these testable seams. -->
+    <Compile Include="../PrayerApp/Services/Confidential/ConfidentialBackupCrypto.cs" />
+    <Compile Include="../PrayerApp/Services/Confidential/ConfidentialExportPayload.cs" />
+    <Compile Include="../PrayerApp/Services/Confidential/PassphrasePolicy.cs" />
+
+    <!-- Confidential-aware backup import (#258): decrypt + explicit-PK insert seam. Opens its own
+         raw SQLiteAsyncConnection against a db path (not IDBService — see the class doc for why),
+         so it links here and is unit-tested against a real temp SQLite file. -->
+    <Compile Include="../PrayerApp/Services/Confidential/ConfidentialBackupImporter.cs" />
 
     <!-- TestSeedFixtures: linked from PrayerApp.UITests so the consistency
          test in this project can reference the same canonical constants
