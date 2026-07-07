@@ -409,6 +409,21 @@ namespace PrayerApp.ViewModels
             var unlocked = await _confidentialAccessService.AuthenticateAsync("Show confidential cards");
             if (!unlocked) return;
 
+            RefreshAfterUnlock();
+        }
+
+        /// <summary>
+        /// Shared post-unlock refresh (issue #296) — the single chokepoint every path that
+        /// transitions the confidential-access session to unlocked must call. Extracted from
+        /// <see cref="ShowConfidentialAsync"/> so <see cref="PrayerCardViewModel.EnsureUnlockedForAccessAsync"/>'s
+        /// in-path unlocks (tap-to-expand, open-card) reuse the exact same mechanism instead of a
+        /// one-off patch per call site — re-raising <see cref="IsSessionUnlocked"/> plus each card's
+        /// lock-state projections and rebuilding sections is enough to unmask LockedVisible cards
+        /// and reveal Hidden cards immediately, mirroring <see cref="OnSessionRelocked"/>'s re-lock
+        /// counterpart.
+        /// </summary>
+        internal void RefreshAfterUnlock()
+        {
             OnPropertyChanged(nameof(IsSessionUnlocked));
             foreach (var card in AllPrayerCards)
                 card.RaiseLockStateChanged();

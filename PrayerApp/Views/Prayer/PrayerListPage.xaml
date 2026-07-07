@@ -10,11 +10,14 @@
              Title="Prayers"
              SafeAreaEdges="Container">
     <ContentPage.ToolbarItems>
-        <ToolbarItem Text="Pray" AutomationId="List_Btn_Pray" Command="{Binding StartPrayerTimeCommand}"
-                     SemanticProperties.Description="Pray"
-                     SemanticProperties.Hint="Pray through the prayers in the current view" />
-        <ToolbarItem Text="Add" AutomationId="Add" Command="{Binding NewCommand}"
-                     SemanticProperties.Hint="Add a new prayer request" />
+        <!-- Single overflow button opens PrayersOverflowPopup (Pray, Add, Show Confidential).
+             Mirrors PrayerCardsPage's "More" overflow (issue #298). -->
+        <ToolbarItem Text="More" AutomationId="More"
+                     IconImageSource="{AppThemeBinding Light=ellipsis_vertical_solid_full.png, Dark=ellipsis_vertical_solid_full_dark.png}"
+                     SemanticProperties.Description="More actions"
+                     SemanticProperties.Hint="Opens a menu with Pray, Add, and Show Confidential"
+                     Clicked="OnOverflowTapped"
+                     Order="Primary" Priority="0" />
     </ContentPage.ToolbarItems>
 
     <Grid x:Name="rootGrid" RowDefinitions="Auto, *">
