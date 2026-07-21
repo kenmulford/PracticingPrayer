@@ -40,7 +40,8 @@ This project follows a Gitflow-style model. **`master` and `dev` are protected**
 2. Branch from `dev` — name it `feature/<short-desc>` or `fix/<short-desc>`.
 3. Make your changes; keep commits focused and reviewable. One concern per branch.
 4. Run the test suite locally — see [Build and run](README.md#build-and-run) and the test layout below.
-5. Open the PR against `dev`. Link the issue with `Closes #<n>` if one exists. The `Unit Tests` check must pass before merge.
+5. Sign the CLA (see [Contributor License Agreement](#contributor-license-agreement)) by adding your name to the signatures file in the same PR.
+6. Open the PR against `dev`. Link the issue with `Closes #<n>` if one exists. The `Unit Tests` check must pass before merge.
 
 PRs are squash-merged into `dev`, so your in-branch commit history is for review readability — the final history is one squashed commit per PR.
 
@@ -71,6 +72,14 @@ PRs are squash-merged into `dev`, so your in-branch commit history is for review
 | `good first issue` | Smaller scope, suitable for a first PR. |
 | `closed-retroactively` | Created post-fix for `git log` archaeology only. Already closed. |
 
+## Contributor License Agreement
+
+Practicing Prayer is licensed under GPL-3.0, but the app is also distributed through application stores (e.g. Apple's App Store) whose terms can conflict with the GPL for code the project does not solely own. To keep **both** kinds of distribution lawful, every contributor signs a one-time **Individual Contributor License Agreement** ([CLA.md](CLA.md)) before their first contribution is merged.
+
+You keep the copyright to your contribution. The CLA grants Multithreaded LLC the right to distribute your contribution under GPL-3.0 **and** under the additional terms required for app-store distribution.
+
+**How to sign (manual):** in the same PR as your first contribution, add a row to [`signatures/individual-cla-signatures.md`](signatures/individual-cla-signatures.md) with your GitHub username, full name, and the date. Adding that row constitutes your agreement to the CLA; the maintainer verifies it before merging.
+
 ## License
 
-By contributing, you agree your contributions will be licensed under [GPL-3.0](LICENSE.txt).
+The project is licensed under [GPL-3.0](LICENSE.txt). By signing the CLA above, you agree your contributions are provided under the terms of that agreement.
