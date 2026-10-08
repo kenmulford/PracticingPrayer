@@ -34,13 +34,11 @@
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net10.0-ios|AnyCPU'">
 	  <EnableSGenConc>False</EnableSGenConc>
-	  <AdditionalArgs>ValidateXcodeVersion=false</AdditionalArgs>
 	  <CodesignEntitlements>Platforms\iOS\Entitlements.plist</CodesignEntitlements>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net10.0-ios|AnyCPU'">
 	  <EnableSGenConc>False</EnableSGenConc>
-	  <AdditionalArgs>ValidateXcodeVersion=false</AdditionalArgs>
 	  <CodesignEntitlements>Platforms\iOS\Entitlements.plist</CodesignEntitlements>
 	</PropertyGroup>
 
@@ -66,8 +64,6 @@
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(TargetFramework)'=='net10.0-ios'">
-	  <!-- Xcode 26.2 and 26.3 have identical SDKs; skip the version check until workloads catch up -->
-	  <ValidateXcodeVersion>false</ValidateXcodeVersion>
 	  <ProvisioningType>manual</ProvisioningType>
 	</PropertyGroup>
 
