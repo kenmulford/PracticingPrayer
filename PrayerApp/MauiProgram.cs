@@ -500,9 +500,7 @@ namespace PrayerApp
         {
             if (intent == null) return;
 
-            // PROCESS_TEXT is API 23+; project MinSdk is 21 so the analyzer needs the runtime guard.
-            if (intent.Action == Android.Content.Intent.ActionProcessText
-                && OperatingSystem.IsAndroidVersionAtLeast(23))
+            if (intent.Action == Android.Content.Intent.ActionProcessText)
             {
                 // EXTRA_PROCESS_TEXT is a CharSequence; GetStringExtra returns null for a
                 // SpannableString (Chrome / Gmail rich-text), silently dropping the share.

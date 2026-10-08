@@ -9,7 +9,7 @@
 	<uses-permission android:name="android.permission.WAKE_LOCK" />
 	<uses-permission android:name="android.permission.VIBRATE" />
 	<!-- Issue #251: required by Oscore.Maui.Biometric v2.5.1 for BiometricPrompt access.
-	     USE_FINGERPRINT (API 23-27) and USE_BIOMETRIC (API 28+) are both normal-protection
+	     USE_FINGERPRINT (API 24-27) and USE_BIOMETRIC (API 28+) are both normal-protection
 	     permissions — granted at install, no runtime prompt. -->
 	<uses-permission android:name="android.permission.USE_FINGERPRINT" android:maxSdkVersion="27" />
 	<uses-permission android:name="android.permission.USE_BIOMETRIC" android:minSdkVersion="28" />

@@ -51,10 +51,10 @@ Practicing Prayer is offline-first by design:
 
 ## Build and run
 
-You'll need the .NET 10 SDK with the MAUI workloads installed:
+You'll need a .NET 10.0.3xx SDK (`global.json` pins the band) with the MAUI workloads at workload set 10.0.301.1, the set the release builds with:
 
 ```bash
-dotnet workload install maui
+dotnet workload install maui --version 10.0.301.1
 ```
 
 Then, from the repo root:
