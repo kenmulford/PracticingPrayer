@@ -63,7 +63,7 @@ Then, from the repo root:
 # Android (emulator or USB-debugging device)
 dotnet build PrayerApp/PrayerApp.csproj -t:Run -f net10.0-android
 
-# iOS (macOS + Xcode required)
+# iOS (macOS + Xcode 27.0 required)
 dotnet build PrayerApp/PrayerApp.csproj -t:Run -f net10.0-ios
 # For an iOS Simulator Debug build/run, add -r iossimulator-arm64 — it selects the
 # simulator native-lib slice; without it the link step fails (see issue #150).

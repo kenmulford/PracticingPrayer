@@ -136,10 +136,10 @@ await _navigationService.PopModalAsync();
 Marker interface in `Views/IPageSheetModal.cs`. Implement it on any `ContentPage` pushed via `PushModalAsync` that should render as a page sheet on iPhone and iPad.
 
 ```csharp
-public partial class QuickAddPage : ContentPage, IPageSheetModal { }
+public partial class TagPickerPage : ContentPage, IPageSheetModal { }
 ```
 
-Pages using this pattern: `QuickAddPage`, `TagPickerPage`, `PrayerTimeScopePage`, `PrayerTimeBoxScopePage`.
+Pages using this pattern: `ConfirmImportPage`, `PrayerTimeCardSelectPage`, `PrayerTimeScopePage`, `PrayerTimeBoxScopePage`, `TagPickerPage`.
 
 `PageSheetPresentation.Apply` runs on `Application.ModalPushing`, subscribed in `App()`.
 

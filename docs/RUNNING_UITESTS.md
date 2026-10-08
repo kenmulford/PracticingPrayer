@@ -10,7 +10,7 @@
 
 | Tool | Version | Install |
 |------|---------|---------|
-| .NET SDK | 10.0.4xx (pinned in `global.json`) | [dotnet.microsoft.com](https://dotnet.microsoft.com/download) |
+| .NET SDK | 10.0.4xx + workload set 10.0.401.1 (both pinned in `global.json`) | [dotnet.microsoft.com](https://dotnet.microsoft.com/download) |
 | Node.js | 18+ | [nodejs.org](https://nodejs.org) (needed for Appium) |
 | Appium | 2.x | `npm install -g appium` |
 
@@ -39,7 +39,7 @@ Restart your terminal after setting these.
 
 | Tool | Version | Install |
 |------|---------|---------|
-| Xcode | 16+ | Mac App Store |
+| Xcode | 27.0 | Mac App Store |
 | Xcode Command Line Tools | — | `xcode-select --install` |
 | iOS Simulator | — | Default: `iPad (A16)` on iOS 27.0 |
 | Appium XCUITest driver | latest | `appium driver install xcuitest` |
@@ -82,8 +82,8 @@ If your AVD has a different name, set the `ANDROID_AVD` environment variable (se
 # List available simulators
 xcrun simctl list devices available
 
-# Boot by UDID: copy the iPad (A16) UDID listed under "-- iOS 27.0 --" above
-xcrun simctl boot <UDID>
+# Boot by UDID: copy the iPad (A16) UDID listed under "-- iOS 27.0 --" above, then paste it in place of PASTE-UDID-HERE
+xcrun simctl boot PASTE-UDID-HERE
 open -a Simulator
 ```
 
