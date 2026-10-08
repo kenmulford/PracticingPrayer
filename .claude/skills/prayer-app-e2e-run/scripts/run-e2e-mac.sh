@@ -10,6 +10,9 @@
 # Usage:
 #   run-e2e-mac.sh [both|android|ios] [--skip-deploy] [--skip-build]
 #
+# Blocks until the suites finish, so launch it detached (nohup, or a background task).
+# Exit: 0 every suite passed, 1 a suite failed, 2 stopped before any test ran.
+#
 set -euo pipefail
 
 PLATFORM="both"
@@ -40,7 +43,7 @@ LOGDIR="${TMPDIR:-/tmp}/pp-e2e"
 mkdir -p "$LOGDIR"
 
 step() { printf '\n=== %s ===\n' "$1"; }
-die()  { printf '\n[run-e2e] STOP: %s\n' "$1" >&2; exit 1; }
+die()  { printf '\n[run-e2e] STOP: %s\n' "$1" >&2; exit 2; }
 want_android() { [ "$PLATFORM" = both ] || [ "$PLATFORM" = android ]; }
 want_ios()     { [ "$PLATFORM" = both ] || [ "$PLATFORM" = ios ]; }
 
@@ -51,9 +54,11 @@ if want_android; then
   if ! adb devices | grep -qE 'emulator-[0-9]+\s+device'; then
     echo "booting $AVD (snapshot)…"
     nohup emulator -avd "$AVD" >"$LOGDIR/emulator.log" 2>&1 &
-    adb wait-for-device
-    for _ in $(seq 1 60); do
+    emu_pid=$!
+    # Bounded poll, not `adb wait-for-device`, which blocks forever if the emulator never attaches.
+    for _ in $(seq 1 90); do
       [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = 1 ] && break
+      kill -0 "$emu_pid" 2>/dev/null || break
       sleep 2
     done
   fi
@@ -100,15 +105,16 @@ if want_ios; then
 fi
 
 # --- 6. Appium servers (reuse if up) ---
+appium_up() { curl -sf --max-time 3 "http://127.0.0.1:$1/status" >/dev/null 2>&1; }
 start_appium() {  # port, extra-args
   local port="$1"; shift
-  if curl -s "http://127.0.0.1:$port/status" >/dev/null 2>&1; then
+  if appium_up "$port"; then
     echo "appium :$port already up"
   else
     echo "starting appium :${port}…"
     nohup appium --port "$port" "$@" >"$LOGDIR/appium-$port.log" 2>&1 &
-    for _ in $(seq 1 15); do curl -s "http://127.0.0.1:$port/status" >/dev/null 2>&1 && break; sleep 1; done
-    curl -s "http://127.0.0.1:$port/status" >/dev/null 2>&1 || die "appium :$port failed to start — see $LOGDIR/appium-$port.log"
+    for _ in $(seq 1 15); do appium_up "$port" && break; sleep 1; done
+    appium_up "$port" || die "appium :$port failed to start — see $LOGDIR/appium-$port.log"
   fi
 }
 step "appium servers"
@@ -123,22 +129,31 @@ fi
 
 # --- 8. Run (detached background; never kill mid-run) ---
 step "run"
+PIDS=(); PLATS=(); LOGS=()
 run_platform() {  # platform, port, log, extra-env...
   local plat="$1" port="$2" log="$3"; shift 3
   echo "$plat → :$port → $log"
-  ( env UITEST_PLATFORM="$plat" APPIUM_SERVER_URL="http://127.0.0.1:$port" "$@" \
-      dotnet test "$UITESTS" --no-build >"$log" 2>&1 ) &
-  echo "$!"
+  nohup env UITEST_PLATFORM="$plat" APPIUM_SERVER_URL="http://127.0.0.1:$port" "$@" \
+    dotnet test "$UITESTS" --no-build >"$log" 2>&1 &
+  PIDS+=("$!"); PLATS+=("$plat"); LOGS+=("$log")
 }
-PIDS=()
-if want_android; then PIDS+=("$(run_platform android 4723 "$LOGDIR/android.log" ANDROID_AVD="$AVD")"); fi
-if want_ios;     then PIDS+=("$(run_platform ios 4725 "$LOGDIR/ios.log" IOS_SIMULATOR="$IOS_SIM" IOS_VERSION="$IOS_VER")"); fi
+if want_android; then run_platform android 4723 "$LOGDIR/android.log" ANDROID_AVD="$AVD"; fi
+if want_ios;     then run_platform ios 4725 "$LOGDIR/ios.log" IOS_SIMULATOR="$IOS_SIM" IOS_VERSION="$IOS_VER"; fi
 
 echo
 echo "runs launched (PIDs: ${PIDS[*]}). Do NOT kill mid-test (wedges UiAutomator2)."
-echo "watch:  tail -f $LOGDIR/android.log $LOGDIR/ios.log"
+echo "watch:  tail -f ${LOGS[*]}"
 echo "waiting for completion…"
-wait
+
+# Wait on the test runs only: a bare `wait` also blocks on an emulator or appium this script started.
+STATUS=()
+for pid in "${PIDS[@]}"; do s=0; wait "$pid" || s=$?; STATUS+=("$s"); done
+
 step "results"
-want_android && { echo "-- android --"; grep -E 'Passed!|Failed!|Total tests|Passed:|Failed:|Skipped:' "$LOGDIR/android.log" | tail -6; }
-want_ios     && { echo "-- ios --";     grep -E 'Passed!|Failed!|Total tests|Passed:|Failed:|Skipped:' "$LOGDIR/ios.log" | tail -6; }
+rc=0
+for i in "${!PIDS[@]}"; do
+  echo "-- ${PLATS[$i]} (dotnet test exit ${STATUS[$i]}) --"
+  grep -E 'Passed!|Failed!|Total tests|Passed:|Failed:|Skipped:' "${LOGS[$i]}" | tail -6 || echo "no test summary in ${LOGS[$i]}"
+  [ "${STATUS[$i]}" -eq 0 ] || rc=1
+done
+exit "$rc"
