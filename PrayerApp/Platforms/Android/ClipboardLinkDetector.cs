@@ -32,19 +32,27 @@ public class ClipboardLinkDetector : IClipboardLinkDetector
     private static Task WaitForWindowFocusAsync(Activity activity, ViewTreeObserver observer)
     {
         var focused = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        EventHandler<ViewTreeObserver.WindowFocusChangeEventArgs>? onFocusChange = null;
-        onFocusChange = (_, e) =>
-        {
-            if (!e.HasFocus)
-                return;
-            // The captured observer can be the floating pre-attach one, so unsubscribe from
-            // the window's live one. Removing from a dead observer throws IllegalStateException.
-            var live = activity.Window?.DecorView?.ViewTreeObserver;
-            if (live is { IsAlive: true })
-                live.WindowFocusChange -= onFocusChange;
-            focused.TrySetResult();
-        };
-        observer.WindowFocusChange += onFocusChange;
+        observer.AddOnWindowFocusChangeListener(new FocusListener(activity, observer, focused));
         return focused.Task;
+    }
+
+    // An explicit listener object, unlike an event handler, is the same instance to Add and
+    // Remove on whichever observer ends up holding it.
+    private sealed class FocusListener(Activity activity, ViewTreeObserver observer, TaskCompletionSource focused)
+        : Java.Lang.Object, ViewTreeObserver.IOnWindowFocusChangeListener
+    {
+        public void OnWindowFocusChanged(bool hasFocus)
+        {
+            if (!hasFocus)
+                return;
+            // The captured observer can be the floating pre-attach one, so remove from the
+            // window's live one too. Removing from a dead observer throws IllegalStateException.
+            if (observer.IsAlive)
+                observer.RemoveOnWindowFocusChangeListener(this);
+            var live = activity.Window?.DecorView?.ViewTreeObserver;
+            if (live is { IsAlive: true } && !ReferenceEquals(live, observer))
+                live.RemoveOnWindowFocusChangeListener(this);
+            focused.TrySetResult();
+        }
     }
 }

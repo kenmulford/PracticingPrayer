@@ -111,6 +111,9 @@
     <Compile Include="../PrayerApp/ViewModels/PrayerTimeBoxScopeViewModel.cs" />
     <Compile Include="../PrayerApp/ViewModels/PrayerTimeCardSelectViewModel.cs" />
 
+    <!-- Views: pure layout logic only; pages themselves need the MAUI runtime -->
+    <Compile Include="../PrayerApp/Views/CardPanelLayout.cs" />
+
     <!-- Service interfaces -->
     <Compile Include="../PrayerApp/Services/ISettings.cs" />
     <Compile Include="../PrayerApp/Services/INavigationService.cs" />

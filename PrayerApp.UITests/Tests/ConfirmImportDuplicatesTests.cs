@@ -25,8 +25,9 @@ public class ConfirmImportDuplicatesTests
         _setup.Driver.ForceStopApp();
         _setup.Driver.LaunchProcessTextIntent(_setup, TestSeedFixtures.ImportSkipsDuplicatesPrayer);
 
-        var stagedTitle = _setup.Driver.WaitForElement("ConfirmImport_Entry_PrayerTitle", timeoutSeconds: 5);
-        Assert.True(stagedTitle.Text == TestSeedFixtures.ImportSkipsDuplicatesPrayer,
+        var stagedTitle = _setup.Driver.WaitForElement("ConfirmImport_Entry_PrayerTitle");
+        // Android prepends the accessibility description ("Prayer title, item 1 of 1, ...") to the Entry text.
+        Assert.True(stagedTitle.Text.EndsWith(TestSeedFixtures.ImportSkipsDuplicatesPrayer, StringComparison.Ordinal),
             $"The intent should stage the full shared title, but the first row reads '{stagedTitle.Text}'");
 
         _setup.Driver.WaitAndTap("ConfirmImport_Seg_ExistingCard");

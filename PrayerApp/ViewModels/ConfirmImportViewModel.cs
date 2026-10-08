@@ -275,11 +275,14 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
 
     // Reads the entity behind the selection from the last fetch: the picker item of a
     // card chosen after auth carries its real title but not its protection mode.
-    private bool IsSelectedCardBlocked(bool isUnlocked)
+    private bool IsSelectedCardBlocked(bool isUnlocked) =>
+        SelectedCard is { } selected && IsCardBlocked(selected.CardId, isUnlocked);
+
+    private bool IsCardBlocked(int cardId, bool isUnlocked)
     {
-        if (SelectedCard is not { } selected || _loadedCards is null || _loadedBoxes is null)
+        if (_loadedCards is null || _loadedBoxes is null)
             return false;
-        var entity = _loadedCards.FirstOrDefault(c => c.Id == selected.CardId);
+        var entity = _loadedCards.FirstOrDefault(c => c.Id == cardId);
         return entity is not null
             && ProtectionPolicy.IsAccessBlocked(entity, _loadedBoxes.FirstOrDefault(b => b.Id == entity.BoxId), isUnlocked);
     }
@@ -468,11 +471,8 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
         if (_loadedCards is null) return;
         if (!IsExistingCardMode)
         {
-            if (SelectedCard is { } selected && IsSelectedCardBlocked(_confidentialAccessService.IsSessionUnlocked))
-            {
-                selected.IsSelected = false;
-                SelectedCard = null;
-            }
+            if (IsSelectedCardBlocked(_confidentialAccessService.IsSessionUnlocked))
+                DropBlockedSelection();
             return;
         }
         if (!_lastApplyUnlocked) return;
@@ -854,14 +854,25 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
                 ? groups.SelectMany(g => g.Cards).FirstOrDefault(c => c.CardId == quickAddCard!.Id)
                 : ListedSelection();
         }
+        else if (selectionBlocked)
+        {
+            DropBlockedSelection();
+            return;
+        }
         else
         {
-            next = selectionBlocked ? null : ListedSelection();
+            next = ListedSelection();
         }
 
         if (SelectedCard is not null) SelectedCard.IsSelected = false;
         if (next is not null) next.IsSelected = true;
         SelectedCard = next;
+    }
+
+    private void DropBlockedSelection()
+    {
+        if (SelectedCard is { } selected) selected.IsSelected = false;
+        SelectedCard = null;
     }
 
     private bool CanSave()
@@ -975,6 +986,11 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
 
     private async Task SaveAsync()
     {
+        // Nothing raises CanExecuteChanged when the session locks, so CanSave cannot stop a
+        // save into a card that locked before the re-lock message re-pointed the selection.
+        if (ImportMode == ImportMode.ExistingCard && IsSelectedCardBlocked(_confidentialAccessService.IsSessionUnlocked))
+            return;
+
         IsBusy = true;
         // ConsumePending already drained both channels by save time;
         // skip the OnDisappearing safety-net.
@@ -986,7 +1002,8 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
             // save semantics. Import mode keeps IsImported = true.
             var isImported = EntryMode != EntryMode.Manual;
 
-            if (ImportMode == ImportMode.ExistingCard && SelectedCard is not null)
+            // target is read once: a re-lock during an awaited save nulls SelectedCard.
+            if (ImportMode == ImportMode.ExistingCard && SelectedCard is { } target)
             {
                 var existingSavedCount = 0;
                 // Snapshot: a row moved or removed during an awaited save must not break the loop.
@@ -994,7 +1011,7 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
                 {
                     var prayer = new Prayer
                     {
-                        PrayerCardId = SelectedCard.CardId,
+                        PrayerCardId = target.CardId,
                         Title = NormalizeQuotes(row.Title)?.Trim() ?? string.Empty,
                         Details = string.IsNullOrWhiteSpace(row.Details) ? null : NormalizeQuotes(row.Details)!.Trim(),
                         IsImported = isImported,
@@ -1004,11 +1021,18 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
                     existingSavedCount++;
                 }
                 _messenger.Send(new BulkChangedMessage());
+                // A re-lock during the write loop leaves target.Title as the real title. The
+                // imported-to-existing route expands the card and loads its prayers, which a
+                // masked row hides, so a blocked target routes to the tab alone.
+                var targetBlocked = IsCardBlocked(target.CardId, _confidentialAccessService.IsSessionUnlocked);
+                var targetTitle = targetBlocked ? ProtectionPolicy.MaskedTitle : target.Title;
                 var existingAnnounce = isImported
-                    ? $"Imported {existingSavedCount} prayers to {SelectedCard.Title}"
-                    : $"Saved {existingSavedCount} {(existingSavedCount == 1 ? "prayer" : "prayers")} to {SelectedCard.Title}";
+                    ? $"Imported {existingSavedCount} prayers to {targetTitle}"
+                    : $"Saved {existingSavedCount} {(existingSavedCount == 1 ? "prayer" : "prayers")} to {targetTitle}";
                 _accessibilityService.Announce(existingAnnounce);
-                await _navigationService.GoToAsync(Routes.PrayerCardsTabImportedToExisting(SelectedCard.CardId));
+                await _navigationService.GoToAsync(targetBlocked
+                    ? Routes.PrayerCardsTab
+                    : Routes.PrayerCardsTabImportedToExisting(target.CardId));
                 return;
             }
 

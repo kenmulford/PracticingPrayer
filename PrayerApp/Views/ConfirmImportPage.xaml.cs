@@ -8,14 +8,15 @@ public partial class ConfirmImportPage : ContentPage, IPageSheetModal
 {
     private bool _animating;
 
-    // View-model changes that arrived while _animating; replayed against the view
+    // A view-model change that arrived while _animating; replayed against the view
     // model's current state when the animation ends.
-    private bool _modePending;
-    private bool _selectionPending;
+    private bool _layoutPending;
 
-    // The card the summary last showed. A re-point to the same card (the relock reload)
-    // must not collapse a list the user reopened with "Change".
+    // The card the summary last showed, and whether "Change" opened the list for it.
+    // CardPanelLayout reads both so a re-point to the same card (the relock reload)
+    // does not collapse a list the user reopened.
     private int? _summaryCardId;
+    private bool _listOpenedByUser;
 
     // #122: the prayer Title Entry lives inside a BindableLayout ItemTemplate, so
     // it has no x:Name and code-behind has no compile-time handle. The first row's
@@ -89,15 +90,9 @@ public partial class ConfirmImportPage : ContentPage, IPageSheetModal
         vm.PropertyChanged -= OnVmPropertyChanged;
         vm.PropertyChanged += OnVmPropertyChanged;
 
-        // Restore collapsed state when resuming with an existing selection
-        // (e.g. backgrounded mid-flow, or Quick Add with Quick Add card preselected).
-        // No animation — page is just appearing.
-        if (vm.IsExistingCardMode && vm.SelectedCard is not null)
-        {
-            cardGroupsList.IsVisible = false;
-            selectedCardSummary.IsVisible = true;
-            _summaryCardId = vm.SelectedCard.CardId;
-        }
+        // Restore the panel state when resuming (e.g. backgrounded mid-flow, or Quick Add
+        // with the Quick Add card preselected). No animation — page is just appearing.
+        await ApplyLayoutAsync(vm, animate: false, isAppearing: true);
     }
 
     protected override void OnDisappearing()
@@ -121,12 +116,11 @@ public partial class ConfirmImportPage : ContentPage, IPageSheetModal
 
     private async void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        var mode = e.PropertyName == nameof(ConfirmImportViewModel.IsExistingCardMode);
-        var selection = e.PropertyName == nameof(ConfirmImportViewModel.SelectedCard);
-        if (!mode && !selection) return;
+        if (e.PropertyName is not (nameof(ConfirmImportViewModel.IsExistingCardMode)
+                                   or nameof(ConfirmImportViewModel.SelectedCard)))
+            return;
 
-        _modePending |= mode;
-        _selectionPending |= selection;
+        _layoutPending = true;
         if (_animating) return;
 
         _animating = true;
@@ -144,57 +138,33 @@ public partial class ConfirmImportPage : ContentPage, IPageSheetModal
     // current state, so a change that arrived mid-animation still reaches its end state.
     private async Task ApplyPendingChangesAsync()
     {
-        while (BindingContext is ConfirmImportViewModel vm && (_modePending || _selectionPending))
+        while (BindingContext is ConfirmImportViewModel vm && _layoutPending)
         {
-            var (mode, selection) = (_modePending, _selectionPending);
-            _modePending = _selectionPending = false;
-            if (mode) await ApplyModeAsync(vm);
-            if (selection) await ApplySelectionAsync(vm);
+            _layoutPending = false;
+            await ApplyLayoutAsync(vm, animate: true);
         }
     }
 
-    private async Task ApplyModeAsync(ConfirmImportViewModel vm)
+    private async Task ApplyLayoutAsync(ConfirmImportViewModel vm, bool animate, bool isAppearing = false)
     {
-        if (vm.IsExistingCardMode)
-        {
-            selectedCardSummary.IsVisible = false;
-            await ShowCardListEntranceAsync();
-        }
-        else
-        {
-            // Switching to New Card mode — hide both the list and any visible summary
-            await cardGroupsList.FadeToAsync(0, 150, Easing.CubicIn);
-            cardGroupsList.IsVisible = false;
-            cardGroupsList.Opacity = 1;
-            cardGroupsList.TranslationY = 0;
-            selectedCardSummary.IsVisible = false;
-        }
-    }
+        var decision = CardPanelLayout.Decide(
+            vm.IsExistingCardMode, vm.SelectedCard?.CardId, _summaryCardId,
+            cardGroupsList.IsVisible, selectedCardSummary.IsVisible, _listOpenedByUser, isAppearing);
+        _summaryCardId = decision.SummaryCardId;
+        if (decision.Transition != CardPanelTransition.None)
+            _listOpenedByUser = false;
 
-    private async Task ApplySelectionAsync(ConfirmImportViewModel vm)
-    {
-        if (vm.SelectedCard is not { } card)
+        switch (decision.Transition)
         {
-            _summaryCardId = null;
-            if (selectedCardSummary.IsVisible)
-            {
-                // Selection cleared while summary is showing — collection filter changed
-                await CollapseSummaryAndShowListAsync();
-            }
-        }
-        else if (cardGroupsList.IsVisible && card.CardId != _summaryCardId)
-        {
-            _summaryCardId = card.CardId;
-            await cardGroupsList.FadeToAsync(0, 180, Easing.CubicIn);
-            cardGroupsList.IsVisible = false;
-            cardGroupsList.Opacity = 1;
-            selectedCardSummary.Opacity = 0;
-            selectedCardSummary.IsVisible = true;
-            await selectedCardSummary.FadeToAsync(1, 220, Easing.CubicOut);
-        }
-        else if (selectedCardSummary.IsVisible)
-        {
-            _summaryCardId = card.CardId;
+            case CardPanelTransition.CollapseToSummary:
+                await CollapseToSummaryAsync(animate);
+                break;
+            case CardPanelTransition.ShowList:
+                await ShowCardListAsync(animate);
+                break;
+            case CardPanelTransition.HideBoth:
+                await HideBothAsync(animate);
+                break;
         }
     }
 
@@ -232,7 +202,8 @@ public partial class ConfirmImportPage : ContentPage, IPageSheetModal
         {
             // Does NOT clear SelectedCard — checkmark stays on the prior selection
             // so the user can confirm or pick a different row.
-            await CollapseSummaryAndShowListAsync();
+            _listOpenedByUser = true;
+            await ShowCardListAsync(animate: true);
             await ApplyPendingChangesAsync();
         }
         finally
@@ -241,22 +212,54 @@ public partial class ConfirmImportPage : ContentPage, IPageSheetModal
         }
     }
 
-    private async Task CollapseSummaryAndShowListAsync()
+    private async Task CollapseToSummaryAsync(bool animate)
     {
-        await selectedCardSummary.FadeToAsync(0, 150, Easing.CubicIn);
-        selectedCardSummary.IsVisible = false;
-        selectedCardSummary.Opacity = 1;
-        await ShowCardListEntranceAsync();
+        if (cardGroupsList.IsVisible)
+        {
+            if (animate)
+                await cardGroupsList.FadeToAsync(0, 180, Easing.CubicIn);
+            cardGroupsList.IsVisible = false;
+            cardGroupsList.Opacity = 1;
+        }
+
+        selectedCardSummary.Opacity = animate ? 0 : 1;
+        selectedCardSummary.IsVisible = true;
+        if (animate)
+            await selectedCardSummary.FadeToAsync(1, 220, Easing.CubicOut);
     }
 
-    private async Task ShowCardListEntranceAsync()
+    private async Task ShowCardListAsync(bool animate)
     {
-        cardGroupsList.Opacity = 0;
-        cardGroupsList.TranslationY = 20;
+        if (selectedCardSummary.IsVisible)
+        {
+            if (animate)
+                await selectedCardSummary.FadeToAsync(0, 150, Easing.CubicIn);
+            selectedCardSummary.IsVisible = false;
+            selectedCardSummary.Opacity = 1;
+        }
+
+        if (animate)
+        {
+            cardGroupsList.Opacity = 0;
+            cardGroupsList.TranslationY = 20;
+        }
+
         cardGroupsList.IsVisible = true;
+        if (!animate) return;
+
         await Task.WhenAll(
             cardGroupsList.FadeToAsync(1, 280, Easing.CubicOut),
             cardGroupsList.TranslateToAsync(0, 0, 280, Easing.CubicOut)
         );
+    }
+
+    private async Task HideBothAsync(bool animate)
+    {
+        if (animate && cardGroupsList.IsVisible)
+            await cardGroupsList.FadeToAsync(0, 150, Easing.CubicIn);
+        cardGroupsList.IsVisible = false;
+        cardGroupsList.Opacity = 1;
+        cardGroupsList.TranslationY = 0;
+        selectedCardSummary.IsVisible = false;
     }
 }

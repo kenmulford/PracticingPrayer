@@ -2199,10 +2199,10 @@ public static class AppExtensions
     }
 
     /// <summary>
-    /// Reject `text` values containing shell metacharacters that would corrupt
-    /// `am`-shell argument tokenisation. Whitelisting the safe set is cheaper than
-    /// guessing the actual tokenisation contract; spaces are allowed because
-    /// <see cref="ToAmShellArg"/> escapes them.
+    /// Allows only <c>[A-Za-z0-9 _.,-]</c>. Any other character can be a shell metacharacter
+    /// that corrupts `am`-shell tokenisation across Appium driver versions, and a denylist
+    /// misses <c>;</c>, <c>&amp;</c>, <c>|</c>, <c>(</c>, <c>)</c>, <c>*</c>, and <c>&lt;</c>.
+    /// Spaces are allowed because <see cref="ToAmShellArg"/> escapes them.
     /// </summary>
     private static void ValidateAmShellText(string text, string paramName)
     {
@@ -2211,11 +2211,10 @@ public static class AppExtensions
 
         foreach (var c in text)
         {
-            if (c is '\'' or '"' or '`' or '$' or '\\' or '\n' or '\r')
+            if (!(char.IsAsciiLetterOrDigit(c) || c is ' ' or '_' or '.' or ',' or '-'))
                 throw new ArgumentException(
-                    $"`{paramName}` contains a shell metacharacter (quote, backtick, $, backslash, or newline). " +
-                    "These corrupt am-shell argument tokenisation across Appium driver versions. " +
-                    "Use plain alphanumeric + space text only (the helper escapes spaces); production " +
+                    $"`{paramName}` contains '{c}', which is outside the allowed set [A-Za-z0-9 _.,-]. " +
+                    "Other characters can corrupt am-shell argument tokenisation; production " +
                     "multi-line / rich-text parsing is covered by TextSelectionParser unit tests.",
                     paramName);
         }
