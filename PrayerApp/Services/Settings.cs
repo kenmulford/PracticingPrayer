@@ -147,8 +147,8 @@ namespace PrayerApp.Services
         /// <summary>True once the first-launch clipboard share-import prompt has been shown.</summary>
         public static bool ShareHandoffPrompted
         {
-            get => Preferences.Get("share_handoff_prompted", false);
-            set => Preferences.Set("share_handoff_prompted", value);
+            get => Preferences.Get(nameof(ShareHandoffPrompted), false);
+            set => Preferences.Set(nameof(ShareHandoffPrompted), value);
         }
 
         public static void ClearSettings()

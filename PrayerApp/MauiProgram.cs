@@ -519,7 +519,7 @@ namespace PrayerApp
             var uri = intent.Data.ToString();
 
             // URL-based deep link
-            if (uri?.StartsWith("https://practicingprayerapp.com/share") == true)
+            if (DeepLinkService.TryExtractShareUrl(uri, out _))
             {
                 HandleDeepLink(uri);
                 return;
@@ -604,14 +604,8 @@ namespace PrayerApp
         /// </summary>
         private static void HandleDeepLink(string? url)
         {
-            if (string.IsNullOrEmpty(url) || !url.StartsWith("https://practicingprayerapp.com/share"))
+            if (!DeepLinkService.TryExtractShareUrl(url, out var shareUrl))
                 return;
-
-            // Strip trailing text — share messages append human-readable summary
-            // after the URL, which some apps pass through as part of the URI.
-            var endOfUrl = url.IndexOfAny(new[] { '\n', '\r', ' ' });
-            if (endOfUrl >= 0)
-                url = url[..endOfUrl];
 
             // Suppress onboarding for this session — must happen before UI dispatch
             // so MainPage.OnAppearing sees the flag when it checks.
@@ -624,7 +618,7 @@ namespace PrayerApp
                 {
                     await App.InitTask;
                     var svc = IPlatformApplication.Current!.Services.GetRequiredService<IDeepLinkService>();
-                    await svc.HandleAsync(url);
+                    await svc.HandleAsync(shareUrl);
                 }
                 catch (Exception ex)
                 {

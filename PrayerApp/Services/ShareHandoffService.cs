@@ -8,8 +8,6 @@ namespace PrayerApp.Services;
 /// </summary>
 public sealed class ShareHandoffService
 {
-    private const string SharePrefix = "https://practicingprayerapp.com/share";
-
     private readonly ISettings _settings;
     private readonly IClipboardLinkDetector _detector;
     private readonly INavigationService _navigation;
@@ -53,8 +51,8 @@ public sealed class ShareHandoffService
         if (!import)
             return false;
 
-        var url = ExtractShareUrl(await _readClipboardText());
-        if (url is null)
+        if (!DeepLinkService.TryExtractShareUrl(await _readClipboardText(), out var url)
+            || !DeepLinkService.IsImportableShareUri(url))
         {
             await _navigation.DisplayAlertAsync(
                 "No shared prayer found",
@@ -66,18 +64,5 @@ public sealed class ShareHandoffService
         _onboarding.MarkDeepLinkSession();
         await _deepLinks.HandleAsync(url);
         return true;
-    }
-
-    // Mirrors MauiProgram.HandleDeepLink: the share message appends human-readable text
-    // after the URL, so the URL ends at the first whitespace.
-    private static string? ExtractShareUrl(string? text)
-    {
-        var trimmed = text?.TrimStart();
-        if (trimmed is null || !trimmed.StartsWith(SharePrefix, StringComparison.Ordinal))
-            return null;
-
-        var end = trimmed.IndexOfAny(new[] { '\n', '\r', ' ' });
-        var url = end >= 0 ? trimmed[..end] : trimmed;
-        return DeepLinkService.IsImportableShareUri(url) ? url : null;
     }
 }

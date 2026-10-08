@@ -1065,15 +1065,7 @@ public static class AppExtensions
         if (TestConfig.IsIOS || !driver.IsAlertPresent())
             return;
 
-        bool hasNotNow;
-        try
-        {
-            driver.Manage().Timeouts().ImplicitWait = TestConfig.ShortTimeout;
-            hasNotNow = driver.FindElements(By.XPath("//*[@text='Not now']")).Count > 0;
-        }
-        finally { driver.Manage().Timeouts().ImplicitWait = TestConfig.DefaultTimeout; }
-
-        if (hasNotNow)
+        if (driver.IsTextDisplayed("Not now"))
             driver.TapAlertButton("Not now");
     }
 

@@ -571,6 +571,62 @@ public class DeepLinkServiceTests : IDisposable
             s.SuggestedCardTitle == "Test"));
     }
 
+    // ── TryExtractShareUrl ──────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("https://practicingprayerapp.com/share/r?d=abc", "https://practicingprayerapp.com/share/r?d=abc")]
+    [InlineData("  \thttps://practicingprayerapp.com/share/r?d=abc", "https://practicingprayerapp.com/share/r?d=abc")]
+    [InlineData("https://practicingprayerapp.com/share/r?d=abc\n\nPray for Mom", "https://practicingprayerapp.com/share/r?d=abc")]
+    [InlineData("https://practicingprayerapp.com/share/r?d=abc\r\nPray", "https://practicingprayerapp.com/share/r?d=abc")]
+    [InlineData("https://practicingprayerapp.com/share/r?d=abc Pray", "https://practicingprayerapp.com/share/r?d=abc")]
+    [InlineData("https://practicingprayerapp.com/share/r?d=abc\tPray", "https://practicingprayerapp.com/share/r?d=abc")]
+    [InlineData("https://practicingprayerapp.com/share/r?d=abc\u00A0Pray", "https://practicingprayerapp.com/share/r?d=abc")]
+    [InlineData("https://practicingprayerapp.com/share/r?d=abc\u2028Pray", "https://practicingprayerapp.com/share/r?d=abc")]
+    public void TryExtractShareUrl_ShareText_ReturnsUrlUpToFirstWhitespace(string text, string expected)
+    {
+        Assert.True(DeepLinkService.TryExtractShareUrl(text, out var url));
+        Assert.Equal(expected, url);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("hello")]
+    [InlineData("https://example.com/share/r?d=abc")]
+    [InlineData("see https://practicingprayerapp.com/share/r?d=abc")]
+    public void TryExtractShareUrl_NotAShareUrl_ReturnsFalse(string? text)
+    {
+        Assert.False(DeepLinkService.TryExtractShareUrl(text, out _));
+    }
+
+    // ── IsImportableShareUri ────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("https://practicingprayerapp.com/share/r?d=abc")]
+    [InlineData("https://practicingprayerapp.com/share/r/?d=abc")]
+    [InlineData("https://practicingprayerapp.com/share/r?title=Heal")]
+    [InlineData("https://practicingprayerapp.com/share/c?d=abc")]
+    [InlineData("https://practicingprayerapp.com/share/c?title=Family&requests=abc")]
+    public void IsImportableShareUri_StagingShape_ReturnsTrue(string uri)
+    {
+        Assert.True(DeepLinkService.IsImportableShareUri(uri));
+    }
+
+    [Theory]
+    [InlineData("https://practicingprayerapp.com/share/c?title=x")]
+    [InlineData("https://practicingprayerapp.com/share/c?requests=abc")]
+    [InlineData("https://practicingprayerapp.com/share/c?title=%20&requests=abc")]
+    [InlineData("https://practicingprayerapp.com/share/r")]
+    [InlineData("https://practicingprayerapp.com/share/r?notes=something")]
+    [InlineData("https://practicingprayerapp.com/share/x?d=abc")]
+    [InlineData("https://example.com/share/r?d=abc")]
+    [InlineData("not a url")]
+    [InlineData("")]
+    public void IsImportableShareUri_NothingToStage_ReturnsFalse(string uri)
+    {
+        Assert.False(DeepLinkService.IsImportableShareUri(uri));
+    }
+
     // ── Helper ──────────────────────────────────────────────────────────────
 
     private static MemoryStream CompressToStream(string json)

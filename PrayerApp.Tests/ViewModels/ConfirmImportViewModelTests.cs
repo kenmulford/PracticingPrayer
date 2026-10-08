@@ -1318,6 +1318,28 @@ public class ConfirmImportViewModelTests
     }
 
     [Fact]
+    public async Task Rematch_MovesAddedRowWithinPrayers_KeepsTitleSubscription()
+    {
+        var sut = await MatchAsync(7, new[] { "Healing" },
+            ("Mom", null), ("Healing", null), ("Wisdom", null));
+        var healing = sut.AlreadyOnCard.Single();
+        sut.AddDuplicateCommand.Execute(healing);
+        Assert.Equal(new[] { "Mom", "Wisdom", "Healing" }, sut.Prayers.Select(r => r.Title));
+
+        StubCardPrayers(8);
+        sut.SelectedCard = CardItem(8, "Other");
+        await Task.Delay(50);
+
+        Assert.Equal(new[] { "Mom", "Healing", "Wisdom" }, sut.Prayers.Select(r => r.Title));
+        var raised = 0;
+        sut.SaveCommand.CanExecuteChanged += (_, _) => raised++;
+
+        healing.Title = "Healing edited";
+
+        Assert.True(raised > 0);
+    }
+
+    [Fact]
     public async Task MoveRows_Announce()
     {
         var sut = await MatchAsync(7, new[] { "Healing" }, ("Healing", null));
@@ -2620,6 +2642,52 @@ public class ConfirmImportViewModelTests
         Assert.NotSame(before, sut.SelectedCard);
         Assert.Same(Row(sut, 2), sut.SelectedCard);
         Assert.True(sut.SelectedCard!.IsSelected);
+    }
+
+    [Fact]
+    public async Task Relocked_AfterLockedApply_LeavesGroupsUntouched()
+    {
+        SetupPickerData(new[] { Card(1, "Secret", mode: CardProtectionMode.LockedVisible) });
+        var sut = await OpenImportPickerAsync();
+        var before = Row(sut, 1);
+        var changes = 0;
+        sut.AvailableCardGroups.CollectionChanged += (_, _) => changes++;
+
+        Relock();
+
+        Assert.Equal(0, changes);
+        Assert.Same(before, Row(sut, 1));
+    }
+
+    [Fact]
+    public async Task SelectCard_Masked_AuthSucceeds_DoesNotRefetchCards()
+    {
+        SetupPickerData(new[] { Card(1, "Secret", mode: CardProtectionMode.LockedVisible) });
+        AuthenticateSucceeds();
+        var sut = await OpenImportPickerAsync();
+
+        await Tap(sut, Row(sut, 1));
+
+        await _cardService.Received(1).GetCardsAsync();
+    }
+
+    [Fact]
+    public async Task SelectCard_Masked_AuthSucceeds_PendingLoadFinishingAfterTap_KeepsSelection()
+    {
+        SetupPickerData(new[] { Card(1, "Secret", mode: CardProtectionMode.LockedVisible) });
+        AuthenticateSucceeds();
+        var sut = await OpenImportPickerAsync();
+        var heldLoad = new TaskCompletionSource<IReadOnlyList<PrayerCard>>();
+        _cardService.GetCardsAsync().Returns(heldLoad.Task);
+        sut.SelectedBox = sut.AvailableBoxes.OfType<RealBoxPickerItem>().First(b => b.BoxId == 0);
+        await Tap(sut, Row(sut, 1));
+
+        heldLoad.SetResult(new[] { Card(1, "Secret", mode: CardProtectionMode.LockedVisible) });
+        await Task.Delay(50);
+
+        Assert.NotNull(sut.SelectedCard);
+        Assert.Equal("Secret", sut.SelectedCard!.Title);
+        Assert.Same(Row(sut, 1), sut.SelectedCard);
     }
 
     [Fact]

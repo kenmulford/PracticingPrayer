@@ -27,6 +27,7 @@ public class ClipboardLinkDetector : IClipboardLinkDetector
             && clipboard.PrimaryClipDescription?.HasMimeType(ClipDescription.MimetypeTextPlain) == true;
     }
 
+    // The clipboard is readable only by the focused window on Android 10+.
     private static Task WaitForWindowFocusAsync(ViewTreeObserver observer)
     {
         var focused = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -35,7 +36,9 @@ public class ClipboardLinkDetector : IClipboardLinkDetector
         {
             if (!e.HasFocus)
                 return;
-            observer.WindowFocusChange -= onFocusChange;
+            // Removing from a dead observer throws IllegalStateException.
+            if (observer.IsAlive)
+                observer.WindowFocusChange -= onFocusChange;
             focused.TrySetResult();
         };
         observer.WindowFocusChange += onFocusChange;
