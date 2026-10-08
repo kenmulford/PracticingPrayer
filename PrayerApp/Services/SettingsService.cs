@@ -83,4 +83,10 @@ public class SettingsService : ISettings
         get => Settings.ExpandedSectionIds;
         set => Settings.ExpandedSectionIds = value;
     }
+
+    public bool ShareHandoffPrompted
+    {
+        get => Settings.ShareHandoffPrompted;
+        set => Settings.ShareHandoffPrompted = value;
+    }
 }

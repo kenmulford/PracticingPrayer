@@ -929,6 +929,7 @@ public static class AppExtensions
         if (!driver.IsAlertPresent() && driver.IsDisplayed("Home", timeoutSeconds: 0))
             return;
 
+        DismissShareHandoffAlertIfPresent(driver);
         try { driver.DismissAlertIfPresent(); } catch { /* best effort */ }
 
         // Back out to a tab root, dismissing any alert each Back may raise (e.g.
@@ -999,6 +1000,10 @@ public static class AppExtensions
         }
 
         // Android — legacy in-suite dismissal until the Android toolchain returns.
+        // The share-handoff alert precedes the welcome popup and blocks the tab bar, so
+        // it must go before the Home fast path reads the screen.
+        DismissShareHandoffAlertIfPresent(driver);
+
         // Fast path: if the tab bar is already rendered, no onboarding popup is
         // blocking. Saves up to 3s on test #1 vs probing Welcome_Btn_Skip first.
         if (driver.IsDisplayed("Home", timeoutSeconds: 1))
@@ -1011,6 +1016,8 @@ public static class AppExtensions
         // and may not be visible immediately, especially on slow emulators.
         for (int attempt = 0; attempt < 3; attempt++)
         {
+            DismissShareHandoffAlertIfPresent(driver);
+
             // Check for dismissal buttons — welcome popup, mid-onboarding banner, or final "Got it!"
             string? dismissButton = driver.IsDisplayed("Welcome_Btn_Skip", timeoutSeconds: 3) ? "Welcome_Btn_Skip"
                 : driver.IsDisplayed("Banner_Btn_Skip", timeoutSeconds: 2) ? "Banner_Btn_Skip"
@@ -1045,6 +1052,29 @@ public static class AppExtensions
 
         // After retries, mark handled to avoid infinite loops in future calls
         setup.OnboardingHandled = true;
+    }
+
+    /// <summary>
+    /// Android: taps "Not now" on the first-launch "Did someone share a prayer with you?"
+    /// alert. <see cref="DismissAlertIfPresent"/> taps button1, which is "Import" here and
+    /// would stage a clipboard import. iOS: no-op — onboarding is pre-seeded complete, so
+    /// the alert never shows.
+    /// </summary>
+    private static void DismissShareHandoffAlertIfPresent(AppiumDriver driver)
+    {
+        if (TestConfig.IsIOS || !driver.IsAlertPresent())
+            return;
+
+        bool hasNotNow;
+        try
+        {
+            driver.Manage().Timeouts().ImplicitWait = TestConfig.ShortTimeout;
+            hasNotNow = driver.FindElements(By.XPath("//*[@text='Not now']")).Count > 0;
+        }
+        finally { driver.Manage().Timeouts().ImplicitWait = TestConfig.DefaultTimeout; }
+
+        if (hasNotNow)
+            driver.TapAlertButton("Not now");
     }
 
     /// <summary>

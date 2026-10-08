@@ -35,4 +35,10 @@ public interface ISettings
     /// Empty string = all collapsed (the default for new installs).
     /// </summary>
     string ExpandedSectionIds { get; set; }
+
+    /// <summary>
+    /// True once the first-launch "Did someone share a prayer with you?" clipboard
+    /// import prompt has been shown. Set before the alert appears so it never repeats.
+    /// </summary>
+    bool ShareHandoffPrompted { get; set; }
 }

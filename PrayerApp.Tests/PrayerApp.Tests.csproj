@@ -140,6 +140,8 @@
     <Compile Include="../PrayerApp/Services/ModalPushSequence.cs" />
     <Compile Include="../PrayerApp/Services/IAppGroupContainerProvider.cs" />
     <Compile Include="../PrayerApp/Services/AppGroupImportOrchestrator.cs" />
+    <Compile Include="../PrayerApp/Services/IClipboardLinkDetector.cs" />
+    <Compile Include="../PrayerApp/Services/ShareHandoffService.cs" />
     <Compile Include="../PrayerApp/ViewModels/EditablePrayer.cs" />
     <Compile Include="../PrayerApp/ViewModels/ConfirmImportViewModel.cs" />
     <Compile Include="../PrayerApp/Services/IBoxService.cs" />

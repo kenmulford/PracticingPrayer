@@ -15,6 +15,7 @@ public partial class MainPage : ContentPage
     private readonly IOrientationService? _orientationService;
     private readonly IServiceProvider _services;
     private bool _prayerTimeNavigating;
+    private bool _shareHandoffRunning;
 
     public MainPage(HomeViewModel homeViewModel, IOnboardingService onboardingService,
         IOrientationService orientationService, IServiceProvider services)
@@ -110,8 +111,26 @@ public partial class MainPage : ContentPage
         // Show welcome popup on first visit — skip if user entered via share link
         if (_onboardingService.CurrentStep == OnboardingStep.Welcome
             && !_onboardingService.WelcomeShownThisSession
-            && !_onboardingService.IsDeepLinkSession)
+            && !_onboardingService.IsDeepLinkSession
+            && !_shareHandoffRunning)
         {
+            // The handoff awaits dialogs, so a re-entrant OnAppearing must not start a
+            // second one; MarkWelcomeShown only runs after it, so the guard covers that gap.
+            _shareHandoffRunning = true;
+            try
+            {
+                if (await _services.GetRequiredService<ShareHandoffService>().RunAsync())
+                    return;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Share handoff failed: {ex}");
+            }
+            finally
+            {
+                _shareHandoffRunning = false;
+            }
+
             _onboardingService.MarkWelcomeShown();
             try
             {

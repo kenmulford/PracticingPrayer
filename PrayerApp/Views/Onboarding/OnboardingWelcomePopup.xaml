@@ -13,39 +13,48 @@
             <RoundRectangle CornerRadius="16" />
         </Border.StrokeShape>
 
-        <VerticalStackLayout Padding="28,32" Spacing="16">
+        <ScrollView>
+            <VerticalStackLayout Padding="28,32" Spacing="16">
 
-            <Label x:Name="TitleLabel"
-                   Text="Welcome to Practicing Prayer"
-                   FontSize="{StaticResource FontHeadingLg}"
-                   FontAttributes="Bold"
-                   TextColor="{AppThemeBinding Light={StaticResource Tertiary}, Dark={StaticResource TextPrimaryDark}}"
-                   SemanticProperties.HeadingLevel="Level1"
-                   HorizontalOptions="Center"
-                   HorizontalTextAlignment="Center" />
+                <Label x:Name="TitleLabel"
+                       Text="Welcome to Practicing Prayer"
+                       FontSize="{StaticResource FontHeadingLg}"
+                       FontAttributes="Bold"
+                       TextColor="{AppThemeBinding Light={StaticResource Tertiary}, Dark={StaticResource TextPrimaryDark}}"
+                       SemanticProperties.HeadingLevel="Level1"
+                       HorizontalOptions="Center"
+                       HorizontalTextAlignment="Center" />
 
-            <Label x:Name="SubtitleLabel"
-                   Text="Let's set up your first prayer card."
-                   FontSize="{StaticResource FontBodyLg}"
-                   TextColor="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource TextSecondaryDark}}"
-                   HorizontalOptions="Center"
-                   HorizontalTextAlignment="Center" />
+                <Label x:Name="SubtitleLabel"
+                       Text="Let's set up your first prayer card."
+                       FontSize="{StaticResource FontBodyLg}"
+                       TextColor="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource TextSecondaryDark}}"
+                       HorizontalOptions="Center"
+                       HorizontalTextAlignment="Center" />
 
-            <Button x:Name="BtnGetStarted"
-                    Text="Get Started"
-                    AutomationId="Welcome_Btn_GetStarted"
-                    Margin="0,8,0,0" />
+                <Label Text="Got a shared prayer? Tap the link again to open it here."
+                       AutomationId="Welcome_Lbl_ShareHint"
+                       FontSize="{StaticResource FontSmall}"
+                       TextColor="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource TextSecondaryDark}}"
+                       HorizontalOptions="Center"
+                       HorizontalTextAlignment="Center" />
 
-            <Button x:Name="SkipButton"
-                    Text="Skip tour"
-                    AutomationId="Welcome_Btn_Skip"
-                    FontSize="{StaticResource FontSmall}"
-                    TextColor="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource TextMutedDark}}"
-                    BackgroundColor="Transparent"
-                    Padding="0"
-                    BorderWidth="0"
-                    HorizontalOptions="Center" />
+                <Button x:Name="BtnGetStarted"
+                        Text="Get Started"
+                        AutomationId="Welcome_Btn_GetStarted"
+                        Margin="0,8,0,0" />
 
-        </VerticalStackLayout>
+                <Button x:Name="SkipButton"
+                        Text="Skip tour"
+                        AutomationId="Welcome_Btn_Skip"
+                        FontSize="{StaticResource FontSmall}"
+                        TextColor="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource TextMutedDark}}"
+                        BackgroundColor="Transparent"
+                        Padding="0"
+                        BorderWidth="0"
+                        HorizontalOptions="Center" />
+
+            </VerticalStackLayout>
+        </ScrollView>
     </Border>
 </toolkit:Popup>

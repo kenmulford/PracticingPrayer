@@ -117,6 +117,24 @@ public class DeepLinkService : IDeepLinkService
 
     // ── Inbound (receiving via URL) ─────────────────────────────────────────
 
+    /// <summary>
+    /// True when <see cref="HandleAsync"/> would stage a payload for this URI: a share
+    /// host, a request or card path, and a non-blank <c>d</c> or <c>title</c> parameter.
+    /// </summary>
+    public static bool IsImportableShareUri(string uri)
+    {
+        if (!Uri.TryCreate(uri, UriKind.Absolute, out var parsed)
+            || parsed.Host != "practicingprayerapp.com")
+            return false;
+
+        var path = parsed.AbsolutePath.TrimEnd('/');
+        if (path != "/share/r" && path != "/share/c")
+            return false;
+
+        var query = System.Web.HttpUtility.ParseQueryString(parsed.Query);
+        return !string.IsNullOrWhiteSpace(query["d"]) || !string.IsNullOrWhiteSpace(query["title"]);
+    }
+
     public async Task HandleAsync(string uri)
     {
         if (string.IsNullOrEmpty(uri))
