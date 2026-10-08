@@ -175,7 +175,7 @@ builder.Services.AddSingleton<IColorPickerService, PrayerApp.Platforms.iOS.Color
 ## Build Configuration Highlights
 
 - `ApplicationDisplayVersion`: `1.2.5`, `ApplicationVersion`: `64`
-- iOS minimum: 16.0; Android minimum: API 21
+- iOS minimum: 16.0; Android minimum: API 24
 - `CodesignEntitlements` is set in **both** Debug and Release iOS PropertyGroups — required for Universal Links in both configurations
 - Android signing via env vars `ANDROID_SIGNING_STORE_PASS` / `ANDROID_SIGNING_KEY_PASS`; build succeeds debug-signed when absent
 
