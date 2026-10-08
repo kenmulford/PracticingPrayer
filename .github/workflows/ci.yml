@@ -51,7 +51,7 @@ jobs:
           global-json-file: global.json
 
       - name: Install MAUI Android workload
-        run: dotnet workload restore PrayerApp/PrayerApp.csproj
+        run: dotnet workload restore PrayerApp/PrayerApp.csproj --version 10.0.301.1   # same workload set as release.yml
 
       # Builds the Android head on Linux — catches app build/restore breaks (e.g. the
       # iOS workload leaking into the Android restore) on every push/PR, not just at release.
