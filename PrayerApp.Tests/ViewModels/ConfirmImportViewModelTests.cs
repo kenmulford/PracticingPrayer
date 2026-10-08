@@ -2871,6 +2871,87 @@ public class ConfirmImportViewModelTests
     }
 
     [Fact]
+    public async Task Manual_Save_LockedVisibleQuickAddCard_SessionLocked_WritesToQuickAddWithoutAuth()
+    {
+        var quickAdd = QuickAddCard();
+        quickAdd.ProtectionMode = CardProtectionMode.LockedVisible;
+        SetupPickerData(new[] { quickAdd });
+        var sut = await OpenManualPickerAsync(quickAdd);
+        sut.Prayers[0].Title = "Mom";
+
+        await sut.SaveCommand.ExecuteAsync(null);
+
+        await _prayerService.Received(1).SavePrayerAsync(Arg.Any<Prayer>(), false);
+        await _prayerService.Received(1).SavePrayerAsync(Arg.Is<Prayer>(p => p.PrayerCardId == quickAdd.Id), false);
+        await _confidentialAccessService.DidNotReceive().AuthenticateAsync(Arg.Any<string>());
+        _accessibilityService.Received(1).Announce("Saved 1 prayer to Protected");
+        await _navigationService.Received(1).GoToAsync(Routes.PrayerCardsTab);
+        await _navigationService.DidNotReceive().GoToAsync(Routes.PrayerCardsTabImportedToExisting(quickAdd.Id));
+    }
+
+    [Fact]
+    public async Task Manual_Save_HiddenQuickAddCard_SessionLocked_ListsMaskedAndWritesToQuickAddWithoutAuth()
+    {
+        var box = new CardBox { Id = 5, Name = "System", ProtectAllCards = true, CardProtectionMode = CardProtectionMode.Hidden };
+        var quickAdd = QuickAddCard();
+        quickAdd.BoxId = box.Id;
+        SetupPickerData(new[] { quickAdd, Card(1, "Open") }, box);
+        var sut = await OpenManualPickerAsync(quickAdd);
+        // On-device the Quick Add card sits in the System box, which the default Loose
+        // Cards view excludes; the All-collections filter is what lists it. The loose
+        // card keeps that view non-empty, so the VM stays in Existing-card mode.
+        sut.SelectedBox = AllCollectionsPickerItem.Instance;
+        await Task.Delay(50);
+        sut.Prayers[0].Title = "Mom";
+
+        var row = Row(sut, quickAdd.Id);
+        Assert.Equal(ProtectionPolicy.MaskedTitle, row.Title);
+        Assert.True(row.IsLockedVisible);
+        Assert.Same(row, sut.SelectedCard);
+
+        await sut.SaveCommand.ExecuteAsync(null);
+
+        await _prayerService.Received(1).SavePrayerAsync(Arg.Any<Prayer>(), false);
+        await _prayerService.Received(1).SavePrayerAsync(Arg.Is<Prayer>(p => p.PrayerCardId == quickAdd.Id), false);
+        await _cardService.DidNotReceive().SaveCardAsync(Arg.Any<PrayerCard>(), Arg.Any<bool>());
+        await _confidentialAccessService.DidNotReceive().AuthenticateAsync(Arg.Any<string>());
+        _accessibilityService.Received(1).Announce("Saved 1 prayer to Protected");
+        await _navigationService.Received(1).GoToAsync(Routes.PrayerCardsTab);
+        await _navigationService.DidNotReceive().GoToAsync(Routes.PrayerCardsTabImportedToExisting(quickAdd.Id));
+    }
+
+    [Fact]
+    public async Task Manual_Locked_OmitsHiddenUserCard()
+    {
+        var quickAdd = QuickAddCard();
+        SetupPickerData(new[] { quickAdd, Card(1, "Secret", mode: CardProtectionMode.Hidden), Card(2, "Open") });
+
+        var sut = await OpenManualPickerAsync(quickAdd);
+
+        var rows = sut.AvailableCardGroups.SelectMany(g => g.Cards).ToList();
+        Assert.DoesNotContain(rows, c => c.CardId == 1);
+        Assert.Contains(rows, c => c.CardId == 2);
+        Assert.Contains(rows, c => c.CardId == quickAdd.Id);
+    }
+
+    [Fact]
+    public async Task Manual_Save_SelectedProtectedCardBecomesBlockedWithoutRelockMessage_WritesNothing()
+    {
+        var quickAdd = QuickAddCard();
+        SetupPickerData(new[] { quickAdd, Card(1, "Secret", mode: CardProtectionMode.LockedVisible) });
+        AuthenticateSucceeds();
+        var sut = await OpenManualPickerAsync(quickAdd);
+        await Tap(sut, Row(sut, 1));
+        sut.Prayers[0].Title = "Mom";
+
+        SetUnlocked(false);
+        await sut.SaveCommand.ExecuteAsync(null);
+
+        await _prayerService.DidNotReceive().SavePrayerAsync(Arg.Any<Prayer>(), Arg.Any<bool>());
+        await _navigationService.DidNotReceive().GoToAsync(Arg.Any<string>());
+    }
+
+    [Fact]
     public async Task Match_BlockedSelection_NeverQueriesTheCard()
     {
         SetupPickerData(new[] { Card(1, "Secret", mode: CardProtectionMode.LockedVisible) });
@@ -2968,6 +3049,26 @@ public class ConfirmImportViewModelTests
         Relock();
 
         Assert.Equal(quickAdd.Id, sut.SelectedCard!.CardId);
+    }
+
+    [Fact]
+    public async Task Manual_Relock_ProtectedQuickAddCard_StaysListedMaskedAndSelected()
+    {
+        SetUnlocked(true);
+        var quickAdd = QuickAddCard();
+        quickAdd.ProtectionMode = CardProtectionMode.LockedVisible;
+        SetupPickerData(new[] { quickAdd });
+        var sut = await OpenManualPickerAsync(quickAdd);
+        var unlockedRow = Row(sut, quickAdd.Id);
+        Assert.Equal("Quick Add", unlockedRow.Title);
+        Assert.Same(unlockedRow, sut.SelectedCard);
+
+        Relock();
+
+        var row = Row(sut, quickAdd.Id);
+        Assert.Equal(ProtectionPolicy.MaskedTitle, row.Title);
+        Assert.True(row.IsLockedVisible);
+        Assert.Same(row, sut.SelectedCard);
     }
 
     [Fact]

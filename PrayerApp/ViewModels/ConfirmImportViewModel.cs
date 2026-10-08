@@ -287,6 +287,8 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
             && ProtectionPolicy.IsAccessBlocked(entity, _loadedBoxes.FirstOrDefault(b => b.Id == entity.BoxId), isUnlocked);
     }
 
+    private bool IsQuickAddCard(int cardId) => _loadedQuickAddCard?.Id == cardId;
+
     public string PrayersHeader => MatchingActive
         ? $"To import ({Prayers.Count})"
         : $"Prayers ({Prayers.Count})";
@@ -771,7 +773,9 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
     /// Rebuilds <see cref="AvailableCardGroups"/> from the last fetch. While the session is
     /// locked, Hidden cards are omitted and LockedVisible cards become masked rows titled
     /// <see cref="ProtectionPolicy.MaskedTitle"/>, so a protected card's real title never
-    /// enters the collection. A selection that is still listed and unprotected survives.
+    /// enters the collection. Manual entry's Quick Add card is exempt from the Hidden omission
+    /// and is masked only when protected. A selection that is still listed and unprotected
+    /// survives.
     /// </summary>
     private void ApplyCardGroups()
     {
@@ -796,14 +800,15 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
         // Import mode: exclude system cards entirely.
         // Manual mode: include the Quick Add system card alongside user cards.
         IEnumerable<PrayerCard> filtered = EntryMode == EntryMode.Manual
-            ? allCards.Where(c => !c.IsSystem || c.Id == quickAddCard!.Id)
+            ? allCards.Where(c => !c.IsSystem || IsQuickAddCard(c.Id))
             : allCards.Where(c => !c.IsSystem);
 
         if (SelectedBox is RealBoxPickerItem real)
             filtered = filtered.Where(c => c.BoxId == real.BoxId);
 
         if (!isUnlocked)
-            filtered = filtered.Where(c => !ProtectionPolicy.IsHiddenWhileLocked(c, BoxOf(c), isUnlocked));
+            filtered = filtered.Where(c =>
+                IsQuickAddCard(c.Id) || !ProtectionPolicy.IsHiddenWhileLocked(c, BoxOf(c), isUnlocked));
 
         // GroupBy BoxId (not name): two CardBox rows with the same display
         // name would otherwise silently merge their card lists. The group's
@@ -817,6 +822,8 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
                 CollectionName = boxNames.TryGetValue(g.Key, out var name) ? name : UnknownCollectionName,
                 // Sort on the entity's real title so masking leaves row order unchanged.
                 // Hidden cards were dropped above, so a blocked card here is LockedVisible.
+                // Manual entry's Quick Add card is exempt from that omission and is masked
+                // only when protected.
                 Cards = new ObservableCollection<CardPickerItem>(
                     g.OrderBy(c => c.Title)
                      .Select(c => ProtectionPolicy.IsAccessBlocked(c, BoxOf(c), isUnlocked)
@@ -851,7 +858,7 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
         if (EntryMode == EntryMode.Manual)
         {
             next = SelectedCard is null || selectionBlocked
-                ? groups.SelectMany(g => g.Cards).FirstOrDefault(c => c.CardId == quickAddCard!.Id)
+                ? groups.SelectMany(g => g.Cards).FirstOrDefault(c => IsQuickAddCard(c.CardId))
                 : ListedSelection();
         }
         else if (selectionBlocked)
@@ -988,7 +995,11 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
     {
         // Nothing raises CanExecuteChanged when the session locks, so CanSave cannot stop a
         // save into a card that locked before the re-lock message re-pointed the selection.
-        if (ImportMode == ImportMode.ExistingCard && IsSelectedCardBlocked(_confidentialAccessService.IsSessionUnlocked))
+        // Manual entry's Quick Add card is exempt: it saves without auth while locked.
+        if (ImportMode == ImportMode.ExistingCard
+            && SelectedCard is { } selected
+            && IsCardBlocked(selected.CardId, _confidentialAccessService.IsSessionUnlocked)
+            && !IsQuickAddCard(selected.CardId))
             return;
 
         IsBusy = true;
