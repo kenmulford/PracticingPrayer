@@ -35,7 +35,7 @@ jobs:
           global-json-file: global.json
 
       - name: Install MAUI Android workload
-        run: dotnet workload restore PrayerApp/PrayerApp.csproj --version 10.0.301.1   # the workload set 1.6.1 was tested on
+        run: dotnet workload restore PrayerApp/PrayerApp.csproj
 
       - uses: ruby/setup-ruby@v1
         with:
@@ -84,7 +84,7 @@ jobs:
           global-json-file: global.json
 
       - name: Install MAUI iOS workload
-        run: dotnet workload restore PrayerApp/PrayerApp.csproj --version 10.0.301.1   # iOS 26.5.10284, which pairs with the Xcode above
+        run: dotnet workload restore PrayerApp/PrayerApp.csproj
 
       - uses: ruby/setup-ruby@v1
         with:
