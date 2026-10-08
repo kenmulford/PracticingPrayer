@@ -111,6 +111,9 @@
     <Compile Include="../PrayerApp/ViewModels/PrayerTimeBoxScopeViewModel.cs" />
     <Compile Include="../PrayerApp/ViewModels/PrayerTimeCardSelectViewModel.cs" />
 
+    <!-- Views: pure layout logic only; pages themselves need the MAUI runtime -->
+    <Compile Include="../PrayerApp/Views/CardPanelLayout.cs" />
+
     <!-- Service interfaces -->
     <Compile Include="../PrayerApp/Services/ISettings.cs" />
     <Compile Include="../PrayerApp/Services/INavigationService.cs" />
@@ -140,6 +143,8 @@
     <Compile Include="../PrayerApp/Services/ModalPushSequence.cs" />
     <Compile Include="../PrayerApp/Services/IAppGroupContainerProvider.cs" />
     <Compile Include="../PrayerApp/Services/AppGroupImportOrchestrator.cs" />
+    <Compile Include="../PrayerApp/Services/IClipboardLinkDetector.cs" />
+    <Compile Include="../PrayerApp/Services/ShareHandoffService.cs" />
     <Compile Include="../PrayerApp/ViewModels/EditablePrayer.cs" />
     <Compile Include="../PrayerApp/ViewModels/ConfirmImportViewModel.cs" />
     <Compile Include="../PrayerApp/Services/IBoxService.cs" />

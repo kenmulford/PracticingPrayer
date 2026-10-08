@@ -12,6 +12,7 @@ public class DeepLinkService : IDeepLinkService
     private const string BaseUrl = "https://practicingprayerapp.com/share";
     private const string Footer = "(Shared via Practicing Prayer)";
     private const int MaxUrlLength = 1800;
+    private static readonly string ShareHost = new Uri(BaseUrl).Host;
 
     private readonly INavigationService _nav;
     private readonly IShareService _shareService;
@@ -117,19 +118,46 @@ public class DeepLinkService : IDeepLinkService
 
     // ── Inbound (receiving via URL) ─────────────────────────────────────────
 
+    /// <summary>
+    /// Pulls the share URL out of pasted or intent text: the share message appends
+    /// human-readable text after the URL, so the URL ends at the first whitespace.
+    /// </summary>
+    public static bool TryExtractShareUrl(string? text, out string url)
+    {
+        url = string.Empty;
+        var trimmed = text?.TrimStart();
+        if (trimmed is null || !trimmed.StartsWith(BaseUrl, StringComparison.Ordinal))
+            return false;
+
+        var end = 0;
+        while (end < trimmed.Length && !char.IsWhiteSpace(trimmed[end]))
+            end++;
+        url = trimmed[..end];
+        return true;
+    }
+
+    /// <summary>
+    /// True when <see cref="HandleAsync"/> would stage a payload for this URI: a request
+    /// link with a <c>d</c> or <c>title</c> parameter, or a card link with a <c>d</c>
+    /// parameter or both <c>title</c> and <c>requests</c> (the legacy card format).
+    /// </summary>
+    public static bool IsImportableShareUri(string uri)
+    {
+        if (!TryParseShareRoute(uri, out var path, out var query))
+            return false;
+
+        return path switch
+        {
+            "/share/r" => HasValue(query, "d") || HasValue(query, "title"),
+            "/share/c" => HasValue(query, "d") || (HasValue(query, "title") && HasValue(query, "requests")),
+            _ => false,
+        };
+    }
+
     public async Task HandleAsync(string uri)
     {
-        if (string.IsNullOrEmpty(uri))
+        if (!TryParseShareRoute(uri, out var path, out var query))
             return;
-
-        if (!Uri.TryCreate(uri, UriKind.Absolute, out var parsed))
-            return;
-
-        if (parsed.Host != "practicingprayerapp.com")
-            return;
-
-        var path = parsed.AbsolutePath.TrimEnd('/');
-        var query = System.Web.HttpUtility.ParseQueryString(parsed.Query);
 
         // Future-proof: if a newer format version arrives, tell user to update
         if (IsUnsupportedVersion(query))
@@ -303,6 +331,22 @@ public class DeepLinkService : IDeepLinkService
         => _nav.PushModalWithNavigationBarAsync(_confirmImportPageFactory());
 
     // ── Helpers ──────────────────────────────────────────────────────────────
+
+    private static bool TryParseShareRoute(
+        string uri, out string path, out System.Collections.Specialized.NameValueCollection query)
+    {
+        path = string.Empty;
+        query = new System.Collections.Specialized.NameValueCollection();
+        if (!Uri.TryCreate(uri, UriKind.Absolute, out var parsed) || parsed.Host != ShareHost)
+            return false;
+
+        path = parsed.AbsolutePath.TrimEnd('/');
+        query = System.Web.HttpUtility.ParseQueryString(parsed.Query);
+        return true;
+    }
+
+    private static bool HasValue(System.Collections.Specialized.NameValueCollection query, string key)
+        => !string.IsNullOrWhiteSpace(query[key]);
 
     private static bool IsUnsupportedVersion(System.Collections.Specialized.NameValueCollection query)
     {

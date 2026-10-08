@@ -289,15 +289,26 @@ namespace PrayerApp
                 sp.GetRequiredService<IShareService>(),
                 sp.GetRequiredService<IImportPayloadService>(),
                 () => sp.GetRequiredService<PrayerApp.Views.ConfirmImportPage>()));
+            // First-launch clipboard handoff for users who installed from a shared link.
+            // The clipboard text is read only after the user taps Import (UI thread).
+            builder.Services.AddSingleton(sp => new ShareHandoffService(
+                sp.GetRequiredService<ISettings>(),
+                sp.GetRequiredService<IClipboardLinkDetector>(),
+                sp.GetRequiredService<INavigationService>(),
+                sp.GetRequiredService<IDeepLinkService>(),
+                sp.GetRequiredService<IOnboardingService>(),
+                () => Clipboard.Default.GetTextAsync()));
             // Context-menu / share-extension import pipeline
             builder.Services.AddSingleton<IImportPayloadService, ImportPayloadService>();
             builder.Services.AddSingleton<ITextSelectionParser, TextSelectionParser>();
 
 #if ANDROID
             builder.Services.AddSingleton<IOrientationService, PrayerApp.Platforms.Android.OrientationService>();
+            builder.Services.AddSingleton<IClipboardLinkDetector, PrayerApp.Platforms.Android.ClipboardLinkDetector>();
             builder.Services.AddSingleton<IColorPickerService, PrayerApp.Platforms.Android.ColorPickerService>();
 #elif IOS
             builder.Services.AddSingleton<IOrientationService, PrayerApp.Platforms.iOS.OrientationService>();
+            builder.Services.AddSingleton<IClipboardLinkDetector, PrayerApp.Platforms.iOS.ClipboardLinkDetector>();
             builder.Services.AddSingleton<IColorPickerService, PrayerApp.Platforms.iOS.ColorPickerService>();
             // App Group import orchestrator — reads pending-import.json staged
             // by the iOS Share Extension on every Window.Activated.
@@ -508,7 +519,7 @@ namespace PrayerApp
             var uri = intent.Data.ToString();
 
             // URL-based deep link
-            if (uri?.StartsWith("https://practicingprayerapp.com/share") == true)
+            if (DeepLinkService.TryExtractShareUrl(uri, out _))
             {
                 HandleDeepLink(uri);
                 return;
@@ -593,14 +604,8 @@ namespace PrayerApp
         /// </summary>
         private static void HandleDeepLink(string? url)
         {
-            if (string.IsNullOrEmpty(url) || !url.StartsWith("https://practicingprayerapp.com/share"))
+            if (!DeepLinkService.TryExtractShareUrl(url, out var shareUrl))
                 return;
-
-            // Strip trailing text — share messages append human-readable summary
-            // after the URL, which some apps pass through as part of the URI.
-            var endOfUrl = url.IndexOfAny(new[] { '\n', '\r', ' ' });
-            if (endOfUrl >= 0)
-                url = url[..endOfUrl];
 
             // Suppress onboarding for this session — must happen before UI dispatch
             // so MainPage.OnAppearing sees the flag when it checks.
@@ -613,7 +618,7 @@ namespace PrayerApp
                 {
                     await App.InitTask;
                     var svc = IPlatformApplication.Current!.Services.GetRequiredService<IDeepLinkService>();
-                    await svc.HandleAsync(url);
+                    await svc.HandleAsync(shareUrl);
                 }
                 catch (Exception ex)
                 {

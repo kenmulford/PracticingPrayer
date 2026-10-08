@@ -1,2 +1,10 @@
-• Accessibility: at large text sizes, the Home dashboard now reflows to a single column so the summary counts stay fully visible instead of getting cut off.
-• Reliability improvements behind the scenes.
+Protect your most personal prayers with Face ID, Touch ID, or a PIN.
+
+• New: mark any prayer card or collection as Locked (content hidden until you unlock it) or Hidden (masked in your lists) for an extra layer of privacy.
+• Unlock with Face ID, Touch ID, or a 6-digit PIN.
+• Protected prayers are excluded from Prayer Time and search until you authenticate, and can't be shared while locked.
+• The app automatically locks protected content when you switch away, even mid-session.
+• Backups now keep protected prayers safe in a separate encrypted file.
+• New "Show Confidential" option lets you reveal protected prayers on the Prayers list.
+• Accessibility: the Home dashboard now reflows to a single column at large text sizes so your summary counts stay visible.
+• Plus bug fixes and reliability improvements.

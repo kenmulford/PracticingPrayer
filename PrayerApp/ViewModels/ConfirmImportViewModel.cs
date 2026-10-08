@@ -25,6 +25,7 @@ public class CardPickerItem : ObservableObject
 {
     public int CardId { get; init; }
     public string Title { get; init; } = string.Empty;
+    public bool IsLockedVisible { get; init; }
     private bool _isSelected;
     public bool IsSelected { get => _isSelected; set => SetProperty(ref _isSelected, value); }
 }
@@ -54,6 +55,7 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
     private readonly IImportPayloadService _payloadService;
     private readonly ITextSelectionParser _parser;
     private readonly IBoxService _boxService;
+    private readonly IConfidentialAccessService _confidentialAccessService;
 
     // Fallback group header for cards whose BoxId doesn't resolve to a known
     // CardBox — only reachable if data integrity drifted (a card pointing at
@@ -74,7 +76,30 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
     // Preselection is owned by the authoritative loader, not by every caller
     // remembering to bypass the setter.
     private bool _manualLoadInFlight;
+    // The PIN popup's close-time OnAppearing re-enters LoadManualCardGroupsAsync;
+    // a second run would reset the Collection picker and the post-auth selection.
+    private bool _manualGroupsLoaded;
     private CancellationTokenSource? _loadCardGroupsCts = new();
+
+    // #313: bumped by every RematchAsync run; a lookup returning to a changed value is
+    // stale. Dispose leaves it alone so an in-flight run still settles _matchInFlight
+    // after OnDisappearing.
+    private int _matchGeneration;
+    // True from an active match's lookup until it applies; Save would otherwise
+    // write rows the lookup is about to move.
+    private bool _matchInFlight;
+    // True when any payload row, deleted ones included, is not on the matched card.
+    private bool _hasNewPayloadRows;
+    // Every row ConsumePending staged, in payload order, including rows since deleted.
+    private readonly List<EditablePrayer> _payloadRows = new();
+
+    // Last fetch behind AvailableCardGroups. A re-lock re-masks from these
+    // without a refetch, so the rows change before any await.
+    private PrayerCard? _loadedQuickAddCard;
+    private IReadOnlyList<PrayerCard>? _loadedCards;
+    private IReadOnlyList<CardBox>? _loadedBoxes;
+    // Session state the last ApplyCardGroups rendered; a re-lock over already-masked rows is a no-op.
+    private bool _lastApplyUnlocked;
 
     private EntryMode _entryMode;
     /// <summary>
@@ -90,6 +115,13 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
     }
 
     public ObservableCollection<EditablePrayer> Prayers { get; } = new();
+
+    /// <summary>
+    /// Payload rows whose title is already on the selected card (#313). Read-only
+    /// in the UI; "+ Add" moves a row to <see cref="Prayers"/>, which stays the
+    /// To import collection the Save loop writes.
+    /// </summary>
+    public ObservableCollection<EditablePrayer> AlreadyOnCard { get; } = new();
 
     /// <summary>
     /// Picker source for the Collection field on the Confirm Import page.
@@ -137,6 +169,7 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
                 OnPropertyChanged(nameof(IsNewCardMode));
                 OnPropertyChanged(nameof(IsExistingCardMode));
                 RaiseHasNoAvailableCardsIfChanged();
+                RematchAsync().SafeFireAndForget();
             }
         }
     }
@@ -212,8 +245,8 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
     /// <summary>
     /// Grouped card list for Existing-Card mode — collection name + the
     /// non-system cards under that BoxId, sorted alphabetically within and
-    /// across groups. Always mutated in place via Clear()/Add() in
-    /// LoadCardGroupsAsync — do not reassign. HasNoAvailableCards notification
+    /// across groups. Always mutated in place (Add new groups, then Remove
+    /// stale ones) in ApplyCardGroups — do not reassign. HasNoAvailableCards notification
     /// is wired to this instance via CollectionChanged in the constructor.
     /// </summary>
     public ObservableCollection<CardCollectionGroup> AvailableCardGroups { get; } = new();
@@ -224,12 +257,51 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
         get => _selectedCard;
         set
         {
-            if (SetProperty(ref _selectedCard, value))
-                NotifySaveCanExecute();
+            var previousCardId = _selectedCard?.CardId;
+            if (!SetProperty(ref _selectedCard, value)) return;
+            NotifySaveCanExecute();
+            // The #312 re-lock reload re-points the selection at a new item for the
+            // same card; that must keep the matches and "+ Add" moves.
+            if (value?.CardId == previousCardId) return;
+            RematchAsync().SafeFireAndForget();
         }
     }
 
-    public string PrayersHeader => $"Prayers ({Prayers.Count})";
+    // Skipped rows apply only to an import into a chosen, accessible existing card; a
+    // blocked card's prayers are never queried.
+    private bool MatchingActive =>
+        EntryMode != EntryMode.Manual && ImportMode == ImportMode.ExistingCard && SelectedCard is not null
+        && !IsSelectedCardBlocked(_confidentialAccessService.IsSessionUnlocked);
+
+    // Reads the entity behind the selection from the last fetch: the picker item of a
+    // card chosen after auth carries its real title but not its protection mode.
+    private bool IsSelectedCardBlocked(bool isUnlocked) =>
+        SelectedCard is { } selected && IsCardBlocked(selected.CardId, isUnlocked);
+
+    private bool IsCardBlocked(int cardId, bool isUnlocked)
+    {
+        if (_loadedCards is null || _loadedBoxes is null)
+            return false;
+        var entity = _loadedCards.FirstOrDefault(c => c.Id == cardId);
+        return entity is not null
+            && ProtectionPolicy.IsAccessBlocked(entity, _loadedBoxes.FirstOrDefault(b => b.Id == entity.BoxId), isUnlocked);
+    }
+
+    private bool IsQuickAddCard(int cardId) => _loadedQuickAddCard?.Id == cardId;
+
+    public string PrayersHeader => MatchingActive
+        ? $"To import ({Prayers.Count})"
+        : $"Prayers ({Prayers.Count})";
+
+    public string AlreadyOnCardHeader => $"Already on this card ({AlreadyOnCard.Count})";
+    public bool HasAlreadyOnCard => AlreadyOnCard.Count > 0;
+
+    // Requires !_hasNewPayloadRows so a user who ✕'d every new row is not told the
+    // share was already on the card.
+    public bool IsEverythingAlreadyOnCard =>
+        MatchingActive && Prayers.Count == 0 && AlreadyOnCard.Count > 0 && !_hasNewPayloadRows;
+
+    public string AllDuplicatesMessage => $"Everything in this share is already on {SelectedCard?.Title}.";
 
     private string _cardTitle = string.Empty;
     public string CardTitle
@@ -257,6 +329,7 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
     public IAsyncRelayCommand CancelCommand { get; }
     public ICommand AddPrayerCommand { get; }
     public ICommand RemovePrayerCommand { get; }
+    public IRelayCommand<EditablePrayer> AddDuplicateCommand { get; }
     public ICommand SetNewCardModeCommand { get; }
     public ICommand SetExistingCardModeCommand { get; }
     public IRelayCommand<CardPickerItem> SelectCardCommand { get; }
@@ -269,7 +342,8 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
         IMessenger messenger,
         IImportPayloadService payloadService,
         ITextSelectionParser parser,
-        IBoxService boxService)
+        IBoxService boxService,
+        IConfidentialAccessService confidentialAccessService)
     {
         _cardService = cardService;
         _prayerService = prayerService;
@@ -279,6 +353,7 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
         _payloadService = payloadService;
         _parser = parser;
         _boxService = boxService;
+        _confidentialAccessService = confidentialAccessService;
 
         SaveCommand = new AsyncRelayCommand(SaveAsync, CanSave);
         CancelCommand = new AsyncRelayCommand(CancelAsync);
@@ -287,36 +362,41 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
         {
             if (row is null) return;
             Prayers.Remove(row);
+            if (!row.IsAddedDuplicate) return;
+
+            row.IsAddedDuplicate = false;
+            var index = AlreadyOnCard.TakeWhile(r => r.PayloadIndex < row.PayloadIndex).Count();
+            AlreadyOnCard.Insert(index, row);
+            _accessibilityService.Announce($"Returned {row.Title} to Already on this card");
+        });
+        AddDuplicateCommand = new RelayCommand<EditablePrayer>(row =>
+        {
+            if (row is null || !AlreadyOnCard.Remove(row)) return;
+            row.IsAddedDuplicate = true;
+            Prayers.Add(row);
+            _accessibilityService.Announce($"Added {row.Title} to import");
         });
         SetNewCardModeCommand = new RelayCommand(() => ImportMode = ImportMode.NewCard);
         SetExistingCardModeCommand = new RelayCommand(() => ImportMode = ImportMode.ExistingCard);
-        SelectCardCommand = new RelayCommand<CardPickerItem>(item =>
-        {
-            if (item is null) return;
-            if (SelectedCard is not null) SelectedCard.IsSelected = false;
-            SelectedCard = item;
-            item.IsSelected = true;
-            // The checkmark appears via an IsSelected DataTrigger, which TalkBack
-            // does not announce (#30). Announce the selection so a screen-reader
-            // user gets feedback that their tap registered.
-            _accessibilityService.Announce($"Selected {item.Title}");
-        });
+        SelectCardCommand = new AsyncRelayCommand<CardPickerItem>(SelectCardAsync);
 
         Prayers.CollectionChanged += (_, e) =>
         {
+            // Unsubscribe from rows leaving the collection to prevent leaks. Runs before
+            // the subscribe below: a Move reports the same row in OldItems and NewItems.
+            if (e.OldItems is not null)
+                foreach (EditablePrayer row in e.OldItems)
+                    row.PropertyChanged -= OnPrayerPropertyChanged;
+
             // Subscribe to Title changes on rows entering the collection so
             // CanSave is re-evaluated when the user types (not only on Add/Remove).
             if (e.NewItems is not null)
                 foreach (EditablePrayer row in e.NewItems)
                     row.PropertyChanged += OnPrayerPropertyChanged;
 
-            // Unsubscribe from rows leaving the collection to prevent leaks.
-            if (e.OldItems is not null)
-                foreach (EditablePrayer row in e.OldItems)
-                    row.PropertyChanged -= OnPrayerPropertyChanged;
-
             NotifySaveCanExecute();
             OnPropertyChanged(nameof(PrayersHeader));
+            OnPropertyChanged(nameof(IsEverythingAlreadyOnCard));
 
             // #15: re-stamp each row's 1-based position and the new total so the
             // accessible descriptions ("Prayer title, item 2 of 3") stay correct
@@ -326,14 +406,79 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
             RestampPrayerPositions();
         };
 
+        AlreadyOnCard.CollectionChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(AlreadyOnCardHeader));
+            OnPropertyChanged(nameof(HasAlreadyOnCard));
+            OnPropertyChanged(nameof(IsEverythingAlreadyOnCard));
+        };
+
         // HasNoAvailableCards drives the empty-state Label in the XAML; it
         // depends on AvailableCardGroups, which changes inside
-        // LoadCardGroupsAsync via Clear()+Add() — both fire CollectionChanged.
-        // Cache + change-detection: a Clear()+N×Add() sequence is N+1
+        // ApplyCardGroups via Add()+Remove() — both fire CollectionChanged.
+        // Cache + change-detection: an N×Add()+M×Remove() sequence is N+M
         // CollectionChanged events but at most one logical transition on this
         // bool. Don't spam PropertyChanged on every intermediate state.
         _hasNoAvailableCardsCached = HasNoAvailableCards;
         AvailableCardGroups.CollectionChanged += (_, _) => RaiseHasNoAvailableCardsIfChanged();
+
+        _messenger.Register<ConfirmImportViewModel, SessionRelockedMessage>(this, (vm, _) => vm.OnSessionRelocked());
+    }
+
+    /// <summary>
+    /// Selects <paramref name="item"/>. A masked row first authenticates, then re-applies
+    /// the cached fetch so the row carries its real title, and selects that row. Auth failure
+    /// or cancel returns silently with the selection and the masked list unchanged.
+    /// </summary>
+    private async Task SelectCardAsync(CardPickerItem? item)
+    {
+        if (item is null) return;
+
+        if (item.IsLockedVisible)
+        {
+            if (!await _confidentialAccessService.AuthenticateAsync("Import to a protected card"))
+                return;
+
+            // A load still in flight would finish after this tap and null SelectedCard.
+            _loadCardGroupsCts?.Cancel();
+            _loadCardGroupsCts?.Dispose();
+            _loadCardGroupsCts = new CancellationTokenSource();
+            ApplyCardGroups();
+            var cardId = item.CardId;
+            item = AvailableCardGroups
+                .SelectMany(g => g.Cards)
+                .FirstOrDefault(c => c.CardId == cardId && !c.IsLockedVisible);
+            if (item is null) return;
+        }
+
+        if (SelectedCard is not null) SelectedCard.IsSelected = false;
+        SelectedCard = item;
+        item.IsSelected = true;
+        // The checkmark appears via an IsSelected DataTrigger, which TalkBack
+        // does not announce (#30). Announce the selection so a screen-reader
+        // user gets feedback that their tap registered.
+        _accessibilityService.Announce($"Selected {item.Title}");
+    }
+
+    /// <summary>
+    /// Handles <see cref="SessionRelockedMessage"/> by re-masking the loaded cards in
+    /// place. Synchronous, no refetch: no underlying data changed, and an async reload
+    /// would leave real titles on screen until it completed. Only Existing-card mode
+    /// shows the picker, and rows already rendered locked need no re-mask. Outside
+    /// Existing-card mode only a blocked selection is dropped: the picker is cleared
+    /// there, but the selection would reappear with its real title on the flip back.
+    /// </summary>
+    private void OnSessionRelocked()
+    {
+        if (_loadedCards is null) return;
+        if (!IsExistingCardMode)
+        {
+            if (IsSelectedCardBlocked(_confidentialAccessService.IsSessionUnlocked))
+                DropBlockedSelection();
+            return;
+        }
+        if (!_lastApplyUnlocked) return;
+        ApplyCardGroups();
     }
 
     /// <summary>
@@ -389,7 +534,8 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
         IPlatformApplication.Current!.Services.GetRequiredService<IMessenger>(),
         IPlatformApplication.Current!.Services.GetRequiredService<IImportPayloadService>(),
         IPlatformApplication.Current!.Services.GetRequiredService<ITextSelectionParser>(),
-        IPlatformApplication.Current!.Services.GetRequiredService<IBoxService>())
+        IPlatformApplication.Current!.Services.GetRequiredService<IBoxService>(),
+        IPlatformApplication.Current!.Services.GetRequiredService<IConfidentialAccessService>())
     { }
 
     public void ConsumePending()
@@ -409,7 +555,8 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
 
         CardTitle = result.SuggestedCardTitle;
         foreach (var p in result.Prayers)
-            Prayers.Add(new EditablePrayer
+        {
+            var row = new EditablePrayer
             {
                 Title = p.Title,
                 Details = p.Details,
@@ -417,7 +564,13 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
                 // prefilled a body; empty/whitespace rows render collapsed with
                 // a "+ details" affordance. Parser's choice wins on initial render.
                 IsDetailsExpanded = !string.IsNullOrWhiteSpace(p.Details),
-            });
+                PayloadIndex = _payloadRows.Count,
+            };
+            _payloadRows.Add(row);
+            Prayers.Add(row);
+        }
+
+        RematchAsync().SafeFireAndForget();
     }
 
     /// <summary>
@@ -470,6 +623,7 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
     public async Task LoadManualCardGroupsAsync()
     {
         if (EntryMode != EntryMode.Manual) return;
+        if (_manualGroupsLoaded || _manualLoadInFlight) return;
 
         // #171: hold the gate for the whole authoritative load. While set, the
         // SelectedBox setter skips its fire-and-forget reload (see the setter),
@@ -511,6 +665,7 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
             // flip. Decide it explicitly here. Later user-driven box changes (which
             // toggle the cached value) still flip reactively.
             FlipToNewCardIfEmptyManualRealBox();
+            _manualGroupsLoaded = true;
         }
         finally
         {
@@ -608,22 +763,52 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
         var allBoxes = await _boxService.GetBoxesAsync();
         if (token.IsCancellationRequested) return;
 
+        _loadedQuickAddCard = quickAddCard;
+        _loadedCards = allCards;
+        _loadedBoxes = allBoxes;
+        ApplyCardGroups();
+    }
+
+    /// <summary>
+    /// Rebuilds <see cref="AvailableCardGroups"/> from the last fetch. While the session is
+    /// locked, Hidden cards are omitted and LockedVisible cards become masked rows titled
+    /// <see cref="ProtectionPolicy.MaskedTitle"/>, so a protected card's real title never
+    /// enters the collection. Manual entry's Quick Add card is exempt from the Hidden omission
+    /// and is masked only when protected. A selection that is still listed and unprotected
+    /// survives.
+    /// </summary>
+    private void ApplyCardGroups()
+    {
+        var quickAddCard = _loadedQuickAddCard;
+        var allCards = _loadedCards!;
+        var allBoxes = _loadedBoxes!;
+        // Read once, after the load's last await, so a re-lock during the fetch still masks.
+        var isUnlocked = _confidentialAccessService.IsSessionUnlocked;
+        _lastApplyUnlocked = isUnlocked;
+        var boxesById = allBoxes.ToDictionary(b => b.Id);
+        // BoxId 0 has no CardBox row, so Loose Cards resolve to null.
+        CardBox? BoxOf(PrayerCard c) => boxesById.GetValueOrDefault(c.BoxId);
+
         // BoxId 0 is the "loose cards" sentinel — there is no CardBox row
         // for it, so seed the lookup so the group header shows the proper
         // label rather than "Unknown". For data-drift duplicates (two
         // CardBox rows with the same Id is impossible — DB PK; same NAME is
         // possible), ToDictionary is keyed by Id, which is what we want.
-        var boxNames = allBoxes.ToDictionary(b => b.Id, b => b.Name);
+        var boxNames = boxesById.ToDictionary(kv => kv.Key, kv => kv.Value.Name);
         boxNames[0] = BoxStrings.Unorganized;
 
         // Import mode: exclude system cards entirely.
         // Manual mode: include the Quick Add system card alongside user cards.
         IEnumerable<PrayerCard> filtered = EntryMode == EntryMode.Manual
-            ? allCards.Where(c => !c.IsSystem || c.Id == quickAddCard!.Id)
+            ? allCards.Where(c => !c.IsSystem || IsQuickAddCard(c.Id))
             : allCards.Where(c => !c.IsSystem);
 
         if (SelectedBox is RealBoxPickerItem real)
             filtered = filtered.Where(c => c.BoxId == real.BoxId);
+
+        if (!isUnlocked)
+            filtered = filtered.Where(c =>
+                IsQuickAddCard(c.Id) || !ProtectionPolicy.IsHiddenWhileLocked(c, BoxOf(c), isUnlocked));
 
         // GroupBy BoxId (not name): two CardBox rows with the same display
         // name would otherwise silently merge their card lists. The group's
@@ -635,48 +820,71 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
             {
                 BoxId = g.Key,
                 CollectionName = boxNames.TryGetValue(g.Key, out var name) ? name : UnknownCollectionName,
+                // Sort on the entity's real title so masking leaves row order unchanged.
+                // Hidden cards were dropped above, so a blocked card here is LockedVisible.
+                // Manual entry's Quick Add card is exempt from that omission and is masked
+                // only when protected.
                 Cards = new ObservableCollection<CardPickerItem>(
                     g.OrderBy(c => c.Title)
-                     .Select(c => new CardPickerItem { CardId = c.Id, Title = c.Title }))
+                     .Select(c => ProtectionPolicy.IsAccessBlocked(c, BoxOf(c), isUnlocked)
+                         ? new CardPickerItem { CardId = c.Id, Title = ProtectionPolicy.MaskedTitle, IsLockedVisible = true }
+                         : new CardPickerItem { CardId = c.Id, Title = c.Title }))
             })
             .OrderBy(g => g.CollectionName)
             .ToList();
 
-        AvailableCardGroups.Clear();
+        // Add then Remove, never Clear: a transient empty collection would trip
+        // FlipToNewCardIfEmptyManualRealBox on a populated Quick Add collection.
+        var staleGroups = AvailableCardGroups.ToList();
         foreach (var grp in groups)
             AvailableCardGroups.Add(grp);
+        foreach (var stale in staleGroups)
+            AvailableCardGroups.Remove(stale);
 
-        // Manual mode: preselect the Quick Add card when no card is already
-        // selected (first load). Re-filter (box change) preserves the
-        // existing selection if Quick Add is still in the filtered set, or
-        // clears it if Quick Add was filtered out by a collection change.
-        if (EntryMode == EntryMode.Manual && quickAddCard is not null)
-        {
-            var qaItem = groups
-                .SelectMany(g => g.Cards)
-                .FirstOrDefault(c => c.CardId == quickAddCard.Id);
+        var selectionBlocked = IsSelectedCardBlocked(isUnlocked);
+        CardPickerItem? ListedSelection() => SelectedCard is { } sel
+            ? groups.SelectMany(g => g.Cards).FirstOrDefault(c => c.CardId == sel.CardId)
+            : null;
 
-            if (SelectedCard is null && qaItem is not null)
-            {
-                SelectedCard = qaItem;
-                qaItem.IsSelected = true;
-            }
-            else if (SelectedCard is not null && groups.SelectMany(g => g.Cards)
-                         .All(c => c.CardId != SelectedCard.CardId))
-            {
-                // Selected card no longer visible after filter change — clear.
-                if (SelectedCard is not null) SelectedCard.IsSelected = false;
-                SelectedCard = null;
-            }
-        }
-        else if (EntryMode != EntryMode.Manual)
+        // Manual mode without a Quick Add card leaves the selection alone.
+        if (EntryMode == EntryMode.Manual && quickAddCard is null) return;
+
+        // Manual mode: a missing or protected selection falls back to the Quick Add
+        // card; otherwise the selection is kept if its card is still listed, or
+        // cleared if a collection change filtered it out. Import mode keeps a listed,
+        // unprotected selection the same way. Either way the rows were rebuilt, so a
+        // kept selection follows its reloaded item.
+        CardPickerItem? next;
+        if (EntryMode == EntryMode.Manual)
         {
-            SelectedCard = null;
+            next = SelectedCard is null || selectionBlocked
+                ? groups.SelectMany(g => g.Cards).FirstOrDefault(c => IsQuickAddCard(c.CardId))
+                : ListedSelection();
         }
+        else if (selectionBlocked)
+        {
+            DropBlockedSelection();
+            return;
+        }
+        else
+        {
+            next = ListedSelection();
+        }
+
+        if (SelectedCard is not null) SelectedCard.IsSelected = false;
+        if (next is not null) next.IsSelected = true;
+        SelectedCard = next;
+    }
+
+    private void DropBlockedSelection()
+    {
+        if (SelectedCard is { } selected) selected.IsSelected = false;
+        SelectedCard = null;
     }
 
     private bool CanSave()
         => !IsBusy
+           && !_matchInFlight
            && Prayers.Any(p => !string.IsNullOrWhiteSpace(p.Title))
            && (ImportMode == ImportMode.NewCard
                    // #119: In Quick Add (Manual), a blank card title is allowed —
@@ -693,8 +901,107 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
                    // so the Import flow still requires an explicitly chosen card.
                    : EntryMode == EntryMode.Manual || SelectedCard is not null);
 
+    /// <summary>
+    /// Sorts the staged payload rows into To import and Already on this card
+    /// against the selected card's prayers (#313). Re-run by every change of
+    /// card id or <see cref="ImportMode"/>; Title edits do not re-run it.
+    /// Rows are moved, never recreated, so edited Title and Details survive,
+    /// and rows deleted with ✕ stay deleted. Inactive matching (New card, Quick
+    /// Add, no card) runs synchronously and puts every row in To import.
+    /// </summary>
+    private async Task RematchAsync()
+    {
+        var generation = ++_matchGeneration;
+
+        var existingKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var lookupFailed = false;
+        if (MatchingActive)
+        {
+            RaiseMatchStateChanged();
+            _matchInFlight = true;
+            NotifySaveCanExecute();
+            try
+            {
+                foreach (var prayer in await _prayerService.GetPrayersByCardAsync(SelectedCard!.CardId))
+                    existingKeys.Add(MatchKey(prayer.Title));
+            }
+            catch (Exception)
+            {
+                lookupFailed = true;
+            }
+
+            // A newer run owns _matchInFlight and the rows now.
+            if (generation != _matchGeneration) return;
+        }
+
+        _matchInFlight = false;
+        ApplyMatch(existingKeys);
+
+        if (lookupFailed)
+            await _navigationService.DisplayAlertAsync("Error", "Unable to load prayers on this card.", "OK");
+    }
+
+    private void ApplyMatch(HashSet<string> existingKeys)
+    {
+        var duplicates = _payloadRows.Where(r => existingKeys.Contains(MatchKey(r.Title))).ToHashSet();
+        _hasNewPayloadRows = duplicates.Count < _payloadRows.Count;
+
+        // Rows removed with ✕ are in neither collection and stay removed.
+        var present = _payloadRows.Where(r => Prayers.Contains(r) || AlreadyOnCard.Contains(r)).ToList();
+        foreach (var row in present)
+            row.IsAddedDuplicate = false;
+
+        var toImport = present.Where(r => !duplicates.Contains(r))
+            .Concat(Prayers.Where(r => r.PayloadIndex < 0))
+            .ToList();
+        SyncRows(Prayers, toImport);
+        SyncRows(AlreadyOnCard, present.Where(duplicates.Contains).ToList());
+
+        RaiseMatchStateChanged();
+        NotifySaveCanExecute();
+    }
+
+    // Never Clear: a Reset carries no OldItems for the Prayers CollectionChanged
+    // handler to unsubscribe.
+    private static void SyncRows(ObservableCollection<EditablePrayer> target, IReadOnlyList<EditablePrayer> desired)
+    {
+        foreach (var stale in target.Where(r => !desired.Contains(r)).ToList())
+            target.Remove(stale);
+
+        for (var i = 0; i < desired.Count; i++)
+        {
+            if (i < target.Count && ReferenceEquals(target[i], desired[i])) continue;
+
+            var from = target.IndexOf(desired[i]);
+            if (from >= 0)
+                target.Move(from, i);
+            else
+                target.Insert(i, desired[i]);
+        }
+    }
+
+    // The AlreadyOnCard header and visibility follow AlreadyOnCard.CollectionChanged.
+    private void RaiseMatchStateChanged()
+    {
+        OnPropertyChanged(nameof(PrayersHeader));
+        OnPropertyChanged(nameof(IsEverythingAlreadyOnCard));
+        OnPropertyChanged(nameof(AllDuplicatesMessage));
+    }
+
+    private static string MatchKey(string title) =>
+        CollapseWhitespace(NormalizeQuotes(title) ?? string.Empty);
+
     private async Task SaveAsync()
     {
+        // Nothing raises CanExecuteChanged when the session locks, so CanSave cannot stop a
+        // save into a card that locked before the re-lock message re-pointed the selection.
+        // Manual entry's Quick Add card is exempt: it saves without auth while locked.
+        if (ImportMode == ImportMode.ExistingCard
+            && SelectedCard is { } selected
+            && IsCardBlocked(selected.CardId, _confidentialAccessService.IsSessionUnlocked)
+            && !IsQuickAddCard(selected.CardId))
+            return;
+
         IsBusy = true;
         // ConsumePending already drained both channels by save time;
         // skip the OnDisappearing safety-net.
@@ -706,14 +1013,16 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
             // save semantics. Import mode keeps IsImported = true.
             var isImported = EntryMode != EntryMode.Manual;
 
-            if (ImportMode == ImportMode.ExistingCard && SelectedCard is not null)
+            // target is read once: a re-lock during an awaited save nulls SelectedCard.
+            if (ImportMode == ImportMode.ExistingCard && SelectedCard is { } target)
             {
                 var existingSavedCount = 0;
-                foreach (var row in Prayers.Where(r => !string.IsNullOrWhiteSpace(r.Title)))
+                // Snapshot: a row moved or removed during an awaited save must not break the loop.
+                foreach (var row in Prayers.Where(r => !string.IsNullOrWhiteSpace(r.Title)).ToList())
                 {
                     var prayer = new Prayer
                     {
-                        PrayerCardId = SelectedCard.CardId,
+                        PrayerCardId = target.CardId,
                         Title = NormalizeQuotes(row.Title)?.Trim() ?? string.Empty,
                         Details = string.IsNullOrWhiteSpace(row.Details) ? null : NormalizeQuotes(row.Details)!.Trim(),
                         IsImported = isImported,
@@ -723,11 +1032,18 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
                     existingSavedCount++;
                 }
                 _messenger.Send(new BulkChangedMessage());
+                // A re-lock during the write loop leaves target.Title as the real title. The
+                // imported-to-existing route expands the card and loads its prayers, which a
+                // masked row hides, so a blocked target routes to the tab alone.
+                var targetBlocked = IsCardBlocked(target.CardId, _confidentialAccessService.IsSessionUnlocked);
+                var targetTitle = targetBlocked ? ProtectionPolicy.MaskedTitle : target.Title;
                 var existingAnnounce = isImported
-                    ? $"Imported {existingSavedCount} prayers to {SelectedCard.Title}"
-                    : $"Saved {existingSavedCount} {(existingSavedCount == 1 ? "prayer" : "prayers")} to {SelectedCard.Title}";
+                    ? $"Imported {existingSavedCount} prayers to {targetTitle}"
+                    : $"Saved {existingSavedCount} {(existingSavedCount == 1 ? "prayer" : "prayers")} to {targetTitle}";
                 _accessibilityService.Announce(existingAnnounce);
-                await _navigationService.GoToAsync(Routes.PrayerCardsTabImportedToExisting(SelectedCard.CardId));
+                await _navigationService.GoToAsync(targetBlocked
+                    ? Routes.PrayerCardsTab
+                    : Routes.PrayerCardsTabImportedToExisting(target.CardId));
                 return;
             }
 
@@ -750,7 +1066,7 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
             await _cardService.SaveCardAsync(card, publishMessage: false);
 
             var savedCount = 0;
-            foreach (var row in Prayers.Where(r => !string.IsNullOrWhiteSpace(r.Title)))
+            foreach (var row in Prayers.Where(r => !string.IsNullOrWhiteSpace(r.Title)).ToList())
             {
                 var prayer = new Prayer
                 {

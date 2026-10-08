@@ -1,2 +1,1 @@
-• Accessibility: at large text sizes, the Home dashboard now reflows to a single column so the summary counts stay fully visible instead of getting cut off.
-• Reliability improvements behind the scenes.
+New: protect your most personal prayers with Face/fingerprint unlock or a PIN. Mark any card or collection Locked or Hidden: it's excluded from Prayer Time and search until unlocked, and the app re-locks automatically when you switch apps. Backups now keep protected prayers in a separate encrypted file. Plus accessibility fixes and reliability improvements.

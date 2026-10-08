@@ -15,7 +15,7 @@ public interface IOnboardingService
     void Skip();
     /// <summary>Clears persisted step key, sets OnboardingComplete=false, resets WelcomeShownThisSession, sets CurrentStep=Welcome in memory.</summary>
     void Reset();
-    /// <summary>Called by MainPage immediately before showing the welcome popup. Sets WelcomeShownThisSession=true.</summary>
+    /// <summary>Called by MainPage on entering the first-visit welcome gate, before the share handoff and the welcome popup. Sets WelcomeShownThisSession=true.</summary>
     void MarkWelcomeShown();
     /// <summary>Called by MauiProgram.HandleDeepLink before UI dispatch. Suppresses onboarding for this session.</summary>
     void MarkDeepLinkSession();

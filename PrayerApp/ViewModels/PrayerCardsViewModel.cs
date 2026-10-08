@@ -915,10 +915,8 @@ namespace PrayerApp.ViewModels
                 foreach (var card in AllPrayerCards)
                     card.Box = _boxes.FirstOrDefault(b => b.Id == card.BoxId);
 
-                var renderableCards = IsSessionUnlocked
-                    ? AllPrayerCards
-                    : AllPrayerCards.Where(c =>
-                        PrayerCard.GetEffectiveProtectionMode(c.Card, c.Box) != CardProtectionMode.Hidden);
+                var renderableCards = AllPrayerCards.Where(c =>
+                    !ProtectionPolicy.IsHiddenWhileLocked(c.Card, c.Box, IsSessionUnlocked));
 
                 var cardsByBox = renderableCards
                     .GroupBy(c => c.BoxId)
@@ -1036,9 +1034,9 @@ namespace PrayerApp.ViewModels
             var renderableCards = IsSessionUnlocked
                 ? AllPrayerCards
                 : hasAnyFilter
-                    ? AllPrayerCards.Where(c => !ProtectionPolicy.IsAccessBlocked(c.Card, c.Box, IsSessionUnlocked))
+                    ? AllPrayerCards.Where(c => !ProtectionPolicy.IsAccessBlocked(c.Card, c.Box, isSessionUnlocked: false))
                     : AllPrayerCards.Where(c =>
-                        PrayerCard.GetEffectiveProtectionMode(c.Card, c.Box) != CardProtectionMode.Hidden);
+                        !ProtectionPolicy.IsHiddenWhileLocked(c.Card, c.Box, isSessionUnlocked: false));
 
             // Group once, look up per section — O(cards + sections) instead of O(sections × cards)
             var cardsByBox = renderableCards
