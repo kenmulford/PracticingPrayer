@@ -113,7 +113,7 @@ noReset:     true (when APK not provided)
 BundleId:              com.multithreadedllc.prayercards
 Automation:            XCUITest
 Device:                env IOS_SIMULATOR ?? "iPad (A16)"
-PlatformVersion:       env IOS_VERSION ?? "26.4"
+PlatformVersion:       env IOS_VERSION ?? "27.0"
 connectHardwareKeyboard: true
 noReset:               true
 ```

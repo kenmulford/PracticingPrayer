@@ -35,7 +35,7 @@ export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$JAVA_HOME/bin:
 APP_ID="com.multithreadedllc.prayercards"
 AVD="${ANDROID_AVD:-pp_api36}"
 IOS_SIM="${IOS_SIMULATOR:-iPad (A16)}"
-IOS_VER="${IOS_VERSION:-26.5}"
+IOS_VER="${IOS_VERSION:-27.0}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
 CSPROJ="$REPO_ROOT/PrayerApp/PrayerApp.csproj"
 UITESTS="$REPO_ROOT/PrayerApp.UITests/PrayerApp.UITests.csproj"
@@ -70,12 +70,30 @@ fi
 # --- 2. iOS simulator: boot and KEEP booted (never shut down before the run) ---
 if want_ios; then
   step "ios simulator"
-  if ! xcrun simctl list devices booted | grep -q "$IOS_SIM"; then
+  command -v jq >/dev/null || die "jq not found (ships with macOS at /usr/bin/jq)"
+  # A name alone matches one simulator per installed runtime, and the test harness addresses
+  # "booted": resolve one simulator by name + runtime, address it by UDID, refuse a second booted one.
+  SIM_JSON=$(xcrun simctl list devices -j) || die "xcrun simctl list devices -j failed"
+  IOS_RUNTIME="com.apple.CoreSimulator.SimRuntime.iOS-${IOS_VER//./-}"
+  SIM_MATCHES=$(printf '%s\n' "$SIM_JSON" | jq -r --arg rt "$IOS_RUNTIME" --arg name "$IOS_SIM" \
+    '(.devices[$rt] // [])[] | select(.name == $name and .isAvailable == true) | .udid') \
+    || die "could not read the simulator list"
+  case "$SIM_MATCHES" in
+    "")      die "no available simulator named '$IOS_SIM' on iOS $IOS_VER; list them with 'xcrun simctl list devices available' and set IOS_SIMULATOR / IOS_VERSION" ;;
+    *$'\n'*) die "several available simulators named '$IOS_SIM' on iOS $IOS_VER: ${SIM_MATCHES//$'\n'/ }; set IOS_SIMULATOR to a unique name" ;;
+  esac
+  IOS_UDID="$SIM_MATCHES"
+  echo "ios simulator: $IOS_SIM, iOS $IOS_VER, $IOS_UDID"
+  SIM_OTHERS=$(printf '%s\n' "$SIM_JSON" | jq -r --arg u "$IOS_UDID" \
+    '.devices | to_entries[] | .key as $rt | .value[] | select(.state == "Booted" and .udid != $u) | "\(.name) \($rt | ltrimstr("com.apple.CoreSimulator.SimRuntime.")) \(.udid) (xcrun simctl shutdown \(.udid))"') \
+    || die "could not read the simulator list"
+  [ -z "$SIM_OTHERS" ] || die "another simulator is booted and the harness addresses 'booted': ${SIM_OTHERS//$'\n'/; }"
+  if ! xcrun simctl list devices booted | grep -q "$IOS_UDID"; then
     echo "booting ${IOS_SIM}…"
-    xcrun simctl boot "$IOS_SIM"
+    xcrun simctl boot "$IOS_UDID"
     sleep 8
   fi
-  xcrun simctl list devices booted | grep "$IOS_SIM" || die "iOS sim '$IOS_SIM' not booted"
+  xcrun simctl list devices booted | grep "$IOS_UDID" || die "iOS sim '$IOS_SIM' ($IOS_UDID) not booted"
 fi
 
 # --- 3/4. Deploy (one MAUI build at a time; never concurrent) ---
@@ -87,7 +105,7 @@ if [ "$SKIP_DEPLOY" -eq 0 ]; then
   if want_ios; then
     step "deploy ios (-r iossimulator-arm64, Debug)"
     dotnet build "$CSPROJ" -f net10.0-ios -c Debug -r iossimulator-arm64 || die "ios build failed"
-    xcrun simctl install "$IOS_SIM" \
+    xcrun simctl install "$IOS_UDID" \
       "$REPO_ROOT/PrayerApp/bin/Debug/net10.0-ios/iossimulator-arm64/PrayerApp.app" || die "simctl install failed"
   fi
 fi
@@ -100,7 +118,7 @@ if want_android; then
   echo "android: files/ present"
 fi
 if want_ios; then
-  xcrun simctl list devices booted | grep -q "$IOS_SIM" || die "iOS sim not booted"
+  xcrun simctl list devices booted | grep -q "$IOS_UDID" || die "iOS sim not booted"
   echo "ios: sim booted"
 fi
 

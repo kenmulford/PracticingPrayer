@@ -67,7 +67,7 @@ export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$JAVA_HOME/bin:
 |---|---|
 | App id / bundle | `com.multithreadedllc.prayercards` (both platforms) |
 | Android AVD | `pp_api36` (NOT the `pixel_9_-_api_36_0` default in the docs/`TestConfig`) |
-| iOS sim | `iPad (A16)` on iOS **26.5** (iPad on purpose — keyboard has a Done button) |
+| iOS sim | `iPad (A16)` on iOS **27.0** (iPad on purpose — keyboard has a Done button) |
 | Appium | 3.2.2, drivers `uiautomator2` + `xcuitest` installed |
 | Android Appium port | `4723` (default) |
 | iOS Appium port | `4725` (2nd server, for parallel) |
@@ -100,7 +100,8 @@ The snapshot boot restores the warm state where that dir already exists.
 
 ### 2. iOS simulator — boot and KEEP it booted
 ```bash
-xcrun simctl boot "iPad (A16)"   # (or by UDID); reuse if already booted
+IOS_UDID=$(xcrun simctl list devices -j | jq -r --arg rt com.apple.CoreSimulator.SimRuntime.iOS-27-0 --arg name "iPad (A16)" '(.devices[$rt] // [])[] | select(.name == $name and .isAvailable == true) | .udid')
+xcrun simctl boot "$IOS_UDID"   # reuse if already booted
 ```
 ⚠ **Do NOT shut the sim down before the run** — even though the `connectHardwareKeyboard`
 comment in `TestConfig.GetIOSOptions` says to. The iOS seed (`SeedIOSAsync`,
@@ -122,7 +123,7 @@ FastDev install (wipes override assemblies → SIGABRT); redeploy with `-t:Insta
 ### 4. Deploy iOS — sim slice, then `simctl install`, stay booted
 ```bash
 dotnet build PrayerApp/PrayerApp.csproj -f net10.0-ios -c Debug -r iossimulator-arm64
-xcrun simctl install "iPad (A16)" PrayerApp/bin/Debug/net10.0-ios/iossimulator-arm64/PrayerApp.app
+xcrun simctl install "$IOS_UDID" PrayerApp/bin/Debug/net10.0-ios/iossimulator-arm64/PrayerApp.app
 ```
 `-r iossimulator-arm64` selects the simulator slice of the App-Shortcuts native lib; without it
 the link fails (issue #150). The harness attaches by `bundleId` with `noReset` and **no `app`
@@ -135,7 +136,7 @@ device offline`). Build Android, then iOS. **Never kill a build mid-flight** (co
 ### 5. Verify seed-ready before running
 ```bash
 adb shell run-as com.multithreadedllc.prayercards ls files/   # → prayer_app.db, profileInstalled, diagnostics.log
-xcrun simctl list devices booted | grep -i ipad               # → iPad (A16) … (Booted)
+xcrun simctl list devices booted | grep "$IOS_UDID"           # → iPad (A16) (<UDID>) (Booted)
 ```
 If `run-as` still can't stat the dir, the emulator is cold — go back to step 1 (snapshot boot),
 don't improvise a fix.
@@ -159,8 +160,8 @@ Both runs then use `--no-build` so two `dotnet test` processes never race on the
 # Android → :4723 → emulator
 UITEST_PLATFORM=android APPIUM_SERVER_URL=http://127.0.0.1:4723 ANDROID_AVD=pp_api36 \
   dotnet test PrayerApp.UITests/PrayerApp.UITests.csproj --no-build
-# iOS → :4725 → iPad (A16) 26.5
-UITEST_PLATFORM=ios APPIUM_SERVER_URL=http://127.0.0.1:4725 IOS_SIMULATOR="iPad (A16)" IOS_VERSION=26.5 \
+# iOS → :4725 → iPad (A16) 27.0
+UITEST_PLATFORM=ios APPIUM_SERVER_URL=http://127.0.0.1:4725 IOS_SIMULATOR="iPad (A16)" IOS_VERSION=27.0 \
   dotnet test PrayerApp.UITests/PrayerApp.UITests.csproj --no-build
 ```
 Different devices + ports + processes → they don't collide; each `AppiumSetup` seeds its own device.
@@ -211,5 +212,6 @@ failed. Exit 2: it stopped before any test ran.
 ```
 
 It mirrors the manual steps above and **stops with a clear error** rather than improvising if a
-precondition isn't met (emulator not warm, sim not booted, build fails). If it stops, fix the named
-step by hand from this doc — don't work around it.
+precondition isn't met (emulator not warm, no simulator matches the name and version, several
+simulators match, another simulator is booted, sim not booted, build fails). If it stops, fix the
+named step by hand from this doc — don't work around it.
