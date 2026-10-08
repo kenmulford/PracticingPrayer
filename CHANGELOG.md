@@ -22,7 +22,7 @@ Release notes for Practicing Prayer, newest first.
 
 ### Consumer notes
 
-- Requires Android 7.0 (API 24) or later, up from Android 5.0 (API 21): Google Play's automatic protection rejects a lower minimum. Devices on Android 5 and 6 stay on 1.6.0.
+- Requires Android 7.0 (API 24) or later, up from Android 5.0 (API 21): Google Play's automatic protection rejects a lower minimum. Existing installs on Android 5 and 6 stay on 1.6.0; new installs on those versions are no longer possible.
 - The website's share page copies the share link to the clipboard when a store button is tapped. A share whose link would exceed 1800 characters goes out as a `.prayercard` file, carries no link, and does not survive an install.
 - The prompt appears at most once per install (`ShareHandoffPrompted` preference). On Android any clipboard text triggers it, so an unrelated clip spends the one offer.
 - Tapping Import reads the clipboard, which shows the OS paste notice (Android 12+) or the Allow Paste alert (iOS 16+).
@@ -33,5 +33,5 @@ Release notes for Practicing Prayer, newest first.
 
 Judgment-call PRs: none.
 
-- No E2E test exercises the #311 import path on any platform; it is covered by unit tests with a mocked clipboard. The E2E gate passed on Android (26 passed, 1 skipped) and iOS (21 passed, 6 skipped).
+- No E2E test exercises the #311 import path on any platform; it is covered by unit tests with a mocked clipboard. The E2E gate passed on 2026-10-08 via `run-e2e-mac.sh`: Android on the `pp_api36` emulator (26 passed, 1 skipped) and iOS on the iPad (A16) iOS 26.5 simulator (21 passed, 6 skipped).
 - Not verified on a real device: no paste notice before Import on Android 12+ or iOS, and whether the iOS web-link probe matches a copied multi-line share message.

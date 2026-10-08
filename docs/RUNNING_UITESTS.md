@@ -10,7 +10,7 @@
 
 | Tool | Version | Install |
 |------|---------|---------|
-| .NET SDK | 10.0+ | [dotnet.microsoft.com](https://dotnet.microsoft.com/download) |
+| .NET SDK | 10.0.3xx (pinned in `global.json`) | [dotnet.microsoft.com](https://dotnet.microsoft.com/download) |
 | Node.js | 18+ | [nodejs.org](https://nodejs.org) (needed for Appium) |
 | Appium | 2.x | `npm install -g appium` |
 

@@ -7,7 +7,7 @@ name: Release to stores
 on:
   release:
     types: [published]
-  # Manual run for verifying a build on a branch before tagging a release (upload still gated by the store-release environment).
+  # Manual run from master re-ships master's build. Never dispatch from another branch: the build number is the commit count, and master reuses it after a squash merge.
   workflow_dispatch:
 
 concurrency:
