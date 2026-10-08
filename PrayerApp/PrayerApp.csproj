@@ -32,16 +32,6 @@
 		<AndroidSigningKeyStore>prayerapp-release.keystore</AndroidSigningKeyStore>
 	</PropertyGroup>
 
-	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net10.0-ios|AnyCPU'">
-	  <EnableSGenConc>False</EnableSGenConc>
-	  <CodesignEntitlements>Platforms\iOS\Entitlements.plist</CodesignEntitlements>
-	</PropertyGroup>
-
-	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net10.0-ios|AnyCPU'">
-	  <EnableSGenConc>False</EnableSGenConc>
-	  <CodesignEntitlements>Platforms\iOS\Entitlements.plist</CodesignEntitlements>
-	</PropertyGroup>
-
 	<!--
 	  iOS signing identity (CodesignKey + CodesignProvision) is per-developer.
 	  Copy iOS-signing.local.props.example to iOS-signing.local.props (gitignored)
@@ -65,6 +55,8 @@
 
 	<PropertyGroup Condition="'$(TargetFramework)'=='net10.0-ios'">
 	  <ProvisioningType>manual</ProvisioningType>
+	  <EnableSGenConc>False</EnableSGenConc>
+	  <CodesignEntitlements>Platforms\iOS\Entitlements.plist</CodesignEntitlements>
 	</PropertyGroup>
 
 	<ItemGroup>

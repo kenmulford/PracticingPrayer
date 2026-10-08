@@ -88,12 +88,8 @@ if want_ios; then
     '.devices | to_entries[] | .key as $rt | .value[] | select(.state == "Booted" and .udid != $u) | "\(.name) \($rt | ltrimstr("com.apple.CoreSimulator.SimRuntime.")) \(.udid) (xcrun simctl shutdown \(.udid))"') \
     || die "could not read the simulator list"
   [ -z "$SIM_OTHERS" ] || die "another simulator is booted and the harness addresses 'booted': ${SIM_OTHERS//$'\n'/; }"
-  if ! xcrun simctl list devices booted | grep -q "$IOS_UDID"; then
-    echo "booting ${IOS_SIM}…"
-    xcrun simctl boot "$IOS_UDID"
-    sleep 8
-  fi
-  xcrun simctl list devices booted | grep "$IOS_UDID" || die "iOS sim '$IOS_SIM' ($IOS_UDID) not booted"
+  echo "ensuring ${IOS_SIM} is booted…"
+  xcrun simctl bootstatus "$IOS_UDID" -b || die "iOS sim '$IOS_SIM' ($IOS_UDID) did not boot"
 fi
 
 # --- 3/4. Deploy (one MAUI build at a time; never concurrent) ---

@@ -41,7 +41,7 @@ Platform code lives under `PrayerApp/Platforms/Android/` and `PrayerApp/Platform
 | `Platforms/iOS/Resources/PrivacyInfo.xcprivacy` | Apple Privacy Manifest (required since iOS 17.4) |
 | `Platforms/iOS/LinkerConfig.xml` | Trim preservation for SQLite-net AOT compatibility |
 | `MauiProgram.cs` | Handler registration, lifecycle hooks, platform service DI |
-| `PrayerApp.csproj` | Target frameworks, signing, `CodesignEntitlements` (both configs) |
+| `PrayerApp.csproj` | Target frameworks, signing, `CodesignEntitlements` (single `net10.0-ios` PropertyGroup, every configuration) |
 
 ---
 
@@ -128,7 +128,7 @@ Three lifecycle hooks registered under `#elif IOS`:
 
 **`Entitlements.plist`** (`Platforms/iOS/Entitlements.plist`)
 - `com.apple.developer.associated-domains`: `applinks:practicingprayerapp.com`
-- Required for Universal Links; referenced via `CodesignEntitlements` in **both** Debug and Release `PropertyGroup`s in the csproj.
+- Required for Universal Links; referenced via `CodesignEntitlements` in the single `net10.0-ios` `PropertyGroup` in `PrayerApp/PrayerApp.csproj`, so it applies to every configuration, Debug included.
 
 **`PrivacyInfo.xcprivacy`** (`Platforms/iOS/Resources/PrivacyInfo.xcprivacy`)
 - Apple Privacy Manifest required since iOS 17.4 for App Store submission.
@@ -173,7 +173,7 @@ builder.Services.AddSingleton<IColorPickerService, PrayerApp.Platforms.iOS.Color
 
 - `ApplicationDisplayVersion`: `1.2.5`, `ApplicationVersion`: `64`
 - iOS minimum: 16.0; Android minimum: API 24
-- `CodesignEntitlements` is set in **both** Debug and Release iOS PropertyGroups — required for Universal Links in both configurations
+- `CodesignEntitlements` is set in the single `net10.0-ios` PropertyGroup in `PrayerApp/PrayerApp.csproj`, so it applies to every configuration; Universal Links need it in Debug builds too
 - Android signing via env vars `ANDROID_SIGNING_STORE_PASS` / `ANDROID_SIGNING_KEY_PASS`; build succeeds debug-signed when absent
 
 ---
@@ -184,7 +184,7 @@ builder.Services.AddSingleton<IColorPickerService, PrayerApp.Platforms.iOS.Color
 |---------|-----------------|
 | Using `handlers.AddHandler<TimePicker, MyHandler>()` for the time/date picker handlers | Use the static `.Configure()` pattern; handlers use `AppendToMapping` internally |
 | Forgetting the second `IntentFilter` for `.prayercard` file import | `MainActivity.cs` has two filters — one for HTTPS deep links, one for `content://` file URIs |
-| Missing `CodesignEntitlements` in Debug configuration | Both Debug and Release PropertyGroups in the csproj must reference `Entitlements.plist` — Universal Links require it even in debug builds |
+| Adding a per-configuration iOS PropertyGroup that sets `CodesignEntitlements` differently | The single `net10.0-ios` group covers Debug and Release; Universal Links need `Entitlements.plist` in debug builds too |
 | Omitting `PrivacyInfo.xcprivacy` | Required since iOS 17.4; App Store will reject submissions without it |
 | Implementing tab-tap pop-to-root in Shell XAML or `AppShell.xaml.cs` | The fix lives in `CustomShellRenderer` (Android-only); iOS uses a different renderer stack |
 | Hardcoding `UIModalPresentationStyle.PageSheet` on all modals | Only pages implementing `IPageSheetModal` get PageSheet; blocking/progress pages must stay full-screen |

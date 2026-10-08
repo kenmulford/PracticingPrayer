@@ -3,9 +3,7 @@ using UIKit;
 namespace PrayerApp.Platforms.iOS.Helpers;
 
 /// <summary>
-/// Walks the UIResponder chain from a MAUI Page's native view to find
-/// platform-specific controllers. Used by SwipeBackHelper (finds
-/// UINavigationController).
+/// Walks the UIResponder chain from a MAUI Page's native view to its UINavigationController (used by SwipeBackHelper).
 /// </summary>
 public static class UIResponderExtensions
 {

@@ -99,9 +99,14 @@ DB seed fails with `run-as: couldn't stat … No such file or directory` before 
 The snapshot boot restores the warm state where that dir already exists.
 
 ### 2. iOS simulator — boot and KEEP it booted
+`run-e2e-mac.sh` step 2 resolves the simulator by name + runtime, boots it, and prints
+`ios simulator: <name>, iOS <version>, <udid>`. To run the steps by hand, copy the UDID of
+the `iPad (A16)` row under `-- iOS 27.0 --` from the list and paste it in place of
+`PASTE-UDID-HERE`; `bootstatus` boots the sim if needed and waits for boot to finish:
 ```bash
-IOS_UDID=$(xcrun simctl list devices -j | jq -r --arg rt com.apple.CoreSimulator.SimRuntime.iOS-27-0 --arg name "iPad (A16)" '(.devices[$rt] // [])[] | select(.name == $name and .isAvailable == true) | .udid')
-xcrun simctl boot "$IOS_UDID"   # reuse if already booted
+xcrun simctl list devices available
+IOS_UDID=PASTE-UDID-HERE
+xcrun simctl bootstatus "$IOS_UDID" -b
 ```
 ⚠ **Do NOT shut the sim down before the run** — even though the `connectHardwareKeyboard`
 comment in `TestConfig.GetIOSOptions` says to. The iOS seed (`SeedIOSAsync`,
