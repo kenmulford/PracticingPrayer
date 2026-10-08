@@ -1,3 +1,4 @@
+using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using NSubstitute;
 using PrayerApp;
@@ -17,6 +18,8 @@ public class ConfirmImportViewModelTests
     private readonly IImportPayloadService _payloadService = Substitute.For<IImportPayloadService>();
     private readonly ITextSelectionParser _parser = Substitute.For<ITextSelectionParser>();
     private readonly IBoxService _boxService = Substitute.For<IBoxService>();
+    // Defaults to locked (IsSessionUnlocked == false); tests flip it per scenario.
+    private readonly IConfidentialAccessService _confidentialAccessService = Substitute.For<IConfidentialAccessService>();
 
     private readonly IMessenger _messenger = new WeakReferenceMessenger();
     private readonly object _recipient = new();
@@ -42,7 +45,7 @@ public class ConfirmImportViewModelTests
 
     private ConfirmImportViewModel CreateSut() =>
         new(_cardService, _prayerService, _navigationService, _accessibilityService,
-            _messenger, _payloadService, _parser, _boxService);
+            _messenger, _payloadService, _parser, _boxService, _confidentialAccessService);
 
     private static ParseResult Result(string suggestedTitle, params (string Title, string? Details)[] prayers) =>
         new(prayers.Select(p => new ParsedPrayer(p.Title, p.Details)).ToList().AsReadOnly(), suggestedTitle);
@@ -2126,5 +2129,333 @@ public class ConfirmImportViewModelTests
         Assert.Equal(EntryMode.Import, sut.EntryMode);
         Assert.Null(sut.SelectedCard);
         Assert.False(sut.SaveCommand.CanExecute(null));
+    }
+
+    // ── Card protection in the picker (#312) ─────────────────────────────
+
+    private const string ImportAuthReason = "Import to a protected card";
+
+    private static PrayerCard Card(int id, string title, int boxId = 0, CardProtectionMode mode = CardProtectionMode.None) =>
+        new() { Id = id, Title = title, BoxId = boxId, ProtectionMode = mode, IsSystem = false };
+
+    private static PrayerCard QuickAddCard() =>
+        new() { Id = 99, Title = "Quick Add", IsSystem = true, SystemKey = "quick_add", BoxId = 0 };
+
+    private void SetupPickerData(IEnumerable<PrayerCard> cards, params CardBox[] boxes)
+    {
+        _cardService.GetCardsAsync().Returns(Task.FromResult<IReadOnlyList<PrayerCard>>(cards.ToArray()));
+        _boxService.GetBoxesAsync().Returns(Task.FromResult<IReadOnlyList<CardBox>>(boxes));
+    }
+
+    private async Task<ConfirmImportViewModel> OpenImportPickerAsync()
+    {
+        var sut = SetupSutWithRows(("Mom", null));
+        await sut.LoadBoxesAsync();
+        sut.SetExistingCardModeCommand.Execute(null);
+        await Task.Delay(50);
+        return sut;
+    }
+
+    private async Task<ConfirmImportViewModel> OpenManualPickerAsync(PrayerCard quickAdd)
+    {
+        _cardService.GetOrCreateQuickAddCardAsync().Returns(Task.FromResult(quickAdd));
+        var sut = CreateSut();
+        sut.InitializeManualEntry();
+        await sut.LoadBoxesAsync();
+        await sut.LoadManualCardGroupsAsync();
+        return sut;
+    }
+
+    private void SetUnlocked(bool unlocked) => _confidentialAccessService.IsSessionUnlocked.Returns(unlocked);
+
+    // Mirrors the real ConfidentialAccessService, whose IsSessionUnlocked flips after a
+    // successful AuthenticateAsync.
+    private void AuthenticateSucceeds() =>
+        _confidentialAccessService.AuthenticateAsync(ImportAuthReason).Returns(_ =>
+        {
+            _confidentialAccessService.IsSessionUnlocked.Returns(true);
+            return Task.FromResult(true);
+        });
+
+    private void Relock()
+    {
+        SetUnlocked(false);
+        _messenger.Send(new SessionRelockedMessage());
+    }
+
+    private static CardPickerItem Row(ConfirmImportViewModel sut, int cardId) =>
+        sut.AvailableCardGroups.SelectMany(g => g.Cards).Single(c => c.CardId == cardId);
+
+    private static Task Tap(ConfirmImportViewModel sut, CardPickerItem item) =>
+        ((IAsyncRelayCommand<CardPickerItem>)sut.SelectCardCommand).ExecuteAsync(item);
+
+    [Fact]
+    public async Task Locked_OmitsHiddenCard()
+    {
+        SetupPickerData(new[] { Card(1, "Secret", mode: CardProtectionMode.Hidden), Card(2, "Open") });
+
+        var sut = await OpenImportPickerAsync();
+
+        var rows = sut.AvailableCardGroups.SelectMany(g => g.Cards).ToList();
+        Assert.DoesNotContain(rows, c => c.CardId == 1);
+        Assert.Contains(rows, c => c.CardId == 2);
+    }
+
+    [Fact]
+    public async Task Locked_MasksLockedVisibleCard()
+    {
+        SetupPickerData(new[] { Card(1, "Secret", mode: CardProtectionMode.LockedVisible) });
+
+        var sut = await OpenImportPickerAsync();
+
+        var row = Row(sut, 1);
+        Assert.Equal("Protected", row.Title);
+        Assert.True(row.IsLockedVisible);
+    }
+
+    [Fact]
+    public async Task Locked_BoxCascade_MasksCard()
+    {
+        var box = new CardBox { Id = 7, Name = "Family", ProtectAllCards = true, CardProtectionMode = CardProtectionMode.LockedVisible };
+        SetupPickerData(new[] { Card(1, "Plain", boxId: 7) }, box);
+
+        var sut = await OpenImportPickerAsync();
+
+        var row = Row(sut, 1);
+        Assert.Equal("Protected", row.Title);
+        Assert.True(row.IsLockedVisible);
+    }
+
+    [Fact]
+    public async Task Unlocked_ListsRealTitles()
+    {
+        SetUnlocked(true);
+        var cards = new[]
+        {
+            Card(1, "Hidden one", mode: CardProtectionMode.Hidden),
+            Card(2, "Visible one", mode: CardProtectionMode.LockedVisible),
+            Card(3, "Plain"),
+        };
+        SetupPickerData(cards);
+
+        var sut = await OpenImportPickerAsync();
+
+        foreach (var card in cards)
+        {
+            var row = Row(sut, card.Id);
+            Assert.Equal(card.Title, row.Title);
+            Assert.False(row.IsLockedVisible);
+        }
+    }
+
+    [Fact]
+    public async Task Locked_AllCardsOmitted_ShowsEmptyState()
+    {
+        var box = new CardBox { Id = 7, Name = "Family" };
+        SetupPickerData(new[] { Card(1, "Secret", boxId: 7, mode: CardProtectionMode.Hidden) }, box);
+        var sut = await OpenImportPickerAsync();
+
+        sut.SelectedBox = sut.AvailableBoxes.OfType<RealBoxPickerItem>().First(b => b.BoxId == 7);
+        await Task.Delay(50);
+
+        Assert.Empty(sut.AvailableCardGroups.SelectMany(g => g.Cards));
+        Assert.True(sut.HasNoAvailableCards);
+    }
+
+    [Fact]
+    public async Task SelectCard_Masked_AuthSucceeds_SelectsReloadedItem()
+    {
+        SetupPickerData(new[] { Card(1, "Secret", mode: CardProtectionMode.LockedVisible) });
+        AuthenticateSucceeds();
+        var sut = await OpenImportPickerAsync();
+
+        await Tap(sut, Row(sut, 1));
+
+        Assert.NotNull(sut.SelectedCard);
+        Assert.Equal("Secret", sut.SelectedCard!.Title);
+        Assert.True(sut.SelectedCard.IsSelected);
+        Assert.Same(Row(sut, 1), sut.SelectedCard);
+        _accessibilityService.Received(1).Announce("Selected Secret");
+    }
+
+    [Fact]
+    public async Task SelectCard_Masked_AuthFails_NoChange()
+    {
+        SetupPickerData(new[] { Card(1, "Secret", mode: CardProtectionMode.LockedVisible), Card(2, "Open") });
+        _confidentialAccessService.AuthenticateAsync(ImportAuthReason).Returns(false);
+        var sut = await OpenImportPickerAsync();
+        await Tap(sut, Row(sut, 2));
+        var selected = sut.SelectedCard;
+
+        await Tap(sut, Row(sut, 1));
+
+        await _confidentialAccessService.Received(1).AuthenticateAsync(ImportAuthReason);
+        Assert.Same(selected, sut.SelectedCard);
+        Assert.True(selected!.IsSelected);
+        var masked = Row(sut, 1);
+        Assert.Equal("Protected", masked.Title);
+        Assert.False(masked.IsSelected);
+    }
+
+    [Fact]
+    public async Task SelectCard_Unmasked_DoesNotAuthenticate()
+    {
+        SetupPickerData(new[] { Card(1, "Open") });
+        var sut = await OpenImportPickerAsync();
+
+        await Tap(sut, Row(sut, 1));
+
+        await _confidentialAccessService.DidNotReceive().AuthenticateAsync(Arg.Any<string>());
+        Assert.Equal(1, sut.SelectedCard!.CardId);
+    }
+
+    [Fact]
+    public async Task Relocked_RemasksRowsSynchronously()
+    {
+        SetUnlocked(true);
+        SetupPickerData(new[] { Card(1, "Secret", mode: CardProtectionMode.LockedVisible) });
+        var sut = await OpenImportPickerAsync();
+        Assert.Equal("Secret", Row(sut, 1).Title);
+
+        Relock();
+
+        Assert.Equal("Protected", Row(sut, 1).Title);
+        Assert.True(Row(sut, 1).IsLockedVisible);
+    }
+
+    [Fact]
+    public async Task Relocked_ProtectedSelection_ClearedAndSaveDisabled()
+    {
+        SetUnlocked(true);
+        SetupPickerData(new[] { Card(1, "Secret", mode: CardProtectionMode.LockedVisible) });
+        var sut = await OpenImportPickerAsync();
+        await Tap(sut, Row(sut, 1));
+        Assert.True(sut.SaveCommand.CanExecute(null));
+
+        Relock();
+
+        Assert.Null(sut.SelectedCard);
+        Assert.False(sut.SaveCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task Relocked_UnprotectedSelection_Repointed()
+    {
+        SetUnlocked(true);
+        SetupPickerData(new[] { Card(1, "Secret", mode: CardProtectionMode.LockedVisible), Card(2, "Open") });
+        var sut = await OpenImportPickerAsync();
+        await Tap(sut, Row(sut, 2));
+        var before = sut.SelectedCard;
+
+        Relock();
+
+        // The re-lock rebuilds every row, so the kept selection must follow the new instance.
+        Assert.NotSame(before, sut.SelectedCard);
+        Assert.Same(Row(sut, 2), sut.SelectedCard);
+        Assert.True(sut.SelectedCard!.IsSelected);
+    }
+
+    [Fact]
+    public async Task Relocked_NewCardMode_DoesNotReload()
+    {
+        SetUnlocked(true);
+        SetupPickerData(new[] { Card(1, "Secret", mode: CardProtectionMode.LockedVisible) });
+        var sut = SetupSutWithRows(("Mom", null));
+        await sut.LoadBoxesAsync();
+
+        Relock();
+
+        Assert.Empty(sut.AvailableCardGroups);
+        await _cardService.DidNotReceive().GetCardsAsync();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Manual_QuickAddPreselected_BothSessionStates(bool unlocked)
+    {
+        SetUnlocked(unlocked);
+        var quickAdd = QuickAddCard();
+        SetupPickerData(new[] { quickAdd });
+
+        var sut = await OpenManualPickerAsync(quickAdd);
+
+        Assert.Equal(quickAdd.Id, sut.SelectedCard!.CardId);
+    }
+
+    [Fact]
+    public async Task Manual_Locked_MasksLockedVisibleCard()
+    {
+        var quickAdd = QuickAddCard();
+        SetupPickerData(new[] { quickAdd, Card(1, "Secret", mode: CardProtectionMode.LockedVisible) });
+
+        var sut = await OpenManualPickerAsync(quickAdd);
+
+        Assert.Equal("Protected", Row(sut, 1).Title);
+    }
+
+    [Fact]
+    public async Task Manual_Relocked_StaysExistingCardAndRepoints()
+    {
+        SetUnlocked(true);
+        var quickAdd = QuickAddCard();
+        SetupPickerData(new[] { quickAdd, Card(1, "Secret", mode: CardProtectionMode.LockedVisible) });
+        var sut = await OpenManualPickerAsync(quickAdd);
+        var before = sut.SelectedCard;
+
+        Relock();
+
+        Assert.Equal(ImportMode.ExistingCard, sut.ImportMode);
+        Assert.NotSame(before, sut.SelectedCard);
+        Assert.Same(Row(sut, quickAdd.Id), sut.SelectedCard);
+        Assert.True(sut.SelectedCard!.IsSelected);
+    }
+
+    [Fact]
+    public async Task Manual_Relocked_ProtectedSelection_FallsBackToQuickAdd()
+    {
+        SetUnlocked(true);
+        var quickAdd = QuickAddCard();
+        SetupPickerData(new[] { quickAdd, Card(1, "Secret", mode: CardProtectionMode.LockedVisible) });
+        var sut = await OpenManualPickerAsync(quickAdd);
+        await Tap(sut, Row(sut, 1));
+        Assert.Equal(1, sut.SelectedCard!.CardId);
+
+        Relock();
+
+        Assert.Equal(quickAdd.Id, sut.SelectedCard!.CardId);
+    }
+
+    [Fact]
+    public async Task Manual_SelectCard_Masked_AuthSucceeds_StaysExistingCard()
+    {
+        var quickAdd = QuickAddCard();
+        SetupPickerData(new[] { quickAdd, Card(1, "Secret", mode: CardProtectionMode.LockedVisible) });
+        AuthenticateSucceeds();
+        var sut = await OpenManualPickerAsync(quickAdd);
+
+        await Tap(sut, Row(sut, 1));
+
+        Assert.Equal(ImportMode.ExistingCard, sut.ImportMode);
+        Assert.Equal(1, sut.SelectedCard!.CardId);
+    }
+
+    [Fact]
+    public async Task Manual_SecondLoadManualCardGroupsAsync_LeavesSelectedBoxAndSelectedCardUnchanged()
+    {
+        var quickAdd = QuickAddCard();
+        SetupPickerData(new[] { quickAdd, Card(1, "Alpha", boxId: 7) }, new CardBox { Id = 7, Name = "Family" });
+        var sut = await OpenManualPickerAsync(quickAdd);
+        sut.SelectedBox = sut.AvailableBoxes.OfType<RealBoxPickerItem>().First(b => b.BoxId == 7);
+        await Task.Delay(50);
+        await Tap(sut, Row(sut, 1));
+        var box = sut.SelectedBox;
+        var card = sut.SelectedCard;
+
+        // The PIN popup's close-time OnAppearing re-enters here.
+        await sut.LoadManualCardGroupsAsync();
+
+        Assert.Same(box, sut.SelectedBox);
+        Assert.Same(card, sut.SelectedCard);
     }
 }

@@ -185,12 +185,32 @@
                                             <VerticalStackLayout Spacing="0">
                                                 <Border Style="{StaticResource PickerRow}"
                                                         AutomationId="{Binding CardId, StringFormat='ConfirmImport_Item_{0}'}">
-                                                    <Grid ColumnDefinitions="*, Auto">
+                                                    <Border.Triggers>
+                                                        <DataTrigger TargetType="Border" Binding="{Binding IsLockedVisible}" Value="True">
+                                                            <Setter Property="SemanticProperties.Description" Value="Protected card, locked" />
+                                                            <Setter Property="SemanticProperties.Hint" Value="Double tap to unlock" />
+                                                        </DataTrigger>
+                                                    </Border.Triggers>
+                                                    <Grid ColumnDefinitions="Auto, *, Auto">
+                                                        <!-- Lock glyph: same Unicode glyph the Cards tab shows on a masked card. -->
                                                         <Label Grid.Column="0"
+                                                               Text="🔒"
+                                                               FontSize="{StaticResource FontBody}"
+                                                               IsVisible="{Binding IsLockedVisible}"
+                                                               AutomationProperties.IsInAccessibleTree="False"
+                                                               VerticalOptions="Center"
+                                                               Margin="0,0,6,0" />
+                                                        <Label Grid.Column="1"
                                                                Text="{Binding Title}"
                                                                VerticalOptions="Center"
-                                                               TextColor="{AppThemeBinding Light={StaticResource Tertiary}, Dark={StaticResource TextPrimaryDark}}" />
-                                                        <Label Grid.Column="1"
+                                                               TextColor="{AppThemeBinding Light={StaticResource Tertiary}, Dark={StaticResource TextPrimaryDark}}">
+                                                            <Label.Triggers>
+                                                                <DataTrigger TargetType="Label" Binding="{Binding IsLockedVisible}" Value="True">
+                                                                    <Setter Property="AutomationProperties.IsInAccessibleTree" Value="False" />
+                                                                </DataTrigger>
+                                                            </Label.Triggers>
+                                                        </Label>
+                                                        <Label Grid.Column="2"
                                                                Text="&#x2713;"
                                                                IsVisible="False"
                                                                VerticalOptions="Center"

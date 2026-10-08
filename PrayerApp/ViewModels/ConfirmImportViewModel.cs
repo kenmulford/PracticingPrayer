@@ -25,6 +25,7 @@ public class CardPickerItem : ObservableObject
 {
     public int CardId { get; init; }
     public string Title { get; init; } = string.Empty;
+    public bool IsLockedVisible { get; init; }
     private bool _isSelected;
     public bool IsSelected { get => _isSelected; set => SetProperty(ref _isSelected, value); }
 }
@@ -54,6 +55,7 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
     private readonly IImportPayloadService _payloadService;
     private readonly ITextSelectionParser _parser;
     private readonly IBoxService _boxService;
+    private readonly IConfidentialAccessService _confidentialAccessService;
 
     // Fallback group header for cards whose BoxId doesn't resolve to a known
     // CardBox — only reachable if data integrity drifted (a card pointing at
@@ -74,7 +76,16 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
     // Preselection is owned by the authoritative loader, not by every caller
     // remembering to bypass the setter.
     private bool _manualLoadInFlight;
+    // The PIN popup's close-time OnAppearing re-enters LoadManualCardGroupsAsync;
+    // a second run would reset the Collection picker and the post-auth selection.
+    private bool _manualGroupsLoaded;
     private CancellationTokenSource? _loadCardGroupsCts = new();
+
+    // Last fetch behind AvailableCardGroups. A re-lock re-masks from these
+    // without a refetch, so the rows change before any await.
+    private PrayerCard? _loadedQuickAddCard;
+    private IReadOnlyList<PrayerCard>? _loadedCards;
+    private IReadOnlyList<CardBox>? _loadedBoxes;
 
     private EntryMode _entryMode;
     /// <summary>
@@ -212,8 +223,8 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
     /// <summary>
     /// Grouped card list for Existing-Card mode — collection name + the
     /// non-system cards under that BoxId, sorted alphabetically within and
-    /// across groups. Always mutated in place via Clear()/Add() in
-    /// LoadCardGroupsAsync — do not reassign. HasNoAvailableCards notification
+    /// across groups. Always mutated in place (Add new groups, then Remove
+    /// stale ones) in ApplyCardGroups — do not reassign. HasNoAvailableCards notification
     /// is wired to this instance via CollectionChanged in the constructor.
     /// </summary>
     public ObservableCollection<CardCollectionGroup> AvailableCardGroups { get; } = new();
@@ -269,7 +280,8 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
         IMessenger messenger,
         IImportPayloadService payloadService,
         ITextSelectionParser parser,
-        IBoxService boxService)
+        IBoxService boxService,
+        IConfidentialAccessService confidentialAccessService)
     {
         _cardService = cardService;
         _prayerService = prayerService;
@@ -279,6 +291,7 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
         _payloadService = payloadService;
         _parser = parser;
         _boxService = boxService;
+        _confidentialAccessService = confidentialAccessService;
 
         SaveCommand = new AsyncRelayCommand(SaveAsync, CanSave);
         CancelCommand = new AsyncRelayCommand(CancelAsync);
@@ -290,17 +303,7 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
         });
         SetNewCardModeCommand = new RelayCommand(() => ImportMode = ImportMode.NewCard);
         SetExistingCardModeCommand = new RelayCommand(() => ImportMode = ImportMode.ExistingCard);
-        SelectCardCommand = new RelayCommand<CardPickerItem>(item =>
-        {
-            if (item is null) return;
-            if (SelectedCard is not null) SelectedCard.IsSelected = false;
-            SelectedCard = item;
-            item.IsSelected = true;
-            // The checkmark appears via an IsSelected DataTrigger, which TalkBack
-            // does not announce (#30). Announce the selection so a screen-reader
-            // user gets feedback that their tap registered.
-            _accessibilityService.Announce($"Selected {item.Title}");
-        });
+        SelectCardCommand = new AsyncRelayCommand<CardPickerItem>(SelectCardAsync);
 
         Prayers.CollectionChanged += (_, e) =>
         {
@@ -328,12 +331,57 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
 
         // HasNoAvailableCards drives the empty-state Label in the XAML; it
         // depends on AvailableCardGroups, which changes inside
-        // LoadCardGroupsAsync via Clear()+Add() — both fire CollectionChanged.
-        // Cache + change-detection: a Clear()+N×Add() sequence is N+1
+        // ApplyCardGroups via Add()+Remove() — both fire CollectionChanged.
+        // Cache + change-detection: an N×Add()+M×Remove() sequence is N+M
         // CollectionChanged events but at most one logical transition on this
         // bool. Don't spam PropertyChanged on every intermediate state.
         _hasNoAvailableCardsCached = HasNoAvailableCards;
         AvailableCardGroups.CollectionChanged += (_, _) => RaiseHasNoAvailableCardsIfChanged();
+
+        _messenger.Register<ConfirmImportViewModel, SessionRelockedMessage>(this, (vm, _) => vm.OnSessionRelocked());
+    }
+
+    /// <summary>
+    /// Selects <paramref name="item"/>. A masked row first authenticates, then reloads
+    /// so the row carries its real title, and selects that reloaded row. Auth failure
+    /// or cancel returns silently with the selection and the masked list unchanged.
+    /// </summary>
+    private async Task SelectCardAsync(CardPickerItem? item)
+    {
+        if (item is null) return;
+
+        if (item.IsLockedVisible)
+        {
+            if (!await _confidentialAccessService.AuthenticateAsync("Import to a protected card"))
+                return;
+
+            await LoadCardGroupsAsync();
+            var cardId = item.CardId;
+            item = AvailableCardGroups
+                .SelectMany(g => g.Cards)
+                .FirstOrDefault(c => c.CardId == cardId && !c.IsLockedVisible);
+            if (item is null) return;
+        }
+
+        if (SelectedCard is not null) SelectedCard.IsSelected = false;
+        SelectedCard = item;
+        item.IsSelected = true;
+        // The checkmark appears via an IsSelected DataTrigger, which TalkBack
+        // does not announce (#30). Announce the selection so a screen-reader
+        // user gets feedback that their tap registered.
+        _accessibilityService.Announce($"Selected {item.Title}");
+    }
+
+    /// <summary>
+    /// Handles <see cref="SessionRelockedMessage"/> by re-masking the loaded cards in
+    /// place. Synchronous, no refetch: no underlying data changed, and an async reload
+    /// would leave real titles on screen until it completed. Only Existing-card mode
+    /// shows the picker.
+    /// </summary>
+    private void OnSessionRelocked()
+    {
+        if (!IsExistingCardMode || _loadedCards is null) return;
+        ApplyCardGroups(isRelock: true);
     }
 
     /// <summary>
@@ -389,7 +437,8 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
         IPlatformApplication.Current!.Services.GetRequiredService<IMessenger>(),
         IPlatformApplication.Current!.Services.GetRequiredService<IImportPayloadService>(),
         IPlatformApplication.Current!.Services.GetRequiredService<ITextSelectionParser>(),
-        IPlatformApplication.Current!.Services.GetRequiredService<IBoxService>())
+        IPlatformApplication.Current!.Services.GetRequiredService<IBoxService>(),
+        IPlatformApplication.Current!.Services.GetRequiredService<IConfidentialAccessService>())
     { }
 
     public void ConsumePending()
@@ -470,6 +519,7 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
     public async Task LoadManualCardGroupsAsync()
     {
         if (EntryMode != EntryMode.Manual) return;
+        if (_manualGroupsLoaded || _manualLoadInFlight) return;
 
         // #171: hold the gate for the whole authoritative load. While set, the
         // SelectedBox setter skips its fire-and-forget reload (see the setter),
@@ -511,6 +561,7 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
             // flip. Decide it explicitly here. Later user-driven box changes (which
             // toggle the cached value) still flip reactively.
             FlipToNewCardIfEmptyManualRealBox();
+            _manualGroupsLoaded = true;
         }
         finally
         {
@@ -608,6 +659,29 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
         var allBoxes = await _boxService.GetBoxesAsync();
         if (token.IsCancellationRequested) return;
 
+        _loadedQuickAddCard = quickAddCard;
+        _loadedCards = allCards;
+        _loadedBoxes = allBoxes;
+        ApplyCardGroups(isRelock: false);
+    }
+
+    /// <summary>
+    /// Rebuilds <see cref="AvailableCardGroups"/> from the last fetch. While the session is
+    /// locked, Hidden cards are omitted and LockedVisible cards become masked rows titled
+    /// "Protected", so a protected card's real title never enters the collection. Called
+    /// with <paramref name="isRelock"/> true from <see cref="OnSessionRelocked"/>, where
+    /// an Import selection that is still listed and unprotected survives.
+    /// </summary>
+    private void ApplyCardGroups(bool isRelock)
+    {
+        var quickAddCard = _loadedQuickAddCard;
+        var allCards = _loadedCards!;
+        var allBoxes = _loadedBoxes!;
+        // Read once, after the load's last await, so a re-lock during the fetch still masks.
+        var isUnlocked = _confidentialAccessService.IsSessionUnlocked;
+        // BoxId 0 has no CardBox row, so Loose Cards resolve to null.
+        CardBox? BoxOf(PrayerCard c) => allBoxes.FirstOrDefault(b => b.Id == c.BoxId);
+
         // BoxId 0 is the "loose cards" sentinel — there is no CardBox row
         // for it, so seed the lookup so the group header shows the proper
         // label rather than "Unknown". For data-drift duplicates (two
@@ -625,6 +699,10 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
         if (SelectedBox is RealBoxPickerItem real)
             filtered = filtered.Where(c => c.BoxId == real.BoxId);
 
+        if (!isUnlocked)
+            filtered = filtered.Where(c =>
+                PrayerCard.GetEffectiveProtectionMode(c, BoxOf(c)) != CardProtectionMode.Hidden);
+
         // GroupBy BoxId (not name): two CardBox rows with the same display
         // name would otherwise silently merge their card lists. The group's
         // BoxId field carries the partition key forward for any UI/test code
@@ -635,16 +713,31 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
             {
                 BoxId = g.Key,
                 CollectionName = boxNames.TryGetValue(g.Key, out var name) ? name : UnknownCollectionName,
+                // Sort on the entity's real title so masking leaves row order unchanged.
+                // Hidden cards were dropped above, so a blocked card here is LockedVisible.
                 Cards = new ObservableCollection<CardPickerItem>(
                     g.OrderBy(c => c.Title)
-                     .Select(c => new CardPickerItem { CardId = c.Id, Title = c.Title }))
+                     .Select(c => ProtectionPolicy.IsAccessBlocked(c, BoxOf(c), isUnlocked)
+                         ? new CardPickerItem { CardId = c.Id, Title = "Protected", IsLockedVisible = true }
+                         : new CardPickerItem { CardId = c.Id, Title = c.Title }))
             })
             .OrderBy(g => g.CollectionName)
             .ToList();
 
-        AvailableCardGroups.Clear();
+        // Add then Remove, never Clear: a transient empty collection would trip
+        // FlipToNewCardIfEmptyManualRealBox on a populated Quick Add collection.
+        var staleGroups = AvailableCardGroups.ToList();
         foreach (var grp in groups)
             AvailableCardGroups.Add(grp);
+        foreach (var stale in staleGroups)
+            AvailableCardGroups.Remove(stale);
+
+        var selectionBlocked = SelectedCard is { } selected
+            && allCards.FirstOrDefault(c => c.Id == selected.CardId) is { } selectedEntity
+            && ProtectionPolicy.IsAccessBlocked(selectedEntity, BoxOf(selectedEntity), isUnlocked);
+        CardPickerItem? ListedSelection() => SelectedCard is { } sel
+            ? groups.SelectMany(g => g.Cards).FirstOrDefault(c => c.CardId == sel.CardId)
+            : null;
 
         // Manual mode: preselect the Quick Add card when no card is already
         // selected (first load). Re-filter (box change) preserves the
@@ -652,6 +745,14 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
         // clears it if Quick Add was filtered out by a collection change.
         if (EntryMode == EntryMode.Manual && quickAddCard is not null)
         {
+            // A protected selection is dropped first so the preselect branch below
+            // can fall back to Quick Add.
+            if (selectionBlocked)
+            {
+                SelectedCard!.IsSelected = false;
+                SelectedCard = null;
+            }
+
             var qaItem = groups
                 .SelectMany(g => g.Cards)
                 .FirstOrDefault(c => c.CardId == quickAddCard.Id);
@@ -668,10 +769,19 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
                 if (SelectedCard is not null) SelectedCard.IsSelected = false;
                 SelectedCard = null;
             }
+
+            // The rows were rebuilt, so a kept selection follows its reloaded item.
+            if (ListedSelection() is { } kept)
+            {
+                kept.IsSelected = true;
+                SelectedCard = kept;
+            }
         }
         else if (EntryMode != EntryMode.Manual)
         {
-            SelectedCard = null;
+            var kept = isRelock && !selectionBlocked ? ListedSelection() : null;
+            if (kept is not null) kept.IsSelected = true;
+            SelectedCard = kept;
         }
     }
 
