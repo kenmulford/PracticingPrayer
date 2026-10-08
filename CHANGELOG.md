@@ -18,7 +18,7 @@ Release notes for Practicing Prayer, newest first.
 
 | Issue | PR | What |
 |---|---|---|
-| #312 Mask protected cards in the import card picker while the session is locked | #315 | While the session is locked, the import card picker omits Hidden cards and shows LockedVisible cards as "Protected" with the lock glyph; tapping one authenticates first |
+| #312 Mask protected cards in the import card picker while the session is locked | #315 | While the session is locked, the import card picker omits Hidden cards and shows LockedVisible cards as "Protected" with the lock glyph; tapping one authenticates first. In Quick Add the Quick Add card stays listed and preselected, shows as "Protected" when it is protected, and saves without unlocking |
 
 ### Consumer notes
 
