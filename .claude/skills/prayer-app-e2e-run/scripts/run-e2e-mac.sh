@@ -66,7 +66,7 @@ fi
 if want_ios; then
   step "ios simulator"
   if ! xcrun simctl list devices booted | grep -q "$IOS_SIM"; then
-    echo "booting $IOS_SIM…"
+    echo "booting ${IOS_SIM}…"
     xcrun simctl boot "$IOS_SIM"
     sleep 8
   fi
@@ -105,7 +105,7 @@ start_appium() {  # port, extra-args
   if curl -s "http://127.0.0.1:$port/status" >/dev/null 2>&1; then
     echo "appium :$port already up"
   else
-    echo "starting appium :$port…"
+    echo "starting appium :${port}…"
     nohup appium --port "$port" "$@" >"$LOGDIR/appium-$port.log" 2>&1 &
     for _ in $(seq 1 15); do curl -s "http://127.0.0.1:$port/status" >/dev/null 2>&1 && break; sleep 1; done
     curl -s "http://127.0.0.1:$port/status" >/dev/null 2>&1 || die "appium :$port failed to start — see $LOGDIR/appium-$port.log"
