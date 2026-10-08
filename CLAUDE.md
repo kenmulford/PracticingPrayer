@@ -46,4 +46,4 @@ Per issue the orchestrator — never authoring code itself — reads the issue �
 - `tests-green` — source commits run the unit suite; red blocks the commit.
 - `no-push` / `no-pr-to-protected` — pushing or opening a PR to `master` is blocked locally; GitHub branch protection is the server-side backstop.
 
-Non-negotiables: MAUI .NET 10 + Community Toolkit; iOS 26.5 / Android API 36.
+Non-negotiables: MAUI .NET 10 + Community Toolkit; built with Xcode 27 / iOS 27 SDK (minimum iOS 16.0); Android API 36.
