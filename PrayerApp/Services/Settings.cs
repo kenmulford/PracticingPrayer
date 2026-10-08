@@ -144,6 +144,13 @@ namespace PrayerApp.Services
             set => Preferences.Set(nameof(ExpandedSectionIds), value);
         }
 
+        /// <summary>True once the first-launch clipboard share-import prompt has been shown.</summary>
+        public static bool ShareHandoffPrompted
+        {
+            get => Preferences.Get(nameof(ShareHandoffPrompted), false);
+            set => Preferences.Set(nameof(ShareHandoffPrompted), value);
+        }
+
         public static void ClearSettings()
         {
             // reset "first run" flag

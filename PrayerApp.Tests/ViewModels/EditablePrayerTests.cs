@@ -32,6 +32,32 @@ public class EditablePrayerTests
     }
 
     [Fact]
+    public void RemoveAccessibleDescription_AddedDuplicate_ReadsReturnToAlreadyOnCard()
+    {
+        var row = new EditablePrayer { Title = "Healing", Position = 2, Total = 3 };
+        Assert.Equal("Remove prayer, item 2 of 3", row.RemoveAccessibleDescription);
+
+        row.IsAddedDuplicate = true;
+
+        Assert.Equal("Return Healing to Already on this card, item 2 of 3", row.RemoveAccessibleDescription);
+    }
+
+    [Fact]
+    public void RemoveAccessibleDescription_RaisedWhenIsAddedDuplicateOrTitleChanges()
+    {
+        var row = new EditablePrayer { Position = 1, Total = 1 };
+        var raised = new List<string?>();
+        row.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        row.IsAddedDuplicate = true;
+        Assert.Contains(nameof(EditablePrayer.RemoveAccessibleDescription), raised);
+
+        raised.Clear();
+        row.Title = "Healing";
+        Assert.Contains(nameof(EditablePrayer.RemoveAccessibleDescription), raised);
+    }
+
+    [Fact]
     public void SettingPosition_RaisesPropertyChangedForAllThreeDescriptions()
     {
         var row = new EditablePrayer { Total = 3 };

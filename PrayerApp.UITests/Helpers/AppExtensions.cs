@@ -929,6 +929,7 @@ public static class AppExtensions
         if (!driver.IsAlertPresent() && driver.IsDisplayed("Home", timeoutSeconds: 0))
             return;
 
+        DismissShareHandoffAlertIfPresent(driver);
         try { driver.DismissAlertIfPresent(); } catch { /* best effort */ }
 
         // Back out to a tab root, dismissing any alert each Back may raise (e.g.
@@ -999,6 +1000,10 @@ public static class AppExtensions
         }
 
         // Android — legacy in-suite dismissal until the Android toolchain returns.
+        // The share-handoff alert precedes the welcome popup and blocks the tab bar, so
+        // it must go before the Home fast path reads the screen.
+        DismissShareHandoffAlertIfPresent(driver);
+
         // Fast path: if the tab bar is already rendered, no onboarding popup is
         // blocking. Saves up to 3s on test #1 vs probing Welcome_Btn_Skip first.
         if (driver.IsDisplayed("Home", timeoutSeconds: 1))
@@ -1011,6 +1016,8 @@ public static class AppExtensions
         // and may not be visible immediately, especially on slow emulators.
         for (int attempt = 0; attempt < 3; attempt++)
         {
+            DismissShareHandoffAlertIfPresent(driver);
+
             // Check for dismissal buttons — welcome popup, mid-onboarding banner, or final "Got it!"
             string? dismissButton = driver.IsDisplayed("Welcome_Btn_Skip", timeoutSeconds: 3) ? "Welcome_Btn_Skip"
                 : driver.IsDisplayed("Banner_Btn_Skip", timeoutSeconds: 2) ? "Banner_Btn_Skip"
@@ -1045,6 +1052,21 @@ public static class AppExtensions
 
         // After retries, mark handled to avoid infinite loops in future calls
         setup.OnboardingHandled = true;
+    }
+
+    /// <summary>
+    /// Android: taps "Not now" on the first-launch "Did someone share a prayer with you?"
+    /// alert. <see cref="DismissAlertIfPresent"/> taps button1, which is "Import" here and
+    /// would stage a clipboard import. iOS: no-op — onboarding is pre-seeded complete, so
+    /// the alert never shows.
+    /// </summary>
+    private static void DismissShareHandoffAlertIfPresent(AppiumDriver driver)
+    {
+        if (TestConfig.IsIOS || !driver.IsAlertPresent())
+            return;
+
+        if (driver.IsTextDisplayed("Not now"))
+            driver.TapAlertButton("Not now");
     }
 
     /// <summary>
@@ -2020,17 +2042,18 @@ public static class AppExtensions
     /// <summary>
     /// Android-only: dispatch <c>ACTION_PROCESS_TEXT</c> at MainActivity so the
     /// Slice 2 selection-toolbar handoff can be exercised without driving Gmail's UI.
-    /// Multi-line payloads are not supported here because <c>am start --es</c> tokenises
-    /// values through adb's shell — newlines are stripped. Production multi-line parsing
-    /// is covered by <c>TextSelectionParser</c> unit tests; manual emulator smoke covers
-    /// the real Gmail → toolbar → modal end-to-end path.
+    /// Spaces in <paramref name="text"/> are escaped by the helper. Multi-line payloads are
+    /// not supported here because <c>am start --es</c> tokenises values through adb's
+    /// shell — newlines are stripped. Production multi-line parsing is covered by
+    /// <c>TextSelectionParser</c> unit tests; manual emulator smoke covers the real
+    /// Gmail → toolbar → modal end-to-end path.
     /// </summary>
     public static void LaunchProcessTextIntent(this AppiumDriver driver, AppiumSetup setup, string text)
     {
         if (TestConfig.IsIOS)
             throw new SkipException("Android-only: PROCESS_TEXT is the Android selection-toolbar entry point");
 
-        ValidateAmShellText(text, nameof(text));
+        var amText = ToAmShellArg(text, nameof(text));
 
         // Two-stage foreground → dismiss-onboarding → dispatch, symmetric with
         // `LaunchProcessTextIntentSpannable`. Doing PROCESS_TEXT in a single `am start`
@@ -2075,7 +2098,7 @@ public static class AppExtensions
                 "-n", $"{TestConfig.AndroidPackage}/{TestConfig.AndroidMainActivity}",
                 "-a", "android.intent.action.PROCESS_TEXT",
                 "-t", "text/plain",
-                "--es", "android.intent.extra.PROCESS_TEXT", text
+                "--es", "android.intent.extra.PROCESS_TEXT", amText
             },
             nameof(LaunchProcessTextIntent));
     }
@@ -2115,13 +2138,14 @@ public static class AppExtensions
     /// SpannableString boundary. Receiver is <c>#if DEBUG</c> only and must NOT
     /// ship to Release. Requires Appium server flag
     /// <c>--allow-insecure=uiautomator2:adb_shell</c> (or <c>--relaxed-security</c>).
+    /// Spaces in <paramref name="text"/> are escaped by the helper.
     /// </remarks>
     public static void LaunchProcessTextIntentSpannable(this AppiumDriver driver, AppiumSetup setup, string text)
     {
         if (TestConfig.IsIOS)
             throw new SkipException("Android-only: PROCESS_TEXT is the Android selection-toolbar entry point");
 
-        ValidateAmShellText(text, nameof(text));
+        var amText = ToAmShellArg(text, nameof(text));
 
         // Foreground MainActivity FIRST. Android 14+ (API 34+) enforces Background
         // Activity Launch (BAL) restrictions: when the broadcast receiver below
@@ -2148,30 +2172,37 @@ public static class AppExtensions
 
         AssertHomeVisibleAfterDismiss(driver, setup, nameof(LaunchProcessTextIntentSpannable));
 
-        // `am broadcast` arg list. Appium's `mobile: shell` invocation passes the
-        // args array as separate argv tokens (not via `sh -c` string concatenation),
-        // so spaces inside `text` survive — `ValidateAmShellText` above rejects the
-        // shell metacharacters that would actually corrupt the payload. Newlines
-        // are still stripped by the adb tokeniser; multi-line payloads remain out
-        // of scope for this helper.
+        // `am broadcast` arg list. The device shell re-splits the joined command on
+        // spaces, so `ToAmShellArg` escapes them; it also rejects the shell
+        // metacharacters that would corrupt the payload. Newlines are still stripped
+        // by the adb tokeniser; multi-line payloads remain out of scope for this helper.
         RunAmShellOrThrow(driver,
             new[]
             {
                 "broadcast",
                 "-a", "com.multithreadedllc.prayercards.PRAYER_TEST_SPANNABLE",
                 "-n", $"{TestConfig.AndroidPackage}/.DebugProcessTextShim",
-                "--es", "text", text
+                "--es", "text", amText
             },
             nameof(LaunchProcessTextIntentSpannable));
     }
 
     /// <summary>
-    /// Reject `text` values containing shell metacharacters that would corrupt
-    /// `am`-shell argument tokenisation. The args-array invocation style of
-    /// <c>mobile: shell</c> passes each element as a separate argv token, but
-    /// embedded metacharacters can still interact poorly with adb's parser on
-    /// some Appium driver versions. Whitelisting the safe set is cheaper than
-    /// guessing the actual tokenisation contract.
+    /// Validates <paramref name="text"/>, then escapes each space as <c>\ </c>. <c>mobile: shell</c>
+    /// joins the args array into one command line and the device shell splits it again on
+    /// spaces, so an unescaped value reaches <c>am</c> as its first word only.
+    /// </summary>
+    private static string ToAmShellArg(string text, string paramName)
+    {
+        ValidateAmShellText(text, paramName);
+        return text.Replace(" ", "\\ ");
+    }
+
+    /// <summary>
+    /// Allows only <c>[A-Za-z0-9 _.,-]</c>. Any other character can be a shell metacharacter
+    /// that corrupts `am`-shell tokenisation across Appium driver versions, and a denylist
+    /// misses <c>;</c>, <c>&amp;</c>, <c>|</c>, <c>(</c>, <c>)</c>, <c>*</c>, and <c>&lt;</c>.
+    /// Spaces are allowed because <see cref="ToAmShellArg"/> escapes them.
     /// </summary>
     private static void ValidateAmShellText(string text, string paramName)
     {
@@ -2180,12 +2211,11 @@ public static class AppExtensions
 
         foreach (var c in text)
         {
-            if (c is '\'' or '"' or '`' or '$' or '\\' or '\n' or '\r')
+            if (!(char.IsAsciiLetterOrDigit(c) || c is ' ' or '_' or '.' or ',' or '-'))
                 throw new ArgumentException(
-                    $"`{paramName}` contains a shell metacharacter (quote, backtick, $, backslash, or newline). " +
-                    "These corrupt am-shell argument tokenisation across Appium driver versions. " +
-                    "Use plain alphanumeric + space text only — production multi-line / rich-text parsing " +
-                    "is covered by TextSelectionParser unit tests.",
+                    $"`{paramName}` contains '{c}', which is outside the allowed set [A-Za-z0-9 _.,-]. " +
+                    "Other characters can corrupt am-shell argument tokenisation; production " +
+                    "multi-line / rich-text parsing is covered by TextSelectionParser unit tests.",
                     paramName);
         }
     }

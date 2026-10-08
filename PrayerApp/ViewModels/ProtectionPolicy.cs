@@ -19,6 +19,9 @@ namespace PrayerApp.ViewModels;
 /// </summary>
 internal static class ProtectionPolicy
 {
+    /// <summary>Title shown in place of a masked card's real title.</summary>
+    public const string MaskedTitle = "Protected";
+
     /// <summary>
     /// True when <paramref name="card"/> is effectively protected (via its own mode or
     /// <paramref name="box"/>'s cascade) and <paramref name="isSessionUnlocked"/> is false.
@@ -26,4 +29,13 @@ internal static class ProtectionPolicy
     public static bool IsAccessBlocked(PrayerCard card, CardBox? box, bool isSessionUnlocked) =>
         PrayerCard.GetEffectiveProtectionMode(card, box) != CardProtectionMode.None
         && !isSessionUnlocked;
+
+    /// <summary>
+    /// True when <paramref name="card"/>'s effective mode (own or <paramref name="box"/>'s
+    /// cascade) is <see cref="CardProtectionMode.Hidden"/> and <paramref name="isSessionUnlocked"/>
+    /// is false: the card is left out of the list entirely rather than masked.
+    /// </summary>
+    public static bool IsHiddenWhileLocked(PrayerCard card, CardBox? box, bool isSessionUnlocked) =>
+        !isSessionUnlocked
+        && PrayerCard.GetEffectiveProtectionMode(card, box) == CardProtectionMode.Hidden;
 }

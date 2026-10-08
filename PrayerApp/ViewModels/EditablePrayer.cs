@@ -14,8 +14,34 @@ public class EditablePrayer : ObservableObject
     public string Title
     {
         get => _title;
-        set => SetProperty(ref _title, value ?? string.Empty);
+        set
+        {
+            if (SetProperty(ref _title, value ?? string.Empty))
+            {
+                OnPropertyChanged(nameof(AddAccessibleDescription));
+                OnPropertyChanged(nameof(RemoveAccessibleDescription));
+            }
+        }
     }
+
+    // 0-based position in the import payload; -1 for rows the user typed. Lets
+    // a re-match order skipped rows the way the share listed them (#313).
+    public int PayloadIndex { get; init; } = -1;
+
+    // True while the row sits in To import after "+ Add" moved it from
+    // Already on this card; ✕ on such a row returns it instead of deleting it.
+    private bool _isAddedDuplicate;
+    public bool IsAddedDuplicate
+    {
+        get => _isAddedDuplicate;
+        set
+        {
+            if (SetProperty(ref _isAddedDuplicate, value))
+                OnPropertyChanged(nameof(RemoveAccessibleDescription));
+        }
+    }
+
+    public string AddAccessibleDescription => $"Add {Title} to import";
 
     private string? _details;
     public string? Details
@@ -70,7 +96,10 @@ public class EditablePrayer : ObservableObject
     // "{n} of {count}" phrasing mirrors PrayerTimeViewModel.ProgressDisplay.
     public string TitleAccessibleDescription => $"Prayer title, item {Position} of {Total}";
     public string DetailsAccessibleDescription => $"Prayer details, item {Position} of {Total}";
-    public string RemoveAccessibleDescription => $"Remove prayer, item {Position} of {Total}";
+    // ✕ on an added duplicate returns it to Already on this card instead of deleting it.
+    public string RemoveAccessibleDescription => IsAddedDuplicate
+        ? $"Return {Title} to Already on this card, item {Position} of {Total}"
+        : $"Remove prayer, item {Position} of {Total}";
 
     private void RaiseAccessibleDescriptionsChanged()
     {

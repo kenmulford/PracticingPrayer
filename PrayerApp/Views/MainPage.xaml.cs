@@ -115,6 +115,16 @@ public partial class MainPage : ContentPage
             _onboardingService.MarkWelcomeShown();
             try
             {
+                if (await _services.GetRequiredService<ShareHandoffService>().RunAsync())
+                    return;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Share handoff failed: {ex}");
+            }
+
+            try
+            {
                 await this.ShowPopupAsync(new OnboardingWelcomePopup(_onboardingService),
                     new PopupOptions { CanBeDismissedByTappingOutsideOfPopup = false },
                     CancellationToken.None);

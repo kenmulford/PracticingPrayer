@@ -2,6 +2,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using PrayerApp.Helpers;
 using PrayerApp.Models;
+using static PrayerApp.Helpers.TextNormalization;
 
 namespace PrayerApp.Services;
 
@@ -20,9 +21,6 @@ public class TextSelectionParser : ITextSelectionParser
 
     private static readonly Regex MarkerStripper =
         new(@"^\s*(?:\d+[\.\)]|[-*•])\s*", RegexOptions.Compiled);
-
-    private static readonly Regex InternalWhitespace =
-        new(@"\s+", RegexOptions.Compiled);
 
     // Threshold for the option-d line-2 sentence-shape heuristic. A line
     // with > this many space-separated words (after marker stripping) is
@@ -76,7 +74,7 @@ public class TextSelectionParser : ITextSelectionParser
             {
                 var raw = blockLines[i];
                 var match = MarkerStripper.Match(raw);
-                var content = CollapseLine(match.Success ? raw[match.Length..] : raw);
+                var content = CollapseWhitespace(match.Success ? raw[match.Length..] : raw);
                 if (content.Length == 0) continue;
                 contentLines.Add((content, match.Success));
             }
@@ -101,7 +99,7 @@ public class TextSelectionParser : ITextSelectionParser
 
         if (entries.Count == 0 && !string.IsNullOrWhiteSpace(normalized))
         {
-            entries.Add(BuildPrayer(CollapseLine(normalized)));
+            entries.Add(BuildPrayer(CollapseWhitespace(normalized)));
         }
 
         return new ParseResult(entries.AsReadOnly(), headerTitle ?? defaultTitle);
@@ -218,9 +216,6 @@ public class TextSelectionParser : ITextSelectionParser
             if (!char.IsLetter(c) || !char.IsUpper(c)) return false;
         return true;
     }
-
-    private static string CollapseLine(string text) =>
-        InternalWhitespace.Replace(text, " ").Trim();
 
     // Includes `-` per architecture doc rule 6, but plain hyphens appear in
     // compound words ("father-in-law") and dates ("2026-05-01") — those will
