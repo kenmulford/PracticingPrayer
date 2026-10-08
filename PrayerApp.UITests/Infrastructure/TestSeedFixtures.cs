@@ -23,4 +23,10 @@ public static class TestSeedFixtures
     // Runtime-generated prefix by TagTests.cs (suffixed with DateTime.UtcNow.Ticks
     // for uniqueness; named here for family symmetry).
     public const string DeleteRuntimeTagPrefix = "UITest Delete Target Tag";
+
+    // Owned by ConfirmImportDuplicatesTests alone; the test only cancels, so the
+    // card is never mutated. Outside the Delete Target family that
+    // TestDataSeedConsistencyTests enumerates.
+    public const string ImportSkipsDuplicatesCard = "UITest Card ImportExisting_SkipsDuplicates";
+    public const string ImportSkipsDuplicatesPrayer = "UITest Prayer ImportExisting_SkipsDuplicates";
 }

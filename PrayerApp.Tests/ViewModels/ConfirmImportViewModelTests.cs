@@ -40,6 +40,8 @@ public class ConfirmImportViewModelTests
         // .Returns() calls aren't clobbered when CreateSut runs.
         _boxService.GetBoxesAsync().Returns(Task.FromResult<IReadOnlyList<CardBox>>(
             Array.Empty<CardBox>()));
+        _prayerService.GetPrayersByCardAsync(Arg.Any<int>()).Returns(Task.FromResult<IReadOnlyList<Prayer>>(
+            Array.Empty<Prayer>()));
         _messenger.Register<object, BulkChangedMessage>(_recipient, (_, m) => _bulkMessages.Add(m));
     }
 
@@ -1213,6 +1215,271 @@ public class ConfirmImportViewModelTests
         await _navigationService.Received(1).GoToAsync(Routes.PrayerCardsTabImportedToExisting(42));
         await _navigationService.DidNotReceive().GoToAsync(
             Arg.Is<string>(s => s.Contains("saved=")));
+    }
+
+    // ── Skip requests already on the target card (#313) ───────────────────
+
+    private void StubCardPrayers(int cardId, params string[] titles) =>
+        _prayerService.GetPrayersByCardAsync(cardId).Returns(Task.FromResult<IReadOnlyList<Prayer>>(
+            titles.Select(t => new Prayer { PrayerCardId = cardId, Title = t }).ToArray()));
+
+    private static CardPickerItem CardItem(int cardId, string title = "Family") =>
+        new() { CardId = cardId, Title = title };
+
+    private async Task<ConfirmImportViewModel> MatchAsync(
+        int cardId, string[] titlesOnCard, params (string Title, string? Details)[] rows)
+    {
+        StubCardPrayers(cardId, titlesOnCard);
+        var sut = SetupSutWithRows(rows);
+        sut.SetExistingCardModeCommand.Execute(null);
+        sut.SelectedCard = CardItem(cardId);
+        await Task.Delay(50);
+        return sut;
+    }
+
+    [Fact]
+    public async Task Match_EightOnCardOneNew()
+    {
+        var onCard = Enumerable.Range(1, 8).Select(i => $"Prayer {i}").ToArray();
+        var rows = onCard.Select(t => (Title: t, Details: (string?)null))
+            .Append(("Job interview Friday", null)).ToArray();
+
+        var sut = await MatchAsync(7, onCard, rows);
+
+        Assert.Equal(8, sut.AlreadyOnCard.Count);
+        Assert.Equal("Job interview Friday", Assert.Single(sut.Prayers).Title);
+        Assert.Equal("To import (1)", sut.PrayersHeader);
+        Assert.Equal("Already on this card (8)", sut.AlreadyOnCardHeader);
+        Assert.True(sut.HasAlreadyOnCard);
+    }
+
+    [Fact]
+    public async Task Match_CaseSpaceQuoteVariants()
+    {
+        var sut = await MatchAsync(7,
+            new[] { "Mom's surgery", "Say \"grace\"", "Wisdom at work", "Dad's health" },
+            ("MOM'S SURGERY", null),
+            ("  Say   “grace”  ", null),
+            ("wisdom\tat  work", null),
+            ("Dad’s health", null));
+
+        Assert.Equal(4, sut.AlreadyOnCard.Count);
+        Assert.Empty(sut.Prayers);
+    }
+
+    [Fact]
+    public async Task Match_AnsweredPrayer()
+    {
+        _prayerService.GetPrayersByCardAsync(7).Returns(Task.FromResult<IReadOnlyList<Prayer>>(
+            new[] { new Prayer { PrayerCardId = 7, Title = "Healing", IsAnswered = true } }));
+        var sut = SetupSutWithRows(("Healing", null));
+        sut.SetExistingCardModeCommand.Execute(null);
+
+        sut.SelectedCard = CardItem(7);
+        await Task.Delay(50);
+
+        Assert.Equal("Healing", Assert.Single(sut.AlreadyOnCard).Title);
+        Assert.Empty(sut.Prayers);
+    }
+
+    [Fact]
+    public async Task AddDuplicate_SaveWritesRow()
+    {
+        var sut = await MatchAsync(7, new[] { "Healing" },
+            ("Job interview Friday", null), ("Healing", null));
+        var healing = sut.AlreadyOnCard.Single();
+
+        sut.AddDuplicateCommand.Execute(healing);
+        await sut.SaveCommand.ExecuteAsync(null);
+
+        Assert.True(healing.IsAddedDuplicate);
+        Assert.Empty(sut.AlreadyOnCard);
+        await _prayerService.Received(1).SavePrayerAsync(
+            Arg.Is<Prayer>(p => p.Title == "Healing" && p.PrayerCardId == 7), false);
+        await _prayerService.Received(2).SavePrayerAsync(Arg.Any<Prayer>(), false);
+    }
+
+    [Fact]
+    public async Task RemoveMovedRow_ReturnsInOrder()
+    {
+        var sut = await MatchAsync(7, new[] { "Mom", "Healing", "Wisdom" },
+            ("Mom", null), ("Healing", null), ("Wisdom", null));
+        var healing = sut.AlreadyOnCard[1];
+        sut.AddDuplicateCommand.Execute(healing);
+        Assert.Equal(new[] { "Mom", "Wisdom" }, sut.AlreadyOnCard.Select(r => r.Title));
+
+        sut.RemovePrayerCommand.Execute(healing);
+
+        Assert.Equal(new[] { 0, 1, 2 }, sut.AlreadyOnCard.Select(r => r.PayloadIndex));
+        Assert.Equal(new[] { "Mom", "Healing", "Wisdom" }, sut.AlreadyOnCard.Select(r => r.Title));
+        Assert.False(healing.IsAddedDuplicate);
+        Assert.Empty(sut.Prayers);
+        await _prayerService.DidNotReceive().SavePrayerAsync(Arg.Any<Prayer>(), Arg.Any<bool>());
+    }
+
+    [Fact]
+    public async Task MoveRows_Announce()
+    {
+        var sut = await MatchAsync(7, new[] { "Healing" }, ("Healing", null));
+        var healing = sut.AlreadyOnCard.Single();
+
+        sut.AddDuplicateCommand.Execute(healing);
+        _accessibilityService.Received(1).Announce("Added Healing to import");
+
+        sut.RemovePrayerCommand.Execute(healing);
+        _accessibilityService.Received(1).Announce("Returned Healing to Already on this card");
+    }
+
+    [Fact]
+    public async Task AllOnCard_SaveDisabled()
+    {
+        var sut = await MatchAsync(7, new[] { "Mom", "Dad" }, ("Mom", null), ("Dad", null));
+
+        Assert.True(sut.IsEverythingAlreadyOnCard);
+        Assert.Equal("Everything in this share is already on Family.", sut.AllDuplicatesMessage);
+        Assert.False(sut.SaveCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task NewRowsRemoved_NoAllDuplicates()
+    {
+        var sut = await MatchAsync(7, new[] { "Mom" }, ("Job interview Friday", null), ("Mom", null));
+        Assert.False(sut.IsEverythingAlreadyOnCard);
+
+        sut.RemovePrayerCommand.Execute(sut.Prayers.Single());
+
+        Assert.Empty(sut.Prayers);
+        Assert.Single(sut.AlreadyOnCard);
+        Assert.False(sut.IsEverythingAlreadyOnCard);
+    }
+
+    [Fact]
+    public async Task LookupPending_SaveDisabled()
+    {
+        var pending = new TaskCompletionSource<IReadOnlyList<Prayer>>();
+        _prayerService.GetPrayersByCardAsync(7).Returns(pending.Task);
+        var sut = SetupSutWithRows(("Mom", null));
+        sut.SetExistingCardModeCommand.Execute(null);
+
+        sut.SelectedCard = CardItem(7);
+
+        Assert.False(sut.SaveCommand.CanExecute(null));
+
+        pending.SetResult(Array.Empty<Prayer>());
+        await Task.Delay(50);
+
+        Assert.True(sut.SaveCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task NewCardId_Rematches()
+    {
+        StubCardPrayers(7, "Mom");
+        StubCardPrayers(8, "Dad");
+        var sut = SetupSutWithRows(("Mom", null), ("Dad", null));
+        sut.SetExistingCardModeCommand.Execute(null);
+        sut.SelectedCard = CardItem(7);
+        await Task.Delay(50);
+        sut.AddPrayerCommand.Execute(null);
+        var typed = sut.Prayers[^1];
+
+        sut.SelectedCard = CardItem(8);
+        await Task.Delay(50);
+
+        Assert.Equal("Dad", Assert.Single(sut.AlreadyOnCard).Title);
+        Assert.Equal(new[] { "Mom", "" }, sut.Prayers.Select(r => r.Title));
+        Assert.Same(typed, sut.Prayers[^1]);
+    }
+
+    [Fact]
+    public async Task SameCardIdRepoint_KeepsMove()
+    {
+        var sut = await MatchAsync(7, new[] { "Healing" }, ("Job interview Friday", null), ("Healing", null));
+        var healing = sut.AlreadyOnCard.Single();
+        sut.AddDuplicateCommand.Execute(healing);
+
+        sut.SelectedCard = CardItem(7);
+        await Task.Delay(50);
+
+        Assert.Contains(healing, sut.Prayers);
+        Assert.True(healing.IsAddedDuplicate);
+        Assert.Empty(sut.AlreadyOnCard);
+
+        StubCardPrayers(8, "Healing");
+        sut.SelectedCard = CardItem(8);
+        await Task.Delay(50);
+
+        Assert.Contains(healing, sut.AlreadyOnCard);
+        Assert.False(healing.IsAddedDuplicate);
+    }
+
+    [Fact]
+    public async Task NewCardAndManual_NoAlready()
+    {
+        StubCardPrayers(7, "Mom");
+
+        var newCard = SetupSutWithRows(("Mom", null));
+        newCard.SelectedCard = CardItem(7);
+        await Task.Delay(50);
+        Assert.False(newCard.HasAlreadyOnCard);
+        Assert.Single(newCard.Prayers);
+        Assert.Equal("Prayers (1)", newCard.PrayersHeader);
+
+        var manual = CreateSut();
+        manual.InitializeManualEntry();
+        manual.Prayers[0].Title = "Mom";
+        manual.SelectedCard = CardItem(7);
+        await Task.Delay(50);
+        Assert.False(manual.HasAlreadyOnCard);
+        Assert.Single(manual.Prayers);
+        Assert.Equal("Prayers (1)", manual.PrayersHeader);
+
+        await _prayerService.DidNotReceive().GetPrayersByCardAsync(Arg.Any<int>());
+    }
+
+    [Fact]
+    public async Task LookupThrows_Alerts()
+    {
+        _prayerService.GetPrayersByCardAsync(7).Returns(
+            Task.FromException<IReadOnlyList<Prayer>>(new InvalidOperationException("db")));
+        var sut = SetupSutWithRows(("Mom", null), ("Dad", null));
+        sut.SetExistingCardModeCommand.Execute(null);
+
+        sut.SelectedCard = CardItem(7);
+        await Task.Delay(50);
+
+        await _navigationService.Received(1).DisplayAlertAsync(
+            "Error", "Unable to load prayers on this card.", "OK");
+        Assert.Equal(2, sut.Prayers.Count);
+        Assert.Empty(sut.AlreadyOnCard);
+        Assert.True(sut.SaveCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task Save_AnnouncesImportCount()
+    {
+        var sut = await MatchAsync(7, new[] { "Mom", "Dad" },
+            ("Mom", null), ("Dad", null), ("Job interview Friday", null));
+
+        await sut.SaveCommand.ExecuteAsync(null);
+
+        await _prayerService.Received(1).SavePrayerAsync(Arg.Any<Prayer>(), false);
+        _accessibilityService.Received(1).Announce("Imported 1 prayers to Family");
+    }
+
+    [Fact]
+    public void AddAccessibleDescription()
+    {
+        var row = new EditablePrayer { Title = "Mom" };
+        var raised = new List<string?>();
+        row.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        Assert.Equal("Add Mom to import", row.AddAccessibleDescription);
+
+        row.Title = "Dad";
+
+        Assert.Equal("Add Dad to import", row.AddAccessibleDescription);
+        Assert.Contains(nameof(EditablePrayer.AddAccessibleDescription), raised);
     }
 
     // ── Re-entrancy: in-flight LoadBoxesAsync ─────────────────────────────

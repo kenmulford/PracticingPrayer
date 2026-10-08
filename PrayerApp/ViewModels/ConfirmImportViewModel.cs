@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Text.RegularExpressions;
 using System.Windows.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -81,6 +82,18 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
     private bool _manualGroupsLoaded;
     private CancellationTokenSource? _loadCardGroupsCts = new();
 
+    // #313: the duplicate lookup owns its own token. A card reload must not cancel
+    // a match, and only a triggering change (card id or mode) may cancel one.
+    private CancellationTokenSource? _matchCts;
+    private int? _lastMatchedCardId;
+    // True from an active match's lookup until it applies; Save would otherwise
+    // write rows the lookup is about to move.
+    private bool _matchInFlight;
+    // True when any payload row, deleted ones included, is not on the matched card.
+    private bool _hasNewPayloadRows;
+    // Every row ConsumePending staged, in payload order, including rows since deleted.
+    private readonly List<EditablePrayer> _payloadRows = new();
+
     // Last fetch behind AvailableCardGroups. A re-lock re-masks from these
     // without a refetch, so the rows change before any await.
     private PrayerCard? _loadedQuickAddCard;
@@ -101,6 +114,13 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
     }
 
     public ObservableCollection<EditablePrayer> Prayers { get; } = new();
+
+    /// <summary>
+    /// Payload rows whose title is already on the selected card (#313). Read-only
+    /// in the UI; "+ Add" moves a row to <see cref="Prayers"/>, which stays the
+    /// To import collection the Save loop writes.
+    /// </summary>
+    public ObservableCollection<EditablePrayer> AlreadyOnCard { get; } = new();
 
     /// <summary>
     /// Picker source for the Collection field on the Confirm Import page.
@@ -148,6 +168,7 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
                 OnPropertyChanged(nameof(IsNewCardMode));
                 OnPropertyChanged(nameof(IsExistingCardMode));
                 RaiseHasNoAvailableCardsIfChanged();
+                RematchAsync().SafeFireAndForget();
             }
         }
     }
@@ -235,12 +256,33 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
         get => _selectedCard;
         set
         {
-            if (SetProperty(ref _selectedCard, value))
-                NotifySaveCanExecute();
+            if (!SetProperty(ref _selectedCard, value)) return;
+            NotifySaveCanExecute();
+            OnPropertyChanged(nameof(AllDuplicatesMessage));
+            // The #312 re-lock reload re-points the selection at a new item for the
+            // same card; that must keep the matches and "+ Add" moves.
+            if (value?.CardId == _lastMatchedCardId) return;
+            RematchAsync().SafeFireAndForget();
         }
     }
 
-    public string PrayersHeader => $"Prayers ({Prayers.Count})";
+    // Skipped rows apply only to an import into a chosen existing card.
+    private bool MatchingActive =>
+        EntryMode != EntryMode.Manual && ImportMode == ImportMode.ExistingCard && SelectedCard is not null;
+
+    public string PrayersHeader => MatchingActive
+        ? $"To import ({Prayers.Count})"
+        : $"Prayers ({Prayers.Count})";
+
+    public string AlreadyOnCardHeader => $"Already on this card ({AlreadyOnCard.Count})";
+    public bool HasAlreadyOnCard => AlreadyOnCard.Count > 0;
+
+    // Requires !_hasNewPayloadRows so a user who ✕'d every new row is not told the
+    // share was already on the card.
+    public bool IsEverythingAlreadyOnCard =>
+        MatchingActive && Prayers.Count == 0 && AlreadyOnCard.Count > 0 && !_hasNewPayloadRows;
+
+    public string AllDuplicatesMessage => $"Everything in this share is already on {SelectedCard?.Title}.";
 
     private string _cardTitle = string.Empty;
     public string CardTitle
@@ -268,6 +310,7 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
     public IAsyncRelayCommand CancelCommand { get; }
     public ICommand AddPrayerCommand { get; }
     public ICommand RemovePrayerCommand { get; }
+    public IRelayCommand<EditablePrayer> AddDuplicateCommand { get; }
     public ICommand SetNewCardModeCommand { get; }
     public ICommand SetExistingCardModeCommand { get; }
     public IRelayCommand<CardPickerItem> SelectCardCommand { get; }
@@ -300,6 +343,20 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
         {
             if (row is null) return;
             Prayers.Remove(row);
+            if (!row.IsAddedDuplicate) return;
+
+            row.IsAddedDuplicate = false;
+            var index = AlreadyOnCard.TakeWhile(r => r.PayloadIndex < row.PayloadIndex).Count();
+            AlreadyOnCard.Insert(index, row);
+            _accessibilityService.Announce($"Returned {row.Title} to Already on this card");
+        });
+        AddDuplicateCommand = new RelayCommand<EditablePrayer>(row =>
+        {
+            if (row is null) return;
+            AlreadyOnCard.Remove(row);
+            row.IsAddedDuplicate = true;
+            Prayers.Add(row);
+            _accessibilityService.Announce($"Added {row.Title} to import");
         });
         SetNewCardModeCommand = new RelayCommand(() => ImportMode = ImportMode.NewCard);
         SetExistingCardModeCommand = new RelayCommand(() => ImportMode = ImportMode.ExistingCard);
@@ -320,6 +377,7 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
 
             NotifySaveCanExecute();
             OnPropertyChanged(nameof(PrayersHeader));
+            OnPropertyChanged(nameof(IsEverythingAlreadyOnCard));
 
             // #15: re-stamp each row's 1-based position and the new total so the
             // accessible descriptions ("Prayer title, item 2 of 3") stay correct
@@ -327,6 +385,13 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
             // InitializeManualEntry, AddPrayerCommand, RemovePrayerCommand) since
             // each Add/Remove raises CollectionChanged.
             RestampPrayerPositions();
+        };
+
+        AlreadyOnCard.CollectionChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(AlreadyOnCardHeader));
+            OnPropertyChanged(nameof(HasAlreadyOnCard));
+            OnPropertyChanged(nameof(IsEverythingAlreadyOnCard));
         };
 
         // HasNoAvailableCards drives the empty-state Label in the XAML; it
@@ -458,7 +523,8 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
 
         CardTitle = result.SuggestedCardTitle;
         foreach (var p in result.Prayers)
-            Prayers.Add(new EditablePrayer
+        {
+            var row = new EditablePrayer
             {
                 Title = p.Title,
                 Details = p.Details,
@@ -466,7 +532,13 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
                 // prefilled a body; empty/whitespace rows render collapsed with
                 // a "+ details" affordance. Parser's choice wins on initial render.
                 IsDetailsExpanded = !string.IsNullOrWhiteSpace(p.Details),
-            });
+                PayloadIndex = _payloadRows.Count,
+            };
+            _payloadRows.Add(row);
+            Prayers.Add(row);
+        }
+
+        RematchAsync().SafeFireAndForget();
     }
 
     /// <summary>
@@ -787,6 +859,7 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
 
     private bool CanSave()
         => !IsBusy
+           && !_matchInFlight
            && Prayers.Any(p => !string.IsNullOrWhiteSpace(p.Title))
            && (ImportMode == ImportMode.NewCard
                    // #119: In Quick Add (Manual), a blank card title is allowed —
@@ -802,6 +875,107 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
                    // #119/#122 empty→NewCard flip (FlipToNewCardIfEmptyManualRealBox),
                    // so the Import flow still requires an explicitly chosen card.
                    : EntryMode == EntryMode.Manual || SelectedCard is not null);
+
+    /// <summary>
+    /// Sorts the staged payload rows into To import and Already on this card
+    /// against the selected card's prayers (#313). Re-run by every change of
+    /// card id or <see cref="ImportMode"/>; Title edits do not re-run it.
+    /// Rows are moved, never recreated, so edited Title and Details survive,
+    /// and rows deleted with ✕ stay deleted. Inactive matching (New card, Quick
+    /// Add, no card) runs synchronously and puts every row in To import.
+    /// </summary>
+    private async Task RematchAsync()
+    {
+        _matchCts?.Cancel();
+        _matchCts?.Dispose();
+        _matchCts = new CancellationTokenSource();
+        var token = _matchCts.Token;
+
+        // Set before the await: the SelectedCard setter compares against it, and a
+        // lookup that is still pending must not be restarted by a same-card re-point.
+        _lastMatchedCardId = SelectedCard?.CardId;
+        RaiseMatchStateChanged();
+
+        var existingKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (!MatchingActive)
+        {
+            _matchInFlight = false;
+            ApplyMatch(existingKeys);
+            return;
+        }
+
+        _matchInFlight = true;
+        NotifySaveCanExecute();
+        var lookupFailed = false;
+        try
+        {
+            foreach (var prayer in await _prayerService.GetPrayersByCardAsync(SelectedCard!.CardId))
+                existingKeys.Add(MatchKey(prayer.Title));
+        }
+        catch (Exception)
+        {
+            lookupFailed = true;
+        }
+
+        // A newer run owns _matchInFlight and the rows now.
+        if (token.IsCancellationRequested) return;
+
+        _matchInFlight = false;
+        if (lookupFailed)
+            existingKeys.Clear();
+        ApplyMatch(existingKeys);
+
+        if (lookupFailed)
+            await _navigationService.DisplayAlertAsync("Error", "Unable to load prayers on this card.", "OK");
+    }
+
+    private void ApplyMatch(HashSet<string> existingKeys)
+    {
+        var duplicates = _payloadRows.Where(r => existingKeys.Contains(MatchKey(r.Title))).ToHashSet();
+        _hasNewPayloadRows = duplicates.Count < _payloadRows.Count;
+
+        // Rows removed with ✕ are in neither collection and stay removed.
+        var present = _payloadRows.Where(r => Prayers.Contains(r) || AlreadyOnCard.Contains(r)).ToList();
+        foreach (var row in present)
+            row.IsAddedDuplicate = false;
+
+        var toImport = present.Where(r => !duplicates.Contains(r))
+            .Concat(Prayers.Where(r => r.PayloadIndex < 0))
+            .ToList();
+        SyncRows(Prayers, toImport);
+        SyncRows(AlreadyOnCard, present.Where(duplicates.Contains).ToList());
+
+        RaiseMatchStateChanged();
+        NotifySaveCanExecute();
+    }
+
+    // Remove then Insert, never Move or Clear: the Prayers CollectionChanged handler
+    // subscribes NewItems before it unsubscribes OldItems (a Move would leave the row
+    // unsubscribed), and a Reset carries no OldItems to unsubscribe.
+    private static void SyncRows(ObservableCollection<EditablePrayer> target, IReadOnlyList<EditablePrayer> desired)
+    {
+        foreach (var stale in target.Where(r => !desired.Contains(r)).ToList())
+            target.Remove(stale);
+
+        for (var i = 0; i < desired.Count; i++)
+        {
+            if (i < target.Count && ReferenceEquals(target[i], desired[i])) continue;
+            target.Remove(desired[i]);
+            target.Insert(i, desired[i]);
+        }
+    }
+
+    private void RaiseMatchStateChanged()
+    {
+        OnPropertyChanged(nameof(PrayersHeader));
+        OnPropertyChanged(nameof(AlreadyOnCardHeader));
+        OnPropertyChanged(nameof(HasAlreadyOnCard));
+        OnPropertyChanged(nameof(IsEverythingAlreadyOnCard));
+        OnPropertyChanged(nameof(AllDuplicatesMessage));
+    }
+
+    private static string MatchKey(string title) =>
+        Regex.Replace(NormalizeQuotes(title)?.Trim() ?? string.Empty, @"\s+", " ");
 
     private async Task SaveAsync()
     {
@@ -947,5 +1121,10 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
     {
         _loadCardGroupsCts?.Dispose();
         _loadCardGroupsCts = null;
+        // Not cancelled: the page can reappear after OnDisappearing (the PIN popup
+        // close re-enters OnAppearing), and a cancelled match never clears
+        // _matchInFlight, which would leave Save disabled.
+        _matchCts?.Dispose();
+        _matchCts = null;
     }
 }

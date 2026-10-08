@@ -273,6 +273,13 @@ internal static class TestDataSeed
             ("Recycle Small Survivor",
              "Should still be the only prayer visible after Big is deleted.", false),
         });
+
+        // ConfirmImportDuplicatesTests: the share's one row matches this card's
+        // one prayer, so Confirm Import shows the all-duplicates state.
+        await SeedCardWithPrayersAsync(boxId: 0, TestSeedFixtures.ImportSkipsDuplicatesCard, new[]
+        {
+            (TestSeedFixtures.ImportSkipsDuplicatesPrayer, "Duplicate-skip fixture.", false),
+        });
     }
 
     private static async Task SeedCardWithPrayersAsync(int boxId, string cardTitle,

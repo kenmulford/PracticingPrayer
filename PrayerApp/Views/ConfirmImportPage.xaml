@@ -274,7 +274,13 @@
 
             <Label Text="{Binding PrayersHeader}"
                    Style="{StaticResource FormSectionHeader}"
+                   SemanticProperties.HeadingLevel="Level2"
                    Margin="0,4,0,0" />
+
+            <Label Text="{Binding AllDuplicatesMessage}"
+                   AutomationId="ConfirmImport_Lbl_AllDuplicates"
+                   Style="{StaticResource MutedText}"
+                   IsVisible="{Binding IsEverythingAlreadyOnCard}" />
 
             <VerticalStackLayout BindableLayout.ItemsSource="{Binding Prayers}"
                                  AutomationId="ConfirmImport_List_Prayers"
@@ -314,16 +320,26 @@
                                      AddPrayerAffordanceButton (transparent bg, Primary text) but
                                      start-aligned and body-sized — a per-row hint, not the
                                      prominent centered "+ Add another prayer ›". -->
-                                <Button Text="+ details"
-                                        AutomationId="ConfirmImport_Btn_AddDetails"
-                                        IsVisible="{Binding IsDetailsExpanded, Converter={StaticResource InverseBool}}"
-                                        Command="{Binding ExpandDetailsCommand}"
-                                        BackgroundColor="Transparent"
-                                        TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
-                                        FontSize="{StaticResource FontSmall}"
-                                        Padding="0"
-                                        HorizontalOptions="Start"
-                                        SemanticProperties.Hint="Show the details field for this prayer" />
+                                <HorizontalStackLayout Spacing="8">
+                                    <!-- #313: tags a row that "+ Add" moved here from
+                                         "Already on this card". -->
+                                    <Label Text="Already on this card"
+                                           AutomationId="ConfirmImport_Lbl_DuplicateTag"
+                                           Style="{StaticResource MutedText}"
+                                           FontSize="{StaticResource FontSmall}"
+                                           IsVisible="{Binding IsAddedDuplicate}"
+                                           VerticalOptions="Center" />
+                                    <Button Text="+ details"
+                                            AutomationId="ConfirmImport_Btn_AddDetails"
+                                            IsVisible="{Binding IsDetailsExpanded, Converter={StaticResource InverseBool}}"
+                                            Command="{Binding ExpandDetailsCommand}"
+                                            BackgroundColor="Transparent"
+                                            TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
+                                            FontSize="{StaticResource FontSmall}"
+                                            Padding="0"
+                                            HorizontalOptions="Start"
+                                            SemanticProperties.Hint="Show the details field for this prayer" />
+                                </HorizontalStackLayout>
 
                                 <Editor Text="{Binding Details}"
                                         Placeholder="Add details..."
@@ -347,6 +363,50 @@
                     Text="+ Add another prayer ›"
                     AutomationId="ConfirmImport_Btn_AddPrayer"
                     Command="{Binding AddPrayerCommand}" />
+
+            <!-- #313: payload rows already on the selected card. Read-only; "+ Add" moves
+                 a row up into To import. Hidden when nothing matches. -->
+            <VerticalStackLayout IsVisible="{Binding HasAlreadyOnCard}" Spacing="6">
+                <Label Text="{Binding AlreadyOnCardHeader}"
+                       AutomationId="ConfirmImport_Lbl_DuplicatesHeader"
+                       Style="{StaticResource FormSectionHeader}"
+                       SemanticProperties.HeadingLevel="Level2"
+                       Margin="0,4,0,0" />
+                <Label Text="These won't be added."
+                       Style="{StaticResource MutedText}" />
+                <Border Style="{StaticResource PickerGroupCard}">
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding AlreadyOnCard}"
+                                         AutomationId="ConfirmImport_List_Duplicates"
+                                         Spacing="0">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="viewModels:EditablePrayer">
+                                <VerticalStackLayout Spacing="0">
+                                    <!-- Padding 16,0: the 48 tall button sets the row height; the
+                                         style's default vertical padding would make it 74. -->
+                                    <Border Style="{StaticResource PickerRow}" Padding="16,0">
+                                        <Grid ColumnDefinitions="*, Auto">
+                                            <Label Grid.Column="0"
+                                                   Text="{Binding Title}"
+                                                   VerticalOptions="Center"
+                                                   TextColor="{AppThemeBinding Light={StaticResource Tertiary}, Dark={StaticResource TextPrimaryDark}}" />
+                                            <Button Grid.Column="1"
+                                                    Text="+ Add"
+                                                    AutomationId="ConfirmImport_Btn_AddDuplicate"
+                                                    Clicked="OnAddDuplicateClicked"
+                                                    BackgroundColor="Transparent"
+                                                    TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
+                                                    MinimumHeightRequest="{StaticResource TouchTargetMaterial}"
+                                                    VerticalOptions="Center"
+                                                    SemanticProperties.Description="{Binding AddAccessibleDescription}" />
+                                        </Grid>
+                                    </Border>
+                                    <BoxView Style="{StaticResource PickerInsetSeparator}" />
+                                </VerticalStackLayout>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </Border>
+            </VerticalStackLayout>
 
         </VerticalStackLayout>
     </ScrollView>

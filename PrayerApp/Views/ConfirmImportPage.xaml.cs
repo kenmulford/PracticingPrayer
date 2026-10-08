@@ -168,6 +168,15 @@ public partial class ConfirmImportPage : ContentPage, IPageSheetModal
         }
     }
 
+    private void OnAddDuplicateClicked(object? sender, EventArgs e)
+    {
+        if (sender is Button { BindingContext: EditablePrayer row } &&
+            BindingContext is ConfirmImportViewModel vm)
+        {
+            vm.AddDuplicateCommand.Execute(row);
+        }
+    }
+
     private void OnCardItemTapped(object? sender, TappedEventArgs e)
     {
         if (_animating) return;
