@@ -56,6 +56,22 @@ public static class AppExtensions
         return MobileBy.AccessibilityId(automationId);
     }
 
+    /// <summary>
+    /// Locator for the single overflow toolbar item on Prayers / Prayer Cards. Android finds it
+    /// by content-desc: Microsoft.Maui.Controls 10.0.110 overwrites the toolbar item's
+    /// content-desc with <c>SemanticProperties.Description</c> ("More actions", "Cancel" in
+    /// multi-select), so AutomationId "More" is no longer in the tree. iOS keeps AutomationId
+    /// as accessibilityIdentifier. The Cancel lookup is scoped to the toolbar's
+    /// <c>ActionMenuView</c> so a dialog's Cancel button never matches.
+    /// </summary>
+    private static By OverflowToolbarItemLocator(bool multiSelect = false)
+    {
+        if (!TestConfig.IsAndroid) return MobileBy.AccessibilityId("More");
+        return multiSelect
+            ? By.XPath("//androidx.appcompat.widget.ActionMenuView//*[@content-desc='Cancel']")
+            : By.XPath("//*[@content-desc='More actions']");
+    }
+
     /// <summary>Build a platform-correct XPath to find an element by its visible text.</summary>
     private static By TextLocator(string text)
     {
@@ -245,11 +261,14 @@ public static class AppExtensions
     /// <summary>Check if an element is currently displayed (does not throw).</summary>
     public static bool IsDisplayed(this AppiumDriver driver, string automationId,
         int timeoutSeconds = 3)
+        => IsLocatorDisplayed(driver, AutomationIdLocator(automationId), timeoutSeconds);
+
+    private static bool IsLocatorDisplayed(AppiumDriver driver, By locator, int timeoutSeconds)
     {
         try
         {
             driver.Manage().Timeouts().ImplicitWait = TimeSpan.FromSeconds(timeoutSeconds);
-            var element = driver.FindElement(AutomationIdLocator(automationId));
+            var element = driver.FindElement(locator);
             return element.Displayed;
         }
         catch (WebDriverException)
@@ -897,17 +916,22 @@ public static class AppExtensions
         // short-circuits and returns first, which is exactly the #205 defect this corrects).
         // Keeping both here leaves the fast-path purely gating the back-out navigation below.
         //
-        // Multi-select clear: strictly gated on Cards_Bar_MultiSelect presence so "More" is
-        // tapped only in multi-select; outside it "More" opens the overflow popup, which must
-        // not happen from this reset. timeoutSeconds:0 — a leaked bar is fully realized, so
-        // the instant check detects it at negligible per-reset cost and no-ops otherwise.
+        // Multi-select clear: strictly gated on Cards_Bar_MultiSelect presence so the overflow
+        // item is tapped only in multi-select; outside it that item opens the overflow popup,
+        // which must not happen from this reset. timeoutSeconds:0 — a leaked bar is fully
+        // realized, so the instant check detects it at negligible per-reset cost and no-ops
+        // otherwise.
         try
         {
             if (driver.IsDisplayed("Cards_Bar_MultiSelect", timeoutSeconds: 0))
             {
-                // Overflow button mutates visually to X/Cancel in multi-select mode
-                // but keeps AutomationId="More" (MAUI AutomationId is set-once).
-                driver.TapToolbarItemById("More");
+                // Overflow button mutates visually to X/Cancel in multi-select mode but keeps
+                // AutomationId="More" (MAUI AutomationId is set-once). iOS finds it by that id;
+                // Android's content-desc is "Cancel" here, not the AutomationId.
+                if (TestConfig.IsAndroid)
+                    driver.FindElement(OverflowToolbarItemLocator(multiSelect: true)).Click();
+                else
+                    driver.TapToolbarItemById("More");
                 Thread.Sleep(TestConfig.DelayAfterTap);
             }
         }
@@ -1205,16 +1229,17 @@ public static class AppExtensions
     }
 
     /// <summary>
-    /// Open the "More" overflow button's popup, tap an item inside by AutomationId,
-    /// and let the popup auto-close on tap. Returns false if the overflow button
-    /// isn't present or the item isn't in the opened popup (popup is closed on miss).
+    /// Open the overflow toolbar button's popup (<see cref="OverflowToolbarItemLocator"/>), tap
+    /// an item inside by AutomationId, and let the popup auto-close on tap. Returns false if
+    /// the overflow button isn't present or the item isn't in the opened popup (popup is
+    /// closed on miss).
     /// </summary>
     private static bool TryTapOverflowPopupItem(AppiumDriver driver, string automationId)
     {
         try
         {
             driver.Manage().Timeouts().ImplicitWait = TestConfig.ShortTimeout;
-            driver.FindElement(MobileBy.AccessibilityId("More")).Click();
+            driver.FindElement(OverflowToolbarItemLocator()).Click();
         }
         catch (WebDriverException) { return false; }
         finally { driver.Manage().Timeouts().ImplicitWait = TestConfig.DefaultTimeout; }
@@ -1244,7 +1269,7 @@ public static class AppExtensions
         try
         {
             driver.Manage().Timeouts().ImplicitWait = TestConfig.ShortTimeout;
-            driver.FindElement(MobileBy.AccessibilityId("More")).Click();
+            driver.FindElement(OverflowToolbarItemLocator()).Click();
         }
         catch (WebDriverException) { return false; }
         finally { driver.Manage().Timeouts().ImplicitWait = TestConfig.DefaultTimeout; }
@@ -1735,20 +1760,22 @@ public static class AppExtensions
         // Wait for the Prayers list to render before tapping the toolbar — prevents
         // racing the "Add" tap against an un-rendered Shell action bar.
         driver.WaitForElement("List_List_Prayers", timeoutSeconds: 10);
-        // Wait for the Shell top-bar to actually render the "More" overflow item — it lags
+        // Wait for the Shell top-bar to actually render the overflow item ("More" on iOS,
+        // content-desc "More actions" on Android — see OverflowToolbarItemLocator) — it lags
         // the page content, and tapping before it exists (or before the popup's bindings go
         // live) is a no-op: the click can return HTTP 200 yet route nothing, so the detail
         // page never opens. Issue #298 moved "Add" into the PrayersOverflowPopup, so it is
-        // no longer visible on the toolbar itself — "More" is the always-visible toolbar
-        // button now; TapToolbarItemById("Add") below is already overflow-aware (tries the
-        // toolbar directly, then opens "More" and taps inside), so only this visibility
-        // precondition needs to change. Settle so the binding is live, then retry the tap
-        // until the title entry appears.
-        driver.WaitForElement("More", timeoutSeconds: 10);
+        // no longer visible on the toolbar itself — the overflow item is the always-visible
+        // toolbar button now; TapToolbarItemById("Add") below is already overflow-aware
+        // (tries the toolbar directly, then opens the overflow item and taps inside), so only
+        // this visibility precondition needs to change. Settle so the binding is live, then
+        // retry the tap until the title entry appears.
+        var overflowLocator = OverflowToolbarItemLocator();
+        WaitForRealizedElement(driver, overflowLocator, timeoutSeconds: 10);
         Thread.Sleep(TestConfig.DelayAfterNavigation);
         for (int attempt = 0; attempt < 3; attempt++)
         {
-            if (!driver.IsDisplayed("More", timeoutSeconds: 2)) break; // navigated away — More gone
+            if (!IsLocatorDisplayed(driver, overflowLocator, timeoutSeconds: 2)) break; // navigated away — overflow item gone
             driver.TapToolbarItemById("Add");
             if (driver.IsDisplayed("Detail_Entry_Title", timeoutSeconds: 5)) break;
         }

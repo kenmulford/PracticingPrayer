@@ -50,11 +50,10 @@ public partial class PrayerCardsPage : ContentPage
     /// Mutates the single overflow toolbar item between "More" (opens popup) and
     /// "Cancel" (exits multi-select). <b>AutomationId is never reassigned</b> — MAUI's
     /// `BindableProperty` enforces set-once on AutomationId and throws on mutation.
-    /// Only Text/Icon/SemanticProperties change between modes. Screen-reader labels
-    /// degrade slightly on Android in multi-select mode (TalkBack announces "More"
-    /// instead of "Cancel" because Shell ToolbarItem on Android uses AutomationId
-    /// as contentDescription and ignores SemanticProperties.Description). Acceptable
-    /// trade-off — the Cards_Bar_MultiSelect Border below carries the mode context.
+    /// Only Text/Icon/SemanticProperties change between modes. Semantics are set BEFORE
+    /// Text and Icon: Android refreshes a toolbar item's accessibility description only on a
+    /// Text, Icon, or IsEnabled change (Microsoft.Maui.Controls 10.0.110
+    /// `ToolbarExtensions.OnToolbarItemPropertyChanged`), so the Text/Icon change must come last.
     /// Icon files are selected per-theme because Shell.ForegroundColor doesn't
     /// reliably tint ToolbarItem bitmaps on Android (the SVG-rasterized PNG is
     /// baked black); the *_dark variants have explicit light fills.
@@ -68,19 +67,19 @@ public partial class PrayerCardsPage : ContentPage
 
         if (vm.IsMultiSelectMode)
         {
-            item.Text = "Cancel";
-            item.IconImageSource = isDark ? "xmark_solid_full_dark.png" : "xmark_solid_full.png";
             SemanticProperties.SetDescription(item, "Cancel");
             SemanticProperties.SetHint(item, "Exit multi-select mode");
+            item.Text = "Cancel";
+            item.IconImageSource = isDark ? "xmark_solid_full_dark.png" : "xmark_solid_full.png";
         }
         else
         {
+            SemanticProperties.SetDescription(item, "More actions");
+            SemanticProperties.SetHint(item, "Opens a menu with Add Card, Manage Collections, and Select");
             item.Text = "More";
             item.IconImageSource = isDark
                 ? "ellipsis_vertical_solid_full_dark.png"
                 : "ellipsis_vertical_solid_full.png";
-            SemanticProperties.SetDescription(item, "More actions");
-            SemanticProperties.SetHint(item, "Opens a menu with Add Card, Manage Collections, and Select");
         }
     }
 
