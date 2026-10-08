@@ -7,7 +7,7 @@ name: Release to stores
 on:
   release:
     types: [published]
-  # Manual run for verifying a build on a branch before tagging a release (upload still gated by the store-release environment).
+  # Manual run from master re-ships master's build. Never dispatch from another branch: the build number is the commit count, and master reuses it after a squash merge.
   workflow_dispatch:
 
 concurrency:
@@ -35,7 +35,7 @@ jobs:
           global-json-file: global.json
 
       - name: Install MAUI Android workload
-        run: dotnet workload restore PrayerApp/PrayerApp.csproj
+        run: dotnet workload restore PrayerApp/PrayerApp.csproj --version 10.0.301.1   # the workload set 1.6.1 was tested on
 
       - uses: ruby/setup-ruby@v1
         with:
@@ -77,14 +77,14 @@ jobs:
 
       - uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '26.4'   # confirm/match your local Xcode; ValidateXcodeVersion=false in csproj is tolerant
+          xcode-version: '26.5'   # the Xcode that iOS workload 26.5.10284 (workload set 10.0.301.1 below) recommends
 
       - uses: actions/setup-dotnet@v5
         with:
           global-json-file: global.json
 
       - name: Install MAUI iOS workload
-        run: dotnet workload restore PrayerApp/PrayerApp.csproj
+        run: dotnet workload restore PrayerApp/PrayerApp.csproj --version 10.0.301.1   # iOS 26.5.10284, which pairs with the Xcode above
 
       - uses: ruby/setup-ruby@v1
         with:
