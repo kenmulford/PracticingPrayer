@@ -1,6 +1,6 @@
 ---
 name: prayer-app-platform
-description: Use when working on Android/iOS platform-specific code in PrayerApp — MainActivity IntentFilters, CustomShellRenderer, ModalPageSheetHandler, handler Configure() registration, ColorPickerService, deep linking, file import (.prayercard), Universal Links, Entitlements, PrivacyInfo, conditional compilation, orientation, or build config.
+description: Use when working on Android/iOS platform-specific code in PrayerApp — MainActivity IntentFilters, CustomShellRenderer, PageSheetPresentation, handler Configure() registration, ColorPickerService, deep linking, file import (.prayercard), Universal Links, Entitlements, PrivacyInfo, conditional compilation, orientation, or build config.
 ---
 
 # PrayerApp Platform-Specific Code
@@ -35,7 +35,6 @@ Platform code lives under `PrayerApp/Platforms/Android/` and `PrayerApp/Platform
 | `Platforms/iOS/OrientationService.cs` | `UIWindowSceneGeometryPreferencesIOS` orientation update |
 | `Platforms/iOS/ColorPickerService.cs` | `IColorPickerService` — wraps `NativeColorPicker` |
 | `Platforms/iOS/Handlers/EnglishLocaleTimePickerHandler.cs` | Forces `UIDatePicker` locale to `en_US` |
-| `Platforms/iOS/Handlers/ModalPageSheetHandler.cs` | `PageSheet` presentation for `IPageSheetModal` pages |
 | `Platforms/iOS/Helpers/SwipeBackHelper.cs` | Disable/enable iOS swipe-back gesture on edit pages |
 | `Platforms/iOS/Info.plist` | Device families, orientations, UTI declarations, bundle version |
 | `Platforms/iOS/Entitlements.plist` | `com.apple.developer.associated-domains` for Universal Links |
@@ -97,8 +96,6 @@ PrayerApp.Platforms.iOS.Handlers.EnglishLocaleTimePickerHandler.Configure();
 #endif
 ```
 
-`ModalPageSheetHandler` (iOS-only) also uses `.Configure()` — registered in the same region.
-
 The global `SwitchHandler` thumb-color patch uses `AppendToMapping` directly on the mapper (no `#if`):
 
 ```csharp
@@ -111,9 +108,9 @@ Microsoft.Maui.Handlers.SwitchHandler.Mapper.AppendToMapping("SyncInitialThumbCo
 
 ---
 
-## iOS — ModalPageSheetHandler
+## iOS — PageSheetPresentation
 
-`Platforms/iOS/Handlers/ModalPageSheetHandler.cs` — uses `PageHandler.Mapper.AppendToMapping` to set `UIModalPresentationStyle.PageSheet` for pages that implement `IPageSheetModal`. Pages that should stay full-screen (e.g. `RestoreProgressPage`) do not implement the interface.
+`Views/PageSheetPresentation.cs` — on `Application.ModalPushing` it sets `UIModalPresentationStyle.PageSheet` for a page that implements `IPageSheetModal` or a `NavigationPage` whose `RootPage` implements it. Marked pages are page sheets on iPhone and iPad. Pages that should stay full-screen (e.g. `RestoreProgressPage`) do not implement the interface.
 
 ---
 

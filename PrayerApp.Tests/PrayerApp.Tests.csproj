@@ -113,6 +113,8 @@
 
     <!-- Views: pure layout logic only; pages themselves need the MAUI runtime -->
     <Compile Include="../PrayerApp/Views/CardPanelLayout.cs" />
+    <Compile Include="../PrayerApp/Views/IPageSheetModal.cs" />
+    <Compile Include="../PrayerApp/Views/PageSheetPresentation.cs" />
 
     <!-- Service interfaces -->
     <Compile Include="../PrayerApp/Services/ISettings.cs" />

@@ -133,7 +133,7 @@ await _navigationService.PopModalAsync();
 
 ## IPageSheetModal (iOS card-style sheets)
 
-Marker interface in `Views/IPageSheetModal.cs`. Implement it on any `ContentPage` pushed via `PushModalAsync` that should render as a card-style sheet on iPad. On iPhone, PageSheet and FullScreen are visually identical — no effect.
+Marker interface in `Views/IPageSheetModal.cs`. Implement it on any `ContentPage` pushed via `PushModalAsync` that should render as a page sheet on iPhone and iPad.
 
 ```csharp
 public partial class QuickAddPage : ContentPage, IPageSheetModal { }
@@ -141,7 +141,7 @@ public partial class QuickAddPage : ContentPage, IPageSheetModal { }
 
 Pages using this pattern: `QuickAddPage`, `TagPickerPage`, `PrayerTimeScopePage`, `PrayerTimeBoxScopePage`.
 
-`ModalPageSheetHandler.Configure()` is called in `AppShell.xaml.cs` (iOS only) to wire the handler.
+`PageSheetPresentation.Apply` runs on `Application.ModalPushing`, subscribed in `App()`.
 
 ---
 
@@ -275,7 +275,7 @@ public interface INavigationService
 | Tab 4 route as `"PrayerTimePage"` | Tab 4 is `Route="TagsPage"` (Tags). `PrayerTimePage` is a push route. |
 | Tab 5 route as `"SettingsPage"` | Actual route is `Route="Settings"` (no "Page" suffix). |
 | `IEditGuard`: `args.Cancel()` then re-navigate | Use `GetDeferral()` + `deferral.Complete()`. Cancel only when `CanLeaveAsync()` returns `false`. No re-navigate. |
-| Modal without `IPageSheetModal` on iPad | Implement `IPageSheetModal` on the page class; the handler does the rest. |
+| Modal without `IPageSheetModal` on iOS | Implement `IPageSheetModal` on the page class; `PageSheetPresentation` (on `Application.ModalPushing`) does the rest. |
 | `PopToRoot` not guarded | `OnShellNavigating` includes `PopToRoot` — dirty pages are guarded on tab reselection too. |
 | Using `nameof(Page)` in route strings inside VMs | VMs can't reference View types (test project won't compile). Use `Routes.*` constants instead. |
 | Old `LoadAsync`/`RefreshAsync` split in `OnAppearing` | Use `PageSync.OnAppearingAsync(vm)` with an `ISyncableViewModel` instead. |
