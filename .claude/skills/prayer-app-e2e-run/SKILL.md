@@ -91,7 +91,7 @@ a confidential-cards model the linked `PrayerCard.cs` references wasn't in the c
 ```bash
 adb devices    # reuse if an emulator-XXXX shows "device"
 # else boot PLAIN — this loads the saved snapshot (warm state: app installed, data dir present):
-emulator -avd pp_api36 &        # then: adb wait-for-device ; check getprop sys.boot_completed == 1
+emulator -avd pp_api36 &        # then poll `adb shell getprop sys.boot_completed` until it prints 1
 ```
 ⚠ **Never boot with `-no-snapshot-load`.** A cold boot gives a fresh userdata where the app's
 data dir `/data/user/0/com.multithreadedllc.prayercards/files/` doesn't exist, so the `run-as`
@@ -200,7 +200,9 @@ are still readable). **Recovery if wedged:** `adb shell am force-stop com.multit
 `scripts/run-e2e-mac.sh` runs the whole sequence: reuse/boot the emulator (warm) + sim,
 deploy both (`-t:Install` Android, `-r iossimulator-arm64` iOS), verify seed-ready, stand up the
 two Appium servers, build the test project once, then fire both `--no-build` runs in the
-background and tail their logs.
+background, wait for them, and print each summary. It blocks until both suites finish, so launch it
+detached (`nohup`, or `run_in_background` from an agent). Exit 0: every suite passed. Exit 1: a suite
+failed. Exit 2: it stopped before any test ran.
 
 ```bash
 ./.claude/skills/prayer-app-e2e-run/scripts/run-e2e-mac.sh            # both platforms
