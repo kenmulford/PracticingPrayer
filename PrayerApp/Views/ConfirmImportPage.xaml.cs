@@ -8,6 +8,15 @@ public partial class ConfirmImportPage : ContentPage, IPageSheetModal
 {
     private bool _animating;
 
+    // View-model changes that arrived while _animating; replayed against the view
+    // model's current state when the animation ends.
+    private bool _modePending;
+    private bool _selectionPending;
+
+    // The card the summary last showed. A re-point to the same card (the relock reload)
+    // must not collapse a list the user reopened with "Change".
+    private int? _summaryCardId;
+
     // #122: the prayer Title Entry lives inside a BindableLayout ItemTemplate, so
     // it has no x:Name and code-behind has no compile-time handle. The first row's
     // Entry captures itself here via its Loaded event so OnAppearing can focus it
@@ -87,6 +96,7 @@ public partial class ConfirmImportPage : ContentPage, IPageSheetModal
         {
             cardGroupsList.IsVisible = false;
             selectedCardSummary.IsVisible = true;
+            _summaryCardId = vm.SelectedCard.CardId;
         }
     }
 
@@ -111,51 +121,80 @@ public partial class ConfirmImportPage : ContentPage, IPageSheetModal
 
     private async void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (BindingContext is not ConfirmImportViewModel vm) return;
-        // Mid-animation property changes are intentionally dropped rather than queued.
+        var mode = e.PropertyName == nameof(ConfirmImportViewModel.IsExistingCardMode);
+        var selection = e.PropertyName == nameof(ConfirmImportViewModel.SelectedCard);
+        if (!mode && !selection) return;
+
+        _modePending |= mode;
+        _selectionPending |= selection;
         if (_animating) return;
 
         _animating = true;
         try
         {
-            if (e.PropertyName == nameof(ConfirmImportViewModel.SelectedCard))
-            {
-                if (vm.SelectedCard is not null && cardGroupsList.IsVisible)
-                {
-                    await cardGroupsList.FadeToAsync(0, 180, Easing.CubicIn);
-                    cardGroupsList.IsVisible = false;
-                    cardGroupsList.Opacity = 1;
-                    selectedCardSummary.Opacity = 0;
-                    selectedCardSummary.IsVisible = true;
-                    await selectedCardSummary.FadeToAsync(1, 220, Easing.CubicOut);
-                }
-                else if (vm.SelectedCard is null && selectedCardSummary.IsVisible)
-                {
-                    // Selection cleared while summary is showing — collection filter changed
-                    await CollapseSummaryAndShowListAsync();
-                }
-            }
-            else if (e.PropertyName == nameof(ConfirmImportViewModel.IsExistingCardMode))
-            {
-                if (vm.IsExistingCardMode)
-                {
-                    selectedCardSummary.IsVisible = false;
-                    await ShowCardListEntranceAsync();
-                }
-                else
-                {
-                    // Switching to New Card mode — hide both the list and any visible summary
-                    await cardGroupsList.FadeToAsync(0, 150, Easing.CubicIn);
-                    cardGroupsList.IsVisible = false;
-                    cardGroupsList.Opacity = 1;
-                    cardGroupsList.TranslationY = 0;
-                    selectedCardSummary.IsVisible = false;
-                }
-            }
+            await ApplyPendingChangesAsync();
         }
         finally
         {
             _animating = false;
+        }
+    }
+
+    // Applies every change recorded while an animation ran, against the view model's
+    // current state, so a change that arrived mid-animation still reaches its end state.
+    private async Task ApplyPendingChangesAsync()
+    {
+        while (BindingContext is ConfirmImportViewModel vm && (_modePending || _selectionPending))
+        {
+            var (mode, selection) = (_modePending, _selectionPending);
+            _modePending = _selectionPending = false;
+            if (mode) await ApplyModeAsync(vm);
+            if (selection) await ApplySelectionAsync(vm);
+        }
+    }
+
+    private async Task ApplyModeAsync(ConfirmImportViewModel vm)
+    {
+        if (vm.IsExistingCardMode)
+        {
+            selectedCardSummary.IsVisible = false;
+            await ShowCardListEntranceAsync();
+        }
+        else
+        {
+            // Switching to New Card mode — hide both the list and any visible summary
+            await cardGroupsList.FadeToAsync(0, 150, Easing.CubicIn);
+            cardGroupsList.IsVisible = false;
+            cardGroupsList.Opacity = 1;
+            cardGroupsList.TranslationY = 0;
+            selectedCardSummary.IsVisible = false;
+        }
+    }
+
+    private async Task ApplySelectionAsync(ConfirmImportViewModel vm)
+    {
+        if (vm.SelectedCard is not { } card)
+        {
+            _summaryCardId = null;
+            if (selectedCardSummary.IsVisible)
+            {
+                // Selection cleared while summary is showing — collection filter changed
+                await CollapseSummaryAndShowListAsync();
+            }
+        }
+        else if (cardGroupsList.IsVisible && card.CardId != _summaryCardId)
+        {
+            _summaryCardId = card.CardId;
+            await cardGroupsList.FadeToAsync(0, 180, Easing.CubicIn);
+            cardGroupsList.IsVisible = false;
+            cardGroupsList.Opacity = 1;
+            selectedCardSummary.Opacity = 0;
+            selectedCardSummary.IsVisible = true;
+            await selectedCardSummary.FadeToAsync(1, 220, Easing.CubicOut);
+        }
+        else if (selectedCardSummary.IsVisible)
+        {
+            _summaryCardId = card.CardId;
         }
     }
 
@@ -194,6 +233,7 @@ public partial class ConfirmImportPage : ContentPage, IPageSheetModal
             // Does NOT clear SelectedCard — checkmark stays on the prior selection
             // so the user can confirm or pick a different row.
             await CollapseSummaryAndShowListAsync();
+            await ApplyPendingChangesAsync();
         }
         finally
         {

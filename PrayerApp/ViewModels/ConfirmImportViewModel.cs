@@ -81,9 +81,10 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
     private bool _manualGroupsLoaded;
     private CancellationTokenSource? _loadCardGroupsCts = new();
 
-    // #313: the duplicate lookup owns its own token. A card reload must not cancel
-    // a match, and only a triggering change (card id or mode) may cancel one.
-    private CancellationTokenSource? _matchCts;
+    // #313: bumped by every RematchAsync run; a lookup returning to a changed value is
+    // stale. Dispose leaves it alone so an in-flight run still settles _matchInFlight
+    // after OnDisappearing.
+    private int _matchGeneration;
     // True from an active match's lookup until it applies; Save would otherwise
     // write rows the lookup is about to move.
     private bool _matchInFlight;
@@ -266,9 +267,22 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
         }
     }
 
-    // Skipped rows apply only to an import into a chosen existing card.
+    // Skipped rows apply only to an import into a chosen, accessible existing card; a
+    // blocked card's prayers are never queried.
     private bool MatchingActive =>
-        EntryMode != EntryMode.Manual && ImportMode == ImportMode.ExistingCard && SelectedCard is not null;
+        EntryMode != EntryMode.Manual && ImportMode == ImportMode.ExistingCard && SelectedCard is not null
+        && !IsSelectedCardBlocked(_confidentialAccessService.IsSessionUnlocked);
+
+    // Reads the entity behind the selection from the last fetch: the picker item of a
+    // card chosen after auth carries its real title but not its protection mode.
+    private bool IsSelectedCardBlocked(bool isUnlocked)
+    {
+        if (SelectedCard is not { } selected || _loadedCards is null || _loadedBoxes is null)
+            return false;
+        var entity = _loadedCards.FirstOrDefault(c => c.Id == selected.CardId);
+        return entity is not null
+            && ProtectionPolicy.IsAccessBlocked(entity, _loadedBoxes.FirstOrDefault(b => b.Id == entity.BoxId), isUnlocked);
+    }
 
     public string PrayersHeader => MatchingActive
         ? $"To import ({Prayers.Count})"
@@ -352,8 +366,7 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
         });
         AddDuplicateCommand = new RelayCommand<EditablePrayer>(row =>
         {
-            if (row is null) return;
-            AlreadyOnCard.Remove(row);
+            if (row is null || !AlreadyOnCard.Remove(row)) return;
             row.IsAddedDuplicate = true;
             Prayers.Add(row);
             _accessibilityService.Announce($"Added {row.Title} to import");
@@ -425,7 +438,7 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
             _loadCardGroupsCts?.Cancel();
             _loadCardGroupsCts?.Dispose();
             _loadCardGroupsCts = new CancellationTokenSource();
-            ApplyCardGroups(isRelock: false);
+            ApplyCardGroups();
             var cardId = item.CardId;
             item = AvailableCardGroups
                 .SelectMany(g => g.Cards)
@@ -446,12 +459,24 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
     /// Handles <see cref="SessionRelockedMessage"/> by re-masking the loaded cards in
     /// place. Synchronous, no refetch: no underlying data changed, and an async reload
     /// would leave real titles on screen until it completed. Only Existing-card mode
-    /// shows the picker, and rows already rendered locked need no re-mask.
+    /// shows the picker, and rows already rendered locked need no re-mask. Outside
+    /// Existing-card mode only a blocked selection is dropped: the picker is cleared
+    /// there, but the selection would reappear with its real title on the flip back.
     /// </summary>
     private void OnSessionRelocked()
     {
-        if (!IsExistingCardMode || _loadedCards is null || !_lastApplyUnlocked) return;
-        ApplyCardGroups(isRelock: true);
+        if (_loadedCards is null) return;
+        if (!IsExistingCardMode)
+        {
+            if (SelectedCard is { } selected && IsSelectedCardBlocked(_confidentialAccessService.IsSessionUnlocked))
+            {
+                selected.IsSelected = false;
+                SelectedCard = null;
+            }
+            return;
+        }
+        if (!_lastApplyUnlocked) return;
+        ApplyCardGroups();
     }
 
     /// <summary>
@@ -739,17 +764,16 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
         _loadedQuickAddCard = quickAddCard;
         _loadedCards = allCards;
         _loadedBoxes = allBoxes;
-        ApplyCardGroups(isRelock: false);
+        ApplyCardGroups();
     }
 
     /// <summary>
     /// Rebuilds <see cref="AvailableCardGroups"/> from the last fetch. While the session is
     /// locked, Hidden cards are omitted and LockedVisible cards become masked rows titled
-    /// "Protected", so a protected card's real title never enters the collection. Called
-    /// with <paramref name="isRelock"/> true from <see cref="OnSessionRelocked"/>, where
-    /// an Import selection that is still listed and unprotected survives.
+    /// <see cref="ProtectionPolicy.MaskedTitle"/>, so a protected card's real title never
+    /// enters the collection. A selection that is still listed and unprotected survives.
     /// </summary>
-    private void ApplyCardGroups(bool isRelock)
+    private void ApplyCardGroups()
     {
         var quickAddCard = _loadedQuickAddCard;
         var allCards = _loadedCards!;
@@ -796,7 +820,7 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
                 Cards = new ObservableCollection<CardPickerItem>(
                     g.OrderBy(c => c.Title)
                      .Select(c => ProtectionPolicy.IsAccessBlocked(c, BoxOf(c), isUnlocked)
-                         ? new CardPickerItem { CardId = c.Id, Title = "Protected", IsLockedVisible = true }
+                         ? new CardPickerItem { CardId = c.Id, Title = ProtectionPolicy.MaskedTitle, IsLockedVisible = true }
                          : new CardPickerItem { CardId = c.Id, Title = c.Title }))
             })
             .OrderBy(g => g.CollectionName)
@@ -810,9 +834,7 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
         foreach (var stale in staleGroups)
             AvailableCardGroups.Remove(stale);
 
-        var selectionBlocked = SelectedCard is { } selected
-            && allCards.FirstOrDefault(c => c.Id == selected.CardId) is { } selectedEntity
-            && ProtectionPolicy.IsAccessBlocked(selectedEntity, BoxOf(selectedEntity), isUnlocked);
+        var selectionBlocked = IsSelectedCardBlocked(isUnlocked);
         CardPickerItem? ListedSelection() => SelectedCard is { } sel
             ? groups.SelectMany(g => g.Cards).FirstOrDefault(c => c.CardId == sel.CardId)
             : null;
@@ -822,9 +844,9 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
 
         // Manual mode: a missing or protected selection falls back to the Quick Add
         // card; otherwise the selection is kept if its card is still listed, or
-        // cleared if a collection change filtered it out. Import mode keeps only an
-        // unprotected selection across a re-lock. Either way the rows were rebuilt,
-        // so a kept selection follows its reloaded item.
+        // cleared if a collection change filtered it out. Import mode keeps a listed,
+        // unprotected selection the same way. Either way the rows were rebuilt, so a
+        // kept selection follows its reloaded item.
         CardPickerItem? next;
         if (EntryMode == EntryMode.Manual)
         {
@@ -834,7 +856,7 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
         }
         else
         {
-            next = isRelock && !selectionBlocked ? ListedSelection() : null;
+            next = selectionBlocked ? null : ListedSelection();
         }
 
         if (SelectedCard is not null) SelectedCard.IsSelected = false;
@@ -871,10 +893,7 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
     /// </summary>
     private async Task RematchAsync()
     {
-        _matchCts?.Cancel();
-        _matchCts?.Dispose();
-        _matchCts = new CancellationTokenSource();
-        var token = _matchCts.Token;
+        var generation = ++_matchGeneration;
 
         var existingKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var lookupFailed = false;
@@ -894,7 +913,7 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
             }
 
             // A newer run owns _matchInFlight and the rows now.
-            if (token.IsCancellationRequested) return;
+            if (generation != _matchGeneration) return;
         }
 
         _matchInFlight = false;
@@ -970,7 +989,8 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
             if (ImportMode == ImportMode.ExistingCard && SelectedCard is not null)
             {
                 var existingSavedCount = 0;
-                foreach (var row in Prayers.Where(r => !string.IsNullOrWhiteSpace(r.Title)))
+                // Snapshot: a row moved or removed during an awaited save must not break the loop.
+                foreach (var row in Prayers.Where(r => !string.IsNullOrWhiteSpace(r.Title)).ToList())
                 {
                     var prayer = new Prayer
                     {
@@ -1011,7 +1031,7 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
             await _cardService.SaveCardAsync(card, publishMessage: false);
 
             var savedCount = 0;
-            foreach (var row in Prayers.Where(r => !string.IsNullOrWhiteSpace(r.Title)))
+            foreach (var row in Prayers.Where(r => !string.IsNullOrWhiteSpace(r.Title)).ToList())
             {
                 var prayer = new Prayer
                 {
@@ -1098,10 +1118,5 @@ public sealed class ConfirmImportViewModel : ObservableObject, IDisposable
     {
         _loadCardGroupsCts?.Dispose();
         _loadCardGroupsCts = null;
-        // Not cancelled: the page can reappear after OnDisappearing (the PIN popup
-        // close re-enters OnAppearing), and a cancelled match never clears
-        // _matchInFlight, which would leave Save disabled.
-        _matchCts?.Dispose();
-        _matchCts = null;
     }
 }

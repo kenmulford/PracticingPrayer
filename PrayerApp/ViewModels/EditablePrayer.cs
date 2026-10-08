@@ -17,7 +17,10 @@ public class EditablePrayer : ObservableObject
         set
         {
             if (SetProperty(ref _title, value ?? string.Empty))
+            {
                 OnPropertyChanged(nameof(AddAccessibleDescription));
+                OnPropertyChanged(nameof(RemoveAccessibleDescription));
+            }
         }
     }
 
@@ -31,7 +34,11 @@ public class EditablePrayer : ObservableObject
     public bool IsAddedDuplicate
     {
         get => _isAddedDuplicate;
-        set => SetProperty(ref _isAddedDuplicate, value);
+        set
+        {
+            if (SetProperty(ref _isAddedDuplicate, value))
+                OnPropertyChanged(nameof(RemoveAccessibleDescription));
+        }
     }
 
     public string AddAccessibleDescription => $"Add {Title} to import";
@@ -89,7 +96,10 @@ public class EditablePrayer : ObservableObject
     // "{n} of {count}" phrasing mirrors PrayerTimeViewModel.ProgressDisplay.
     public string TitleAccessibleDescription => $"Prayer title, item {Position} of {Total}";
     public string DetailsAccessibleDescription => $"Prayer details, item {Position} of {Total}";
-    public string RemoveAccessibleDescription => $"Remove prayer, item {Position} of {Total}";
+    // ✕ on an added duplicate returns it to Already on this card instead of deleting it.
+    public string RemoveAccessibleDescription => IsAddedDuplicate
+        ? $"Return {Title} to Already on this card, item {Position} of {Total}"
+        : $"Remove prayer, item {Position} of {Total}";
 
     private void RaiseAccessibleDescriptionsChanged()
     {

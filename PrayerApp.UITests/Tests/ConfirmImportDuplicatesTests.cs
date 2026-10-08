@@ -25,6 +25,10 @@ public class ConfirmImportDuplicatesTests
         _setup.Driver.ForceStopApp();
         _setup.Driver.LaunchProcessTextIntent(_setup, TestSeedFixtures.ImportSkipsDuplicatesPrayer);
 
+        var stagedTitle = _setup.Driver.WaitForElement("ConfirmImport_Entry_PrayerTitle", timeoutSeconds: 5);
+        Assert.True(stagedTitle.Text == TestSeedFixtures.ImportSkipsDuplicatesPrayer,
+            $"The intent should stage the full shared title, but the first row reads '{stagedTitle.Text}'");
+
         _setup.Driver.WaitAndTap("ConfirmImport_Seg_ExistingCard");
         _setup.Driver.ScrollDownToText(TestSeedFixtures.ImportSkipsDuplicatesCard);
         _setup.Driver.TapByText(TestSeedFixtures.ImportSkipsDuplicatesCard);

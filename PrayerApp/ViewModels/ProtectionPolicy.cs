@@ -19,6 +19,9 @@ namespace PrayerApp.ViewModels;
 /// </summary>
 internal static class ProtectionPolicy
 {
+    /// <summary>Title shown in place of a masked card's real title.</summary>
+    public const string MaskedTitle = "Protected";
+
     /// <summary>
     /// True when <paramref name="card"/> is effectively protected (via its own mode or
     /// <paramref name="box"/>'s cascade) and <paramref name="isSessionUnlocked"/> is false.

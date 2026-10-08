@@ -160,7 +160,7 @@ namespace PrayerApp.ViewModels
         /// constraint than binding <see cref="Title"/> and toggling <c>IsVisible</c>, which
         /// would still place the real string in the compiled binding / element tree.
         /// </summary>
-        public string DisplayTitle => IsLockedVisible ? "Protected" : Title;
+        public string DisplayTitle => IsLockedVisible ? ProtectionPolicy.MaskedTitle : Title;
 
         /// <summary>
         /// Re-raises the lock-state-derived projections. Called by <see cref="Box"/>'s setter

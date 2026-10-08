@@ -1490,6 +1490,77 @@ public class ConfirmImportViewModelTests
     }
 
     [Fact]
+    public async Task Save_ExistingCard_RowMovedMidSave_WritesOnlyTheSnapshot()
+    {
+        var sut = await MatchAsync(7, new[] { "Healing" },
+            ("Job interview Friday", null), ("Healing", null));
+        var healing = sut.AlreadyOnCard.Single();
+        var held = new TaskCompletionSource<Prayer>();
+        _prayerService.SavePrayerAsync(Arg.Any<Prayer>(), Arg.Any<bool>()).Returns(held.Task);
+
+        var save = sut.SaveCommand.ExecuteAsync(null);
+        sut.AddDuplicateCommand.Execute(healing);
+        held.SetResult(new Prayer());
+        await save;
+
+        await _prayerService.Received(1).SavePrayerAsync(Arg.Any<Prayer>(), false);
+        await _prayerService.Received(1).SavePrayerAsync(
+            Arg.Is<Prayer>(p => p.Title == "Job interview Friday"), false);
+    }
+
+    [Fact]
+    public async Task Save_NewCard_RowRemovedMidSave_WritesOnlyTheSnapshot()
+    {
+        var sut = SetupSutWithRows(("Mom", null), ("Dad", null));
+        var held = new TaskCompletionSource<Prayer>();
+        _prayerService.SavePrayerAsync(Arg.Any<Prayer>(), Arg.Any<bool>()).Returns(held.Task);
+
+        var save = sut.SaveCommand.ExecuteAsync(null);
+        sut.RemovePrayerCommand.Execute(sut.Prayers[1]);
+        held.SetResult(new Prayer());
+        await save;
+
+        await _prayerService.Received(2).SavePrayerAsync(Arg.Any<Prayer>(), false);
+    }
+
+    [Fact]
+    public async Task AddDuplicate_SecondInvocation_LeavesRowInPrayersOnce()
+    {
+        var sut = await MatchAsync(7, new[] { "Healing" },
+            ("Job interview Friday", null), ("Healing", null));
+        var healing = sut.AlreadyOnCard.Single();
+
+        sut.AddDuplicateCommand.Execute(healing);
+        sut.AddDuplicateCommand.Execute(healing);
+
+        Assert.Equal(1, sut.Prayers.Count(r => ReferenceEquals(r, healing)));
+        _accessibilityService.Received(1).Announce("Added Healing to import");
+    }
+
+    [Fact]
+    public async Task Rematch_DisposeThenSelectOtherCard_SettlesOnTheLatestLookup()
+    {
+        var heldA = new TaskCompletionSource<IReadOnlyList<Prayer>>();
+        var heldB = new TaskCompletionSource<IReadOnlyList<Prayer>>();
+        _prayerService.GetPrayersByCardAsync(7).Returns(heldA.Task);
+        _prayerService.GetPrayersByCardAsync(8).Returns(heldB.Task);
+        var sut = SetupSutWithRows(("Mom", null), ("Dad", null));
+        sut.SetExistingCardModeCommand.Execute(null);
+        sut.SelectedCard = CardItem(7);
+        sut.Dispose();
+        sut.SelectedCard = CardItem(8, "Other");
+
+        heldB.SetResult(new[] { new Prayer { PrayerCardId = 8, Title = "Dad" } });
+        await Task.Delay(50);
+        heldA.SetResult(new[] { new Prayer { PrayerCardId = 7, Title = "Mom" } });
+        await Task.Delay(50);
+
+        Assert.Equal("Dad", Assert.Single(sut.AlreadyOnCard).Title);
+        Assert.Equal("Mom", Assert.Single(sut.Prayers).Title);
+        Assert.True(sut.SaveCommand.CanExecute(null));
+    }
+
+    [Fact]
     public void AddAccessibleDescription()
     {
         var row = new EditablePrayer { Title = "Mom" };
@@ -2702,6 +2773,70 @@ public class ConfirmImportViewModelTests
 
         Assert.Empty(sut.AvailableCardGroups);
         await _cardService.DidNotReceive().GetCardsAsync();
+    }
+
+    [Fact]
+    public async Task Relocked_NewCardMode_ProtectedSelection_DroppedBeforeFlipBack()
+    {
+        SetupPickerData(new[] { Card(1, "Secret", mode: CardProtectionMode.LockedVisible) });
+        AuthenticateSucceeds();
+        var sut = await OpenImportPickerAsync();
+        await Tap(sut, Row(sut, 1));
+        var selected = sut.SelectedCard;
+        Assert.NotNull(selected);
+        sut.SetNewCardModeCommand.Execute(null);
+
+        Relock();
+        var heldReload = new TaskCompletionSource<IReadOnlyList<PrayerCard>>();
+        _cardService.GetCardsAsync().Returns(heldReload.Task);
+        sut.SetExistingCardModeCommand.Execute(null);
+
+        Assert.Null(sut.SelectedCard);
+        Assert.False(selected!.IsSelected);
+        Assert.False(sut.SaveCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task Match_BlockedSelection_NeverQueriesTheCard()
+    {
+        SetupPickerData(new[] { Card(1, "Secret", mode: CardProtectionMode.LockedVisible) });
+        StubCardPrayers(1, "Mom");
+        var sut = await OpenImportPickerAsync();
+
+        sut.SelectedCard = CardItem(1, "Secret");
+        await Task.Delay(50);
+
+        await _prayerService.DidNotReceive().GetPrayersByCardAsync(Arg.Any<int>());
+        Assert.Empty(sut.AlreadyOnCard);
+        Assert.Equal("Mom", Assert.Single(sut.Prayers).Title);
+    }
+
+    [Theory]
+    [InlineData(7, true)]
+    [InlineData(8, false)]
+    public async Task Import_StaleLoadAfterRowTap_KeepsSelectionOnlyWhenStillListed(int boxId, bool expectKept)
+    {
+        var cards = new[] { Card(1, "Open", boxId: 7), Card(2, "Other", boxId: 8) };
+        SetupPickerData(cards,
+            new CardBox { Id = 7, Name = "Family" }, new CardBox { Id = 8, Name = "Work" });
+        var sut = await OpenImportPickerAsync();
+        var heldLoad = new TaskCompletionSource<IReadOnlyList<PrayerCard>>();
+        _cardService.GetCardsAsync().Returns(heldLoad.Task);
+        sut.SelectedBox = sut.AvailableBoxes.OfType<RealBoxPickerItem>().First(b => b.BoxId == boxId);
+        await Tap(sut, Row(sut, 1));
+
+        heldLoad.SetResult(cards);
+        await Task.Delay(50);
+
+        if (expectKept)
+        {
+            Assert.Same(Row(sut, 1), sut.SelectedCard);
+            Assert.True(sut.SelectedCard!.IsSelected);
+        }
+        else
+        {
+            Assert.Null(sut.SelectedCard);
+        }
     }
 
     [Theory]

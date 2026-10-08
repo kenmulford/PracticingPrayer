@@ -2042,17 +2042,18 @@ public static class AppExtensions
     /// <summary>
     /// Android-only: dispatch <c>ACTION_PROCESS_TEXT</c> at MainActivity so the
     /// Slice 2 selection-toolbar handoff can be exercised without driving Gmail's UI.
-    /// Multi-line payloads are not supported here because <c>am start --es</c> tokenises
-    /// values through adb's shell — newlines are stripped. Production multi-line parsing
-    /// is covered by <c>TextSelectionParser</c> unit tests; manual emulator smoke covers
-    /// the real Gmail → toolbar → modal end-to-end path.
+    /// Spaces in <paramref name="text"/> are escaped by the helper. Multi-line payloads are
+    /// not supported here because <c>am start --es</c> tokenises values through adb's
+    /// shell — newlines are stripped. Production multi-line parsing is covered by
+    /// <c>TextSelectionParser</c> unit tests; manual emulator smoke covers the real
+    /// Gmail → toolbar → modal end-to-end path.
     /// </summary>
     public static void LaunchProcessTextIntent(this AppiumDriver driver, AppiumSetup setup, string text)
     {
         if (TestConfig.IsIOS)
             throw new SkipException("Android-only: PROCESS_TEXT is the Android selection-toolbar entry point");
 
-        ValidateAmShellText(text, nameof(text));
+        var amText = ToAmShellArg(text, nameof(text));
 
         // Two-stage foreground → dismiss-onboarding → dispatch, symmetric with
         // `LaunchProcessTextIntentSpannable`. Doing PROCESS_TEXT in a single `am start`
@@ -2097,7 +2098,7 @@ public static class AppExtensions
                 "-n", $"{TestConfig.AndroidPackage}/{TestConfig.AndroidMainActivity}",
                 "-a", "android.intent.action.PROCESS_TEXT",
                 "-t", "text/plain",
-                "--es", "android.intent.extra.PROCESS_TEXT", text
+                "--es", "android.intent.extra.PROCESS_TEXT", amText
             },
             nameof(LaunchProcessTextIntent));
     }
@@ -2137,13 +2138,14 @@ public static class AppExtensions
     /// SpannableString boundary. Receiver is <c>#if DEBUG</c> only and must NOT
     /// ship to Release. Requires Appium server flag
     /// <c>--allow-insecure=uiautomator2:adb_shell</c> (or <c>--relaxed-security</c>).
+    /// Spaces in <paramref name="text"/> are escaped by the helper.
     /// </remarks>
     public static void LaunchProcessTextIntentSpannable(this AppiumDriver driver, AppiumSetup setup, string text)
     {
         if (TestConfig.IsIOS)
             throw new SkipException("Android-only: PROCESS_TEXT is the Android selection-toolbar entry point");
 
-        ValidateAmShellText(text, nameof(text));
+        var amText = ToAmShellArg(text, nameof(text));
 
         // Foreground MainActivity FIRST. Android 14+ (API 34+) enforces Background
         // Activity Launch (BAL) restrictions: when the broadcast receiver below
@@ -2170,30 +2172,37 @@ public static class AppExtensions
 
         AssertHomeVisibleAfterDismiss(driver, setup, nameof(LaunchProcessTextIntentSpannable));
 
-        // `am broadcast` arg list. Appium's `mobile: shell` invocation passes the
-        // args array as separate argv tokens (not via `sh -c` string concatenation),
-        // so spaces inside `text` survive — `ValidateAmShellText` above rejects the
-        // shell metacharacters that would actually corrupt the payload. Newlines
-        // are still stripped by the adb tokeniser; multi-line payloads remain out
-        // of scope for this helper.
+        // `am broadcast` arg list. The device shell re-splits the joined command on
+        // spaces, so `ToAmShellArg` escapes them; it also rejects the shell
+        // metacharacters that would corrupt the payload. Newlines are still stripped
+        // by the adb tokeniser; multi-line payloads remain out of scope for this helper.
         RunAmShellOrThrow(driver,
             new[]
             {
                 "broadcast",
                 "-a", "com.multithreadedllc.prayercards.PRAYER_TEST_SPANNABLE",
                 "-n", $"{TestConfig.AndroidPackage}/.DebugProcessTextShim",
-                "--es", "text", text
+                "--es", "text", amText
             },
             nameof(LaunchProcessTextIntentSpannable));
     }
 
     /// <summary>
+    /// Validates <paramref name="text"/>, then escapes each space as <c>\ </c>. <c>mobile: shell</c>
+    /// joins the args array into one command line and the device shell splits it again on
+    /// spaces, so an unescaped value reaches <c>am</c> as its first word only.
+    /// </summary>
+    private static string ToAmShellArg(string text, string paramName)
+    {
+        ValidateAmShellText(text, paramName);
+        return text.Replace(" ", "\\ ");
+    }
+
+    /// <summary>
     /// Reject `text` values containing shell metacharacters that would corrupt
-    /// `am`-shell argument tokenisation. The args-array invocation style of
-    /// <c>mobile: shell</c> passes each element as a separate argv token, but
-    /// embedded metacharacters can still interact poorly with adb's parser on
-    /// some Appium driver versions. Whitelisting the safe set is cheaper than
-    /// guessing the actual tokenisation contract.
+    /// `am`-shell argument tokenisation. Whitelisting the safe set is cheaper than
+    /// guessing the actual tokenisation contract; spaces are allowed because
+    /// <see cref="ToAmShellArg"/> escapes them.
     /// </summary>
     private static void ValidateAmShellText(string text, string paramName)
     {
@@ -2206,8 +2215,8 @@ public static class AppExtensions
                 throw new ArgumentException(
                     $"`{paramName}` contains a shell metacharacter (quote, backtick, $, backslash, or newline). " +
                     "These corrupt am-shell argument tokenisation across Appium driver versions. " +
-                    "Use plain alphanumeric + space text only — production multi-line / rich-text parsing " +
-                    "is covered by TextSelectionParser unit tests.",
+                    "Use plain alphanumeric + space text only (the helper escapes spaces); production " +
+                    "multi-line / rich-text parsing is covered by TextSelectionParser unit tests.",
                     paramName);
         }
     }

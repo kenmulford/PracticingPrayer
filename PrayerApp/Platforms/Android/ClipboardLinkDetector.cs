@@ -1,3 +1,4 @@
+using Android.App;
 using Android.Content;
 using Android.Views;
 using PrayerApp.Services;
@@ -20,7 +21,7 @@ public class ClipboardLinkDetector : IClipboardLinkDetector
             return false;
 
         if (!activity.HasWindowFocus)
-            await WaitForWindowFocusAsync(observer);
+            await WaitForWindowFocusAsync(activity, observer);
 
         var clipboard = activity.GetSystemService(Context.ClipboardService) as ClipboardManager;
         return clipboard is { HasPrimaryClip: true }
@@ -28,7 +29,7 @@ public class ClipboardLinkDetector : IClipboardLinkDetector
     }
 
     // The clipboard is readable only by the focused window on Android 10+.
-    private static Task WaitForWindowFocusAsync(ViewTreeObserver observer)
+    private static Task WaitForWindowFocusAsync(Activity activity, ViewTreeObserver observer)
     {
         var focused = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         EventHandler<ViewTreeObserver.WindowFocusChangeEventArgs>? onFocusChange = null;
@@ -36,9 +37,11 @@ public class ClipboardLinkDetector : IClipboardLinkDetector
         {
             if (!e.HasFocus)
                 return;
-            // Removing from a dead observer throws IllegalStateException.
-            if (observer.IsAlive)
-                observer.WindowFocusChange -= onFocusChange;
+            // The captured observer can be the floating pre-attach one, so unsubscribe from
+            // the window's live one. Removing from a dead observer throws IllegalStateException.
+            var live = activity.Window?.DecorView?.ViewTreeObserver;
+            if (live is { IsAlive: true })
+                live.WindowFocusChange -= onFocusChange;
             focused.TrySetResult();
         };
         observer.WindowFocusChange += onFocusChange;
