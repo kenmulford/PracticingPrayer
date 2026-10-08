@@ -9,7 +9,7 @@ headings stable — they are citation anchors.
 
 ## Runtime & frameworks
 The platform/runtime and primary frameworks, with versions. (Mirror these into milestone-driver `nonNegotiables` where they're hard constraints.)
-> .NET MAUI 10 (TFMs `net10.0-android`, `net10.0-ios`); built against the iOS 26.5 SDK / Android API 36; minimum supported iOS 16.0 / Android API 21. Hard constraint (milestone-driver `nonNegotiables`): MAUI .NET 10 + Community Toolkit.
+> .NET MAUI 10 (TFMs `net10.0-android`, `net10.0-ios`); built against the iOS 26.5 SDK / Android API 36; minimum supported iOS 16.0 / Android API 24. Hard constraint (milestone-driver `nonNegotiables`): MAUI .NET 10 + Community Toolkit.
 
 ## Approved libraries (by purpose)
 One approved choice per purpose, so a redundant alternative is easy to spot.
