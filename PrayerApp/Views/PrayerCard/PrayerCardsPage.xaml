@@ -15,7 +15,7 @@
              Select Cards). Replaces the prior 3-Primary / iOS-Secondary split: the iOS
              UIMenu was unreadable in dark mode, and a unified MAUI-controlled popup gives
              full theming + a11y. In multi-select mode, the button mutates in place to a
-             Cancel X (AutomationId switches to "Select" to match existing UITest callers). -->
+             Cancel X. -->
         <ToolbarItem Text="More" AutomationId="More"
                      IconImageSource="{AppThemeBinding Light=ellipsis_vertical_solid_full.png, Dark=ellipsis_vertical_solid_full_dark.png}"
                      SemanticProperties.Description="More actions"

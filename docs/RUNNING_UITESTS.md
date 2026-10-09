@@ -10,7 +10,7 @@
 
 | Tool | Version | Install |
 |------|---------|---------|
-| .NET SDK | 10.0.3xx (pinned in `global.json`) | [dotnet.microsoft.com](https://dotnet.microsoft.com/download) |
+| .NET SDK | 10.0.4xx + workload set 10.0.401.1 (both pinned in `global.json`) | [dotnet.microsoft.com](https://dotnet.microsoft.com/download) |
 | Node.js | 18+ | [nodejs.org](https://nodejs.org) (needed for Appium) |
 | Appium | 2.x | `npm install -g appium` |
 
@@ -39,9 +39,9 @@ Restart your terminal after setting these.
 
 | Tool | Version | Install |
 |------|---------|---------|
-| Xcode | 16+ | Mac App Store |
+| Xcode | 27.0 | Mac App Store |
 | Xcode Command Line Tools | — | `xcode-select --install` |
-| iOS Simulator | — | Default: `iPad (A16)` on iOS 26.4 |
+| iOS Simulator | — | Default: `iPad (A16)` on iOS 27.0 |
 | Appium XCUITest driver | latest | `appium driver install xcuitest` |
 
 ---
@@ -82,8 +82,8 @@ If your AVD has a different name, set the `ANDROID_AVD` environment variable (se
 # List available simulators
 xcrun simctl list devices available
 
-# Boot a simulator (use the iPad A16 or similar)
-xcrun simctl boot "iPad (A16)"
+# Boot by UDID: copy the iPad (A16) UDID listed under "-- iOS 27.0 --" above, then paste it in place of PASTE-UDID-HERE
+xcrun simctl boot PASTE-UDID-HERE
 open -a Simulator
 ```
 
@@ -242,7 +242,7 @@ All optional. Set before running `dotnet test`.
 | `ANDROID_AVD` | `pixel_9_-_api_36_0` | Android emulator AVD name |
 | `PRAYER_APK_PATH` | _(pre-installed)_ | Path to APK; if set, Appium installs it |
 | `IOS_SIMULATOR` | `iPad (A16)` | iOS simulator device name |
-| `IOS_VERSION` | `26.4` | iOS platform version string |
+| `IOS_VERSION` | `27.0` | iOS platform version string |
 
 **PC (PowerShell — session-only):**
 ```powershell
@@ -257,15 +257,15 @@ To set permanently on PC:
 
 **Mac (Terminal — session-only):**
 ```bash
-export IOS_SIMULATOR="iPhone 16 Pro"
-export IOS_VERSION="26.4"
+export IOS_SIMULATOR="iPhone 17 Pro"
+export IOS_VERSION="27.0"
 dotnet test PrayerApp.UITests/ --filter "Platform=CrossPlatform|Platform=iOS"
 ```
 
 To set permanently on Mac, add to `~/.zshrc`:
 ```bash
-echo 'export IOS_SIMULATOR="iPhone 16 Pro"' >> ~/.zshrc
-echo 'export IOS_VERSION="26.4"' >> ~/.zshrc
+echo 'export IOS_SIMULATOR="iPhone 17 Pro"' >> ~/.zshrc
+echo 'export IOS_VERSION="27.0"' >> ~/.zshrc
 source ~/.zshrc
 ```
 

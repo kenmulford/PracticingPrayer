@@ -23,7 +23,7 @@
 
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Maui" Version="14.0.1" />
-    <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.50" />
+    <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.110" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
@@ -113,6 +113,8 @@
 
     <!-- Views: pure layout logic only; pages themselves need the MAUI runtime -->
     <Compile Include="../PrayerApp/Views/CardPanelLayout.cs" />
+    <Compile Include="../PrayerApp/Views/IPageSheetModal.cs" />
+    <Compile Include="../PrayerApp/Views/PageSheetPresentation.cs" />
 
     <!-- Service interfaces -->
     <Compile Include="../PrayerApp/Services/ISettings.cs" />

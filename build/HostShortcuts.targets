@@ -19,7 +19,7 @@
       on TestFlight/ad-hoc builds. <XcodeProject> emits XCFRAMEWORK and
       forwards as <NativeReference>. Static lib's .a is discarded; only the
       side-effect Metadata.appintents/ directory matters, and static libs DO
-      trigger appintentsmetadataprocessor (verified on Xcode 26 / iOS 26.4).
+      trigger appintentsmetadataprocessor (verified on Xcode 27 / iOS 27.0).
 
     Why CollectBundleResourcesDependsOn + LogicalName:
       Xamarin maintainer rolfbjarne in dotnet/macios#11984 prescribes exactly

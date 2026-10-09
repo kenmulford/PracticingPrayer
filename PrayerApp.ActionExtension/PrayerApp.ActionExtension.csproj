@@ -14,9 +14,6 @@
 
 		<ApplicationId>com.multithreadedllc.prayercards.actionextension</ApplicationId>
 		<!-- Versions: centralized in repo-root Directory.Build.props (#8). Single source of truth ensures host/extension stamp matches; iOS refuses to load the extension otherwise. -->
-
-		<!-- Xcode 26.2 and 26.3+ have identical SDKs; skip the validation check (matches main app csproj). -->
-		<ValidateXcodeVersion>false</ValidateXcodeVersion>
 	</PropertyGroup>
 
 	<!--
