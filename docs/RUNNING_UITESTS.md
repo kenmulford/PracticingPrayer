@@ -41,7 +41,7 @@ Restart your terminal after setting these.
 |------|---------|---------|
 | Xcode | 27.0 | Mac App Store |
 | Xcode Command Line Tools | — | `xcode-select --install` |
-| iOS Simulator | — | Default: `iPad (A16)` on iOS 27.0 |
+| iOS Simulator | — | Default: `Test iPad` (an iPad (A16)) on iOS 27.0. See "Simulators" in `CLAUDE.md` |
 | Appium XCUITest driver | latest | `appium driver install xcuitest` |
 
 ---
@@ -82,7 +82,7 @@ If your AVD has a different name, set the `ANDROID_AVD` environment variable (se
 # List available simulators
 xcrun simctl list devices available
 
-# Boot by UDID: copy the iPad (A16) UDID listed under "-- iOS 27.0 --" above, then paste it in place of PASTE-UDID-HERE
+# Boot by UDID: copy the Test iPad UDID listed under "-- iOS 27.0 --" above, then paste it in place of PASTE-UDID-HERE
 xcrun simctl boot PASTE-UDID-HERE
 open -a Simulator
 ```
@@ -241,7 +241,7 @@ All optional. Set before running `dotnet test`.
 | `APPIUM_SERVER_URL` | `http://127.0.0.1:4723` | Appium server endpoint |
 | `ANDROID_AVD` | `pixel_9_-_api_36_0` | Android emulator AVD name |
 | `PRAYER_APK_PATH` | _(pre-installed)_ | Path to APK; if set, Appium installs it |
-| `IOS_SIMULATOR` | `iPad (A16)` | iOS simulator device name |
+| `IOS_SIMULATOR` | `Test iPad` | iOS simulator device name |
 | `IOS_VERSION` | `27.0` | iOS platform version string |
 
 **PC (PowerShell — session-only):**
@@ -257,14 +257,14 @@ To set permanently on PC:
 
 **Mac (Terminal — session-only):**
 ```bash
-export IOS_SIMULATOR="iPhone 17 Pro"
+export IOS_SIMULATOR="Test iPad"
 export IOS_VERSION="27.0"
 dotnet test PrayerApp.UITests/ --filter "Platform=CrossPlatform|Platform=iOS"
 ```
 
 To set permanently on Mac, add to `~/.zshrc`:
 ```bash
-echo 'export IOS_SIMULATOR="iPhone 17 Pro"' >> ~/.zshrc
+echo 'export IOS_SIMULATOR="Test iPad"' >> ~/.zshrc
 echo 'export IOS_VERSION="27.0"' >> ~/.zshrc
 source ~/.zshrc
 ```

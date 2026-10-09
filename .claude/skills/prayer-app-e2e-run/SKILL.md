@@ -67,7 +67,7 @@ export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$JAVA_HOME/bin:
 |---|---|
 | App id / bundle | `com.multithreadedllc.prayercards` (both platforms) |
 | Android AVD | `pp_api36` (NOT the `pixel_9_-_api_36_0` default in the docs/`TestConfig`) |
-| iOS sim | `iPad (A16)` on iOS **27.0** (iPad on purpose — keyboard has a Done button) |
+| iOS sim | `Test iPad` (an iPad (A16)) on iOS **27.0**. iPad on purpose: its keyboard has a Done button. See "Simulators" in `CLAUDE.md` |
 | Appium | 3.2.2, drivers `uiautomator2` + `xcuitest` installed |
 | Android Appium port | `4723` (default) |
 | iOS Appium port | `4725` (2nd server, for parallel) |
@@ -101,7 +101,7 @@ The snapshot boot restores the warm state where that dir already exists.
 ### 2. iOS simulator — boot and KEEP it booted
 `run-e2e-mac.sh` step 2 resolves the simulator by name + runtime, boots it, and prints
 `ios simulator: <name>, iOS <version>, <udid>`. To run the steps by hand, copy the UDID of
-the `iPad (A16)` row under `-- iOS 27.0 --` from the list and paste it in place of
+the `Test iPad` row under `-- iOS 27.0 --` from the list and paste it in place of
 `PASTE-UDID-HERE`; `bootstatus` boots the sim if needed and waits for boot to finish:
 ```bash
 xcrun simctl list devices available
@@ -141,7 +141,7 @@ device offline`). Build Android, then iOS. **Never kill a build mid-flight** (co
 ### 5. Verify seed-ready before running
 ```bash
 adb shell run-as com.multithreadedllc.prayercards ls files/   # → prayer_app.db, profileInstalled, diagnostics.log
-xcrun simctl list devices booted | grep "$IOS_UDID"           # → iPad (A16) (<UDID>) (Booted)
+xcrun simctl list devices booted | grep "$IOS_UDID"           # → Test iPad (<UDID>) (Booted)
 ```
 If `run-as` still can't stat the dir, the emulator is cold — go back to step 1 (snapshot boot),
 don't improvise a fix.
@@ -165,8 +165,8 @@ Both runs then use `--no-build` so two `dotnet test` processes never race on the
 # Android → :4723 → emulator
 UITEST_PLATFORM=android APPIUM_SERVER_URL=http://127.0.0.1:4723 ANDROID_AVD=pp_api36 \
   dotnet test PrayerApp.UITests/PrayerApp.UITests.csproj --no-build
-# iOS → :4725 → iPad (A16) 27.0
-UITEST_PLATFORM=ios APPIUM_SERVER_URL=http://127.0.0.1:4725 IOS_SIMULATOR="iPad (A16)" IOS_VERSION=27.0 \
+# iOS → :4725 → Test iPad 27.0
+UITEST_PLATFORM=ios APPIUM_SERVER_URL=http://127.0.0.1:4725 IOS_SIMULATOR="Test iPad" IOS_VERSION=27.0 \
   dotnet test PrayerApp.UITests/PrayerApp.UITests.csproj --no-build
 ```
 Different devices + ports + processes → they don't collide; each `AppiumSetup` seeds its own device.

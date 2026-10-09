@@ -34,7 +34,7 @@ export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$JAVA_HOME/bin:
 
 APP_ID="com.multithreadedllc.prayercards"
 AVD="${ANDROID_AVD:-pp_api36}"
-IOS_SIM="${IOS_SIMULATOR:-iPad (A16)}"
+IOS_SIM="${IOS_SIMULATOR:-Test iPad}"
 IOS_VER="${IOS_VERSION:-27.0}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
 CSPROJ="$REPO_ROOT/PrayerApp/PrayerApp.csproj"
