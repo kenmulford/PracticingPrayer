@@ -184,7 +184,7 @@ public class AppiumSetup : IAsyncLifetime
             return;
         }
 
-        Driver = new IOSDriver(TestConfig.AppiumServerUri, options, TestConfig.SessionTimeout);
+        Driver = new IOSDriver(TestConfig.AppiumServerUri, options, TestConfig.IOSSessionTimeout);
         Driver.Manage().Timeouts().ImplicitWait = TestConfig.DefaultTimeout;
     }
 

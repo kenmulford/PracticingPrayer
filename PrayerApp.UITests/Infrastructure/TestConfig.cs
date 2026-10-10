@@ -55,6 +55,7 @@ public static class TestConfig
     public static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(10);
     public static readonly TimeSpan ShortTimeout = TimeSpan.FromSeconds(3);
     public static readonly TimeSpan SessionTimeout = TimeSpan.FromSeconds(60);
+    public static readonly TimeSpan IOSSessionTimeout = TimeSpan.FromSeconds(240);
 
     // ── Named delay constants (milliseconds) ─────────────────────
     // Centralised so values can be tuned per-platform in one place.
@@ -249,6 +250,8 @@ public static class TestConfig
         // simulator itself (not pre-booted).
         options.AddAdditionalAppiumOption("connectHardwareKeyboard", true);
         options.AddAdditionalAppiumOption("newCommandTimeout", 300);
+        // Sits below IOSSessionTimeout (240s) so the WDA launch error fires before the HTTP timeout.
+        options.AddAdditionalAppiumOption("wdaLaunchTimeout", 180000);
 
         // iPad: mobile: hideKeyboard works reliably on tablets (has "Done" button).
         // iPhone keyboard has no dismiss button, causing cascade failures.
