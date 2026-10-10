@@ -35,6 +35,21 @@ The UITest suite shares one Appium session and one seeded SQLite database (seede
 
 2. **Every test starts on Home.** Begin each test from a known nav root (the Home tab) so a prior test's deep navigation is never a precondition for the next. `ResetAppUIState` + `EnsureOnTab` must reliably land on Home first; nav-state must never leak between tests.
 
+## Simulators (shared with ios-budget-app)
+
+This Mac keeps exactly four iOS simulators, shared with the ios-budget-app repo. Never create, boot, or address any other simulator, and never delete or rename these four. Address them by name, never by a default device name.
+
+| Name | Device | Runtime | Use |
+|---|---|---|---|
+| `Dev iPhone` | iPhone 17 Pro Max | iOS 27.0 | Hand checks and App Store iPhone screenshots, both repos |
+| `Dev iPad` | iPad Pro 13-inch (M5) | iOS 27.0 | Hand checks and App Store iPad screenshots, both repos |
+| `Test iPhone` | iPhone 17 Pro | iOS 27.0 | ios-budget-app automated tests only |
+| `Test iPad` | iPad (A16) | iOS 27.0 | PracticingPrayer E2E only (`IOS_SIMULATOR` default) |
+
+- E2E needs an iPad: the iPhone keyboard has no dismiss button, so `DismissKeyboardIfPresent` fails.
+- `run-e2e-mac.sh` refuses to run while any other simulator is booted. Shut down any simulator you booted for hand checks when you finish.
+- The Android emulator `pp_api36` is outside this set.
+
 ## Solving a GitHub issue (milestone-driver)
 
 This repo is a [milestone-driver](https://github.com/kenmulford/milestone-driver) consumer; its profile is `.milestone-config/driver.json` (with `.milestone-config/feeder.json` and the standing project docs under `.project/`, provisioned by milestone-bootstrapper). Drive one issue with `/solve-issue <n>`, or a whole milestone in dependency order with `/solve-milestone <name>` (order comes from the milestone description's Wave list).

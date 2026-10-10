@@ -184,7 +184,7 @@ public static class TestConfig
 
         // iPad: mobile: hideKeyboard works reliably on tablets (has "Done" button).
         // iPhone keyboard has no dismiss button, causing cascade failures.
-        options.DeviceName = Environment.GetEnvironmentVariable("IOS_SIMULATOR") ?? "iPad (A16)";
+        options.DeviceName = Environment.GetEnvironmentVariable("IOS_SIMULATOR") ?? "Test iPad";
         options.PlatformVersion = Environment.GetEnvironmentVariable("IOS_VERSION") ?? "27.0";
 
         return options;

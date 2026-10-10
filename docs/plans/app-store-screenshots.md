@@ -156,16 +156,17 @@ Output: `PrayerApp/bin/Debug/net10.0-ios/iossimulator-arm64/PrayerApp.app`
 ### 2. Boot & Install
 
 ```bash
-IPHONE=AD03FB0C-F5F3-49C3-AA7B-E06014F19594  # iPhone 17 Pro Max
-IPAD=9D882FAF-5ACF-474D-BC6C-5DCC96A74CF4    # iPad Pro 13" (M5)
+sim_udid() { xcrun simctl list devices -j | jq -r --arg n "$1" '.devices[][] | select(.name == $n) | .udid'; }
+IPHONE=$(sim_udid "Dev iPhone")  # iPhone 17 Pro Max; see "Simulators" in CLAUDE.md
+IPAD=$(sim_udid "Dev iPad")      # iPad Pro 13" (M5)
 APP=PrayerApp/bin/Debug/net10.0-ios/iossimulator-arm64/PrayerApp.app
 
-xcrun simctl boot $IPHONE
-xcrun simctl boot $IPAD
-xcrun simctl install $IPHONE $APP
-xcrun simctl install $IPAD $APP
-xcrun simctl ui $IPHONE appearance light
-xcrun simctl ui $IPAD appearance light
+xcrun simctl boot "$IPHONE"
+xcrun simctl boot "$IPAD"
+xcrun simctl install "$IPHONE" $APP
+xcrun simctl install "$IPAD" $APP
+xcrun simctl ui "$IPHONE" appearance light
+xcrun simctl ui "$IPAD" appearance light
 ```
 
 ### 3. Capture Onboarding (fresh install only)
@@ -233,7 +234,7 @@ Lands on the Confirm Import page populated with a sample payload (3 demo prayers
 ### 6. Switch to Dark Mode
 
 ```bash
-xcrun simctl ui $IPHONE appearance dark
+xcrun simctl ui "$IPHONE" appearance dark
 ```
 
 Retake the 3 key screenshots (prayer cards, prayer list, prayer time).

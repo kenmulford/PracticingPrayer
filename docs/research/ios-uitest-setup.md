@@ -31,12 +31,12 @@ The test framework auto-detects macOS and uses iOS capabilities. Override defaul
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `APPIUM_SERVER_URL` | `http://127.0.0.1:4723` | Appium server address |
-| `IOS_SIMULATOR` | `iPhone 17` | Simulator device name |
-| `IOS_VERSION` | `26.0` | iOS version |
+| `IOS_SIMULATOR` | `Test iPad` | Simulator device name |
+| `IOS_VERSION` | `27.0` | iOS version |
 
 Example:
 ```bash
-IOS_SIMULATOR="iPhone 16 Pro" IOS_VERSION="26.4" dotnet test PrayerApp.UITests/ --filter "Platform!=Android"
+IOS_SIMULATOR="Test iPad" IOS_VERSION="27.0" dotnet test PrayerApp.UITests/ --filter "Platform!=Android"
 ```
 
 ---
@@ -202,6 +202,6 @@ Use these as a reference for what to expect. Failures marked below are test logi
 - **WebDriverAgent build fails**: Open `~/.appium/node_modules/appium-xcuitest-driver/node_modules/appium-webdriveragent/WebDriverAgent.xcodeproj` in Xcode and fix signing
 - **Simulator not found**: `xcrun simctl list devices` to see available simulators, then set `IOS_SIMULATOR` env var
 - **AccessibilityId not found**: MAUI `AutomationId` maps to `accessibilityIdentifier` on iOS — verify in Accessibility Inspector
-- **App not installed error**: Run `xcrun simctl install "iPhone 17" <path-to-.app>` before tests
+- **App not installed error**: Run `xcrun simctl install "Test iPad" <path-to-.app>` before tests
 - **iOS element attributes**: Use `@name` and `@label` (not `@text`/`@content-desc` which are Android)
 - **element.Clear() unreliable on iOS**: Use the "Clear text" (X) button approach in `EnterText`
