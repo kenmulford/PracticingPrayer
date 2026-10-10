@@ -1094,7 +1094,7 @@ public static class AppExtensions
     }
 
     /// <summary>
-    /// Reads OnboardingComplete from NSUserDefaults on the booted simulator.
+    /// Reads OnboardingComplete from NSUserDefaults on the <see cref="TestConfig.IOSUdid"/> simulator.
     /// Throws if the value isn't truthy, catching the failure mode where
     /// <see cref="TestDataSeed.PreSeedOnboardingCompleteAsync"/> didn't run.
     /// </summary>
@@ -1102,7 +1102,7 @@ public static class AppExtensions
     {
         var psi = new System.Diagnostics.ProcessStartInfo(
             "xcrun",
-            $"simctl spawn booted defaults read {TestConfig.IOSBundleId} OnboardingComplete")
+            $"simctl spawn {TestConfig.IOSUdid} defaults read {TestConfig.IOSBundleId} OnboardingComplete")
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,

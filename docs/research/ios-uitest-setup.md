@@ -33,6 +33,7 @@ The test framework auto-detects macOS and uses iOS capabilities. Override defaul
 | `APPIUM_SERVER_URL` | `http://127.0.0.1:4723` | Appium server address |
 | `IOS_SIMULATOR` | `Test iPad` | Simulator device name |
 | `IOS_VERSION` | `27.0` | iOS version |
+| `IOS_UDID` | _(resolved)_ | Optional override: UDID of the target simulator. Unset, the harness uses the one available simulator named `IOS_SIMULATOR` on iOS `IOS_VERSION` |
 
 Example:
 ```bash

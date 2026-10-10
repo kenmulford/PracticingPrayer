@@ -108,10 +108,9 @@ xcrun simctl list devices available
 IOS_UDID=PASTE-UDID-HERE
 xcrun simctl bootstatus "$IOS_UDID" -b
 ```
-⚠ **Do NOT shut the sim down before the run** — even though the `connectHardwareKeyboard`
-comment in `TestConfig.GetIOSOptions` says to. The iOS seed (`SeedIOSAsync`,
-`PreSeedOnboardingCompleteAsync`) shells out to `xcrun simctl … booted`; with the sim down
-those fail `exit 148` ("No devices are booted") and cascade every test in ~1 ms. The iPad's
+⚠ **Do NOT shut the sim down before the run.** The iOS seed (`SeedIOSAsync`,
+`PreSeedOnboardingCompleteAsync`) shells out to `xcrun simctl … <udid>`; with the sim down
+those calls fail and cascade every test in ~1 ms. The iPad's
 Done-button keyboard covers dismissal anyway, so leaving it booted costs nothing.
 
 ### 3. Deploy Android — MAUI `-t:Install`, Debug
@@ -191,7 +190,8 @@ are still readable). **Recovery if wedged:** `adb shell am force-stop com.multit
 | Symptom | Root cause | Fix |
 |---|---|---|
 | `run-as: couldn't stat /data/user/0/…: No such file or directory` at seed | Emulator cold-booted (`-no-snapshot-load`) → app data dir never created | Boot the emulator **plain** (snapshot); if truly fresh, `-t:Install` then launch the app once to create `files/` |
-| iOS `xcrun simctl … booted … exit 148`, all tests fail in ~1 ms | Sim was shut down before the run | **Keep the sim booted** (step 2); ignore the `connectHardwareKeyboard` shutdown comment |
+| iOS `xcrun simctl … <udid>` fails, all tests fail in ~1 ms | Sim was shut down before the run | **Keep the sim booted** (step 2) |
+| `InvalidOperationException` naming `IOS_SIMULATOR / IOS_VERSION` at seed | Zero or several available simulators match the name and version | Fix `IOS_SIMULATOR` / `IOS_VERSION`, or set `IOS_UDID` to one UDID |
 | Installed app has **no launcher activity** (`monkey`: "No activities found") | Hand-rolled embedded-APK `adb install -r` over an existing install | Uninstall the corrupt package, redeploy with `-t:Install` |
 | `Fast Deployment is not currently supported on this device` during `-t:Install` | The app data dir doesn't exist yet (never-launched fresh install) | Boot warm (snapshot). On a genuinely fresh AVD: `-t:Install`, launch once, force-stop, then run |
 | `CS0246 … 'CardProtectionMode' could not be found` building `PrayerApp.UITests` | A linked app source file references a type whose `.cs` isn't in the csproj `<Compile Include>` | Add the missing `<Compile Include="../PrayerApp/Models/…​.cs" />` (issue #302) |
@@ -218,5 +218,5 @@ failed. Exit 2: it stopped before any test ran.
 
 It mirrors the manual steps above and **stops with a clear error** rather than improvising if a
 precondition isn't met (emulator not warm, no simulator matches the name and version, several
-simulators match, another simulator is booted, sim not booted, build fails). If it stops, fix the
+simulators match, sim not booted, build fails). If it stops, fix the
 named step by hand from this doc — don't work around it.

@@ -115,6 +115,74 @@ public static class TestConfig
     /// </remarks>
     public const string IOSAppDbRelativePath = "Library/prayer_app.db";
 
+    // Lazy, not static readonly: type init would run simctl on Android hosts too.
+    private static readonly Lazy<string> IOSUdidLazy = new(() => ResolveIOSUdid(
+        Environment.GetEnvironmentVariable("IOS_UDID"),
+        Environment.GetEnvironmentVariable("IOS_SIMULATOR") ?? "Test iPad",
+        Environment.GetEnvironmentVariable("IOS_VERSION") ?? "27.0",
+        ReadSimctlDevicesJson));
+
+    /// <summary>UDID of the target iOS simulator, resolved once per process from <c>IOS_UDID</c>, else the one available <c>IOS_SIMULATOR</c> on <c>IOS_VERSION</c>.</summary>
+    public static string IOSUdid => IOSUdidLazy.Value;
+
+    internal static string ResolveIOSUdid(
+        string? udidOverride, string simulatorName, string iosVersion, Func<string> readSimctlDevicesJson)
+    {
+        if (!string.IsNullOrWhiteSpace(udidOverride))
+            return udidOverride.Trim();
+
+        var udids = MatchSimulatorUdids(readSimctlDevicesJson(), simulatorName, iosVersion);
+        return udids.Count switch
+        {
+            1 => udids[0],
+            0 => throw new InvalidOperationException(
+                $"No available iOS simulator named '{simulatorName}' on iOS {iosVersion} (IOS_SIMULATOR / IOS_VERSION). " +
+                "List them with 'xcrun simctl list devices available', fix IOS_SIMULATOR / IOS_VERSION, or set IOS_UDID to override."),
+            _ => throw new InvalidOperationException(
+                $"Several available iOS simulators named '{simulatorName}' on iOS {iosVersion} (IOS_SIMULATOR / IOS_VERSION): " +
+                $"{string.Join(", ", udids)}. Rename one, or set IOS_UDID to one of them."),
+        };
+    }
+
+    internal static IReadOnlyList<string> MatchSimulatorUdids(
+        string simctlDevicesJson, string simulatorName, string iosVersion)
+    {
+        using var doc = System.Text.Json.JsonDocument.Parse(simctlDevicesJson);
+        var runtimeKey = "com.apple.CoreSimulator.SimRuntime.iOS-" + iosVersion.Replace('.', '-');
+        if (!doc.RootElement.GetProperty("devices").TryGetProperty(runtimeKey, out var devices))
+            return [];
+
+        return devices.EnumerateArray()
+            .Where(d => string.Equals(d.GetProperty("name").GetString(), simulatorName, StringComparison.Ordinal)
+                && d.GetProperty("isAvailable").GetBoolean())
+            .Select(d => d.GetProperty("udid").GetString()!)
+            .ToList();
+    }
+
+    private static string ReadSimctlDevicesJson()
+    {
+        var psi = new System.Diagnostics.ProcessStartInfo("xcrun", "simctl list devices -j")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+
+        using var proc = System.Diagnostics.Process.Start(psi)
+            ?? throw new InvalidOperationException("Failed to start xcrun simctl. Are Xcode CLI tools installed?");
+
+        var stdout = proc.StandardOutput.ReadToEnd();
+        var stderr = proc.StandardError.ReadToEnd();
+        proc.WaitForExit();
+
+        if (proc.ExitCode != 0)
+            throw new InvalidOperationException(
+                $"'xcrun simctl list devices -j' failed: exit={proc.ExitCode}, stderr='{stderr.Trim()}'.");
+
+        return stdout;
+    }
+
     public static AppiumOptions GetOptions()
     {
         if (IsAndroid)
@@ -178,7 +246,7 @@ public static class TestConfig
         // Discard/Cancel dialogs. Tests dismiss alerts via DismissAlertIfPresent.
         // Hardware keyboard hides software keyboard — prevents SendKeys from
         // hitting dictation/emoji buttons. Only works when Appium boots the
-        // simulator itself (not pre-booted). Shut down simulator before test run.
+        // simulator itself (not pre-booted).
         options.AddAdditionalAppiumOption("connectHardwareKeyboard", true);
         options.AddAdditionalAppiumOption("newCommandTimeout", 300);
 
@@ -186,6 +254,7 @@ public static class TestConfig
         // iPhone keyboard has no dismiss button, causing cascade failures.
         options.DeviceName = Environment.GetEnvironmentVariable("IOS_SIMULATOR") ?? "Test iPad";
         options.PlatformVersion = Environment.GetEnvironmentVariable("IOS_VERSION") ?? "27.0";
+        options.AddAdditionalAppiumOption("udid", IOSUdid);
 
         return options;
     }

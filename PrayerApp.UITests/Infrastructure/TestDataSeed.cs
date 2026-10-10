@@ -41,7 +41,7 @@ internal static class TestDataSeed
         // Mirrors PrayerApp.Services.Settings: Preferences.Set(nameof(OnboardingComplete), true)
         // — `defaults write -bool YES` is the NSUserDefaults equivalent of bool=true.
         await RunSimctlAsync(
-            $"spawn booted defaults write {TestConfig.IOSBundleId} OnboardingComplete -bool YES");
+            $"spawn {TestConfig.IOSUdid} defaults write {TestConfig.IOSBundleId} OnboardingComplete -bool YES");
     }
 
     /// <summary>
@@ -354,12 +354,14 @@ internal static class TestDataSeed
 
         var bundleId = TestConfig.IOSBundleId;
 
-        await RunSimctlAsync($"terminate booted {bundleId}", allowFailure: true);
+        var udid = TestConfig.IOSUdid;
 
-        string? container = await RunSimctlCaptureAsync($"get_app_container booted {bundleId} data");
+        await RunSimctlAsync($"terminate {udid} {bundleId}", allowFailure: true);
+
+        string? container = await RunSimctlCaptureAsync($"get_app_container {udid} {bundleId} data");
         if (string.IsNullOrWhiteSpace(container))
             throw new InvalidOperationException(
-                $"Could not resolve data container for {bundleId}. Is the app installed on the booted simulator?");
+                $"Could not resolve data container for {bundleId}. Is the app installed on simulator {udid}?");
 
         container = container.Trim();
         var destPath = Path.Combine(container, TestConfig.IOSAppDbRelativePath);
