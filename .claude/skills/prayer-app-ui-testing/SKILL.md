@@ -75,6 +75,7 @@ public class AppiumCollection : ICollectionFixture<AppiumSetup> { }
 | `DefaultTimeout` | **10 s** | Standard element wait (base; see note) |
 | `ShortTimeout` | 3 s | Quick presence checks |
 | `SessionTimeout` | 60 s | Driver session |
+| `IOSSessionTimeout` | 240 s | iOS driver session |
 
 > `WaitForElement` and `WaitAndTap` default to **15 s** (`timeoutSeconds: 15`), not `DefaultTimeout`.
 > `DefaultTimeout` (10 s) is the implicit-wait fallback, not the polling-wait default.
