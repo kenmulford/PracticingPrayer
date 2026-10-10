@@ -114,13 +114,14 @@ BundleId:              com.multithreadedllc.prayercards
 Automation:            XCUITest
 Device:                env IOS_SIMULATOR ?? "Test iPad"   (an iPad (A16))
 PlatformVersion:       env IOS_VERSION ?? "27.0"
+Udid:                  TestConfig.IOSUdid (env IOS_UDID, else resolved from Device + PlatformVersion)
 connectHardwareKeyboard: true
 noReset:               true
 ```
 
 **Why iPad?** iPhone has no keyboard dismiss button; `DismissKeyboardIfPresent` fails there, causing cascade failures on text-input tests.
 
-**Why `connectHardwareKeyboard`?** Hardware keyboard hides the software keyboard, preventing `SendKeys` from hitting dictation/emoji intercepts. Only works when Appium boots the simulator; shut the simulator down before a test run.
+**Why `connectHardwareKeyboard`?** Hardware keyboard hides the software keyboard, preventing `SendKeys` from hitting dictation/emoji intercepts. Only works when Appium boots the simulator.
 
 ---
 

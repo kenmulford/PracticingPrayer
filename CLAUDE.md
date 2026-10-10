@@ -47,7 +47,7 @@ This Mac keeps exactly four iOS simulators, shared with the ios-budget-app repo.
 | `Test iPad` | iPad (A16) | iOS 27.0 | PracticingPrayer E2E only (`IOS_SIMULATOR` default) |
 
 - E2E needs an iPad: the iPhone keyboard has no dismiss button, so `DismissKeyboardIfPresent` fails.
-- `run-e2e-mac.sh` refuses to run while any other simulator is booted. Shut down any simulator you booted for hand checks when you finish.
+- Shut down any simulator you booted for hand checks when you finish.
 - The Android emulator `pp_api36` is outside this set.
 
 ## Solving a GitHub issue (milestone-driver)

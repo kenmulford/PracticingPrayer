@@ -71,8 +71,8 @@ fi
 if want_ios; then
   step "ios simulator"
   command -v jq >/dev/null || die "jq not found (ships with macOS at /usr/bin/jq)"
-  # A name alone matches one simulator per installed runtime, and the test harness addresses
-  # "booted": resolve one simulator by name + runtime, address it by UDID, refuse a second booted one.
+  # A name alone matches one simulator per installed runtime: resolve one simulator by name + runtime
+  # and export its UDID as IOS_UDID, which the test harness addresses.
   SIM_JSON=$(xcrun simctl list devices -j) || die "xcrun simctl list devices -j failed"
   IOS_RUNTIME="com.apple.CoreSimulator.SimRuntime.iOS-${IOS_VER//./-}"
   SIM_MATCHES=$(printf '%s\n' "$SIM_JSON" | jq -r --arg rt "$IOS_RUNTIME" --arg name "$IOS_SIM" \
@@ -82,12 +82,8 @@ if want_ios; then
     "")      die "no available simulator named '$IOS_SIM' on iOS $IOS_VER; list them with 'xcrun simctl list devices available' and set IOS_SIMULATOR / IOS_VERSION" ;;
     *$'\n'*) die "several available simulators named '$IOS_SIM' on iOS $IOS_VER: ${SIM_MATCHES//$'\n'/ }; set IOS_SIMULATOR to a unique name" ;;
   esac
-  IOS_UDID="$SIM_MATCHES"
+  export IOS_UDID="$SIM_MATCHES"
   echo "ios simulator: $IOS_SIM, iOS $IOS_VER, $IOS_UDID"
-  SIM_OTHERS=$(printf '%s\n' "$SIM_JSON" | jq -r --arg u "$IOS_UDID" \
-    '.devices | to_entries[] | .key as $rt | .value[] | select(.state == "Booted" and .udid != $u) | "\(.name) \($rt | ltrimstr("com.apple.CoreSimulator.SimRuntime.")) \(.udid) (xcrun simctl shutdown \(.udid))"') \
-    || die "could not read the simulator list"
-  [ -z "$SIM_OTHERS" ] || die "another simulator is booted and the harness addresses 'booted': ${SIM_OTHERS//$'\n'/; }"
   echo "ensuring ${IOS_SIM} is booted…"
   xcrun simctl bootstatus "$IOS_UDID" -b || die "iOS sim '$IOS_SIM' ($IOS_UDID) did not boot"
 fi

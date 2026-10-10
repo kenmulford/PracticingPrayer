@@ -82,8 +82,8 @@ If your AVD has a different name, set the `ANDROID_AVD` environment variable (se
 # List available simulators
 xcrun simctl list devices available
 
-# Boot by UDID: copy the Test iPad UDID listed under "-- iOS 27.0 --" above, then paste it in place of PASTE-UDID-HERE
-xcrun simctl boot PASTE-UDID-HERE
+# Boot the Test iPad by name
+xcrun simctl boot "Test iPad"
 open -a Simulator
 ```
 
@@ -112,8 +112,8 @@ $env:PRAYER_APK_PATH = "C:\path\to\com.multithreadedllc.prayercards-Signed.apk"
 dotnet build PrayerApp/PrayerApp.csproj -f net10.0-ios -c Debug \
   -r iossimulator-arm64 -p:_DeviceType=Simulator
 
-# Install on booted simulator
-xcrun simctl install booted PrayerApp/bin/Debug/net10.0-ios/iossimulator-arm64/PrayerApp.app
+# Install on the Test iPad
+xcrun simctl install "Test iPad" PrayerApp/bin/Debug/net10.0-ios/iossimulator-arm64/PrayerApp.app
 ```
 
 ### 4. Start the Appium server
@@ -243,6 +243,7 @@ All optional. Set before running `dotnet test`.
 | `PRAYER_APK_PATH` | _(pre-installed)_ | Path to APK; if set, Appium installs it |
 | `IOS_SIMULATOR` | `Test iPad` | iOS simulator device name |
 | `IOS_VERSION` | `27.0` | iOS platform version string |
+| `IOS_UDID` | _(resolved)_ | Optional override: UDID of the target simulator. Unset, the harness uses the one available simulator named `IOS_SIMULATOR` on iOS `IOS_VERSION` |
 
 **PC (PowerShell — session-only):**
 ```powershell
