@@ -280,6 +280,12 @@ internal static class TestDataSeed
         {
             (TestSeedFixtures.ImportSkipsDuplicatesPrayer, "Duplicate-skip fixture.", false),
         });
+
+        // PrayerListTests.OneTimeReminder_FutureDate_ShowsOnceOnInReadView edits and saves this prayer.
+        await SeedCardWithPrayersAsync(boxId: 0, TestSeedFixtures.ReminderDateCard, new[]
+        {
+            (TestSeedFixtures.ReminderDatePrayer, "One-time reminder date fixture.", false),
+        });
     }
 
     private static async Task SeedCardWithPrayersAsync(int boxId, string cardTitle,

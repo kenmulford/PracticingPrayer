@@ -1450,7 +1450,48 @@ public static class AppExtensions
         // By.ClassName emits a CSS selector ('.XCUIElementTypePickerWheel'), which Appium's
         // iOS driver rejects (InvalidSelectorException). XPath is the iOS-native strategy used
         // elsewhere in this file (e.g. IOSButtonByNameOrLabel).
-        var wheelBy = By.XPath("//XCUIElementTypePickerWheel");
+        SetIOSPickerWheel(driver, By.XPath("//XCUIElementTypePickerWheel"), value, maxAttempts);
+    }
+
+    /// <summary>
+    /// Sets one wheel of the open iOS date picker. <paramref name="wheelIndex"/> is 1-based.
+    /// The UIDatePicker is the DatePicker field's InputView, so it sits in the keyboard window rather
+    /// than under the field's AutomationId; the lookup is scoped to the XCUIElementTypeDatePicker.
+    /// </summary>
+    public static void SelectIOSPickerWheelValue(this AppiumDriver driver, int wheelIndex, string value, int maxAttempts = 6)
+    {
+        if (!TestConfig.IsIOS) return;
+        const string wheels = "//XCUIElementTypeDatePicker//XCUIElementTypePickerWheel";
+        var wait = new WebDriverWait(driver, TimeSpan.FromSeconds(10));
+        wait.Until(d => d.FindElements(By.XPath(wheels)).Count > 0);
+        // Wheels are month / day / year, so the year is wheel 3 (en-US simulator locale).
+        var count = driver.FindElements(By.XPath(wheels)).Count;
+        if (count != 3)
+            throw new Xunit.Sdk.XunitException($"Expected 3 date picker wheels, found {count}.");
+        SetIOSPickerWheel(driver, By.XPath($"({wheels})[{wheelIndex}]"), value, maxAttempts);
+    }
+
+    /// <summary>
+    /// iOS-only: closes the open Picker/DatePicker input view via its Done accessory button.
+    /// HideKeyboard does not close it, and taps on other fields may not land while it is open.
+    /// </summary>
+    public static void CloseIOSPicker(this AppiumDriver driver, int timeoutSeconds = 10)
+    {
+        if (!TestConfig.IsIOS) return;
+        var done = By.XPath("//XCUIElementTypeOther[@name='DoneAccessory']//XCUIElementTypeButton[@name='Done']");
+        var wait = new WebDriverWait(driver, TimeSpan.FromSeconds(timeoutSeconds));
+        wait.Until(d => d.FindElement(done)).Click();
+        // The accessory is torn down while we poll; a stale element means it is gone.
+        wait.Until(d => d.FindElements(done).All(e =>
+        {
+            try { return !e.Displayed; }
+            catch (StaleElementReferenceException) { return true; }
+        }));
+        Thread.Sleep(TestConfig.DelayAfterTap);
+    }
+
+    private static void SetIOSPickerWheel(AppiumDriver driver, By wheelBy, string value, int maxAttempts)
+    {
         var wait = new WebDriverWait(driver, TimeSpan.FromSeconds(10));
         wait.Until(d => d.FindElement(wheelBy));
 

@@ -389,4 +389,126 @@ public class NotificationServiceTests
         Assert.Equal(23, result.Hour);
         Assert.Equal(59, result.Minute);
     }
+
+    // ── ScheduleAsync — NotifyDate ────────────────────────────────────────────
+
+    [Fact]
+    public async Task ScheduleAsync_OneTimeWithNotifyDate_SchedulesAtThatDateAndTime()
+    {
+        var date = DateTime.Today.AddDays(3);
+        var prayer = new Prayer
+        {
+            Id = 10, Title = "Once", PrayerFrequency = PrayerFrequency.OneTime,
+            NotifyHour = 8, NotifyMinute = 30, NotifyDate = date
+        };
+
+        await _service.ScheduleAsync(prayer);
+
+        await _center.Received(1).ShowAsync(
+            10, "Practicing Prayer", "Once",
+            date.AddHours(8).AddMinutes(30), NotifyRepeat.No, null);
+    }
+
+    [Fact]
+    public async Task ScheduleAsync_YearlyWithNotifyDate_SchedulesNextOccurrence()
+    {
+        var prayer = new Prayer
+        {
+            Id = 11, Title = "Yearly", PrayerFrequency = PrayerFrequency.Yearly,
+            NotifyHour = 9, NotifyMinute = 0, NotifyDate = new DateTime(2020, 3, 5)
+        };
+
+        await _service.ScheduleAsync(prayer);
+
+        var expected = PrayerApp.Helpers.NotificationHelper.NextYearlyFire(
+            prayer.NotifyDate!.Value, 9, 0, DateTime.Now);
+        await _center.Received(1).ShowAsync(
+            11, "Practicing Prayer", "Yearly", expected, NotifyRepeat.No, null);
+    }
+
+    [Fact]
+    public async Task ScheduleAsync_YearlyNullNotifyDate_AnchorsOnCreationDate()
+    {
+        var created = DateTime.Today.AddDays(-40).AddHours(8);
+        var prayer = new Prayer
+        {
+            Id = 13, Title = "Yearly legacy", PrayerFrequency = PrayerFrequency.Yearly,
+            NotifyHour = 9, NotifyMinute = 0, CreatedAt = created
+        };
+
+        await _service.ScheduleAsync(prayer);
+
+        var expected = PrayerApp.Helpers.NotificationHelper.NextYearlyFire(created.Date, 9, 0, DateTime.Now);
+        await _center.Received(1).ShowAsync(
+            13, "Practicing Prayer", "Yearly legacy", expected, NotifyRepeat.No, null);
+    }
+
+    [Fact]
+    public async Task ScheduleAsync_OneTimeWithPastNotifyDate_SchedulesNothing()
+    {
+        var prayer = new Prayer
+        {
+            Id = 12, Title = "Past", PrayerFrequency = PrayerFrequency.OneTime,
+            NotifyHour = 8, NotifyMinute = 0, NotifyDate = DateTime.Today.AddDays(-2)
+        };
+
+        await _service.ScheduleAsync(prayer);
+
+        _center.Received(1).Cancel(12);
+        await _center.DidNotReceive().ShowAsync(
+            Arg.Any<int>(), Arg.Any<string>(), Arg.Any<string>(),
+            Arg.Any<DateTime>(), Arg.Any<NotifyRepeat>(), Arg.Any<TimeSpan?>());
+    }
+
+    [Fact]
+    public async Task ScheduleAsync_OneTimeNullNotifyDateFirstFirePassed_SchedulesNothing()
+    {
+        var prayer = new Prayer
+        {
+            Id = 14, Title = "Legacy past", PrayerFrequency = PrayerFrequency.OneTime,
+            NotifyHour = 9, NotifyMinute = 0, NotifyDate = null,
+            CreatedAt = DateTime.Today.AddDays(-1).AddHours(8)
+        };
+
+        await _service.ScheduleAsync(prayer);
+
+        _center.Received(1).Cancel(14);
+        await _center.DidNotReceive().ShowAsync(
+            Arg.Any<int>(), Arg.Any<string>(), Arg.Any<string>(),
+            Arg.Any<DateTime>(), Arg.Any<NotifyRepeat>(), Arg.Any<TimeSpan?>());
+    }
+
+    [Fact]
+    public async Task ScheduleAsync_OneTimeNullNotifyDateCreatedAfterTime_SchedulesNextDay()
+    {
+        var createdAt = DateTime.Today.AddHours(21).AddMinutes(45);
+        var prayer = new Prayer
+        {
+            Id = 15, Title = "Legacy late", PrayerFrequency = PrayerFrequency.OneTime,
+            NotifyHour = 9, NotifyMinute = 0, NotifyDate = null, CreatedAt = createdAt
+        };
+
+        await _service.ScheduleAsync(prayer);
+
+        await _center.Received(1).ShowAsync(
+            15, "Practicing Prayer", "Legacy late",
+            DateTime.Today.AddDays(1).AddHours(9), NotifyRepeat.No, null);
+    }
+
+    [Fact]
+    public async Task ScheduleAsync_OneTimeNullNotifyDate_KeepsTodayOrTomorrow()
+    {
+        var prayer = new Prayer
+        {
+            Id = 13, Title = "Legacy", PrayerFrequency = PrayerFrequency.OneTime,
+            NotifyHour = 9, NotifyMinute = 0, NotifyDate = null
+        };
+
+        await _service.ScheduleAsync(prayer);
+
+        var call = _center.ReceivedCalls().Single(c => c.GetMethodInfo().Name == nameof(ILocalNotificationCenter.ShowAsync));
+        var fire = (DateTime)call.GetArguments()[3]!;
+        Assert.True(fire > DateTime.Now);
+        Assert.True(fire - DateTime.Now <= TimeSpan.FromHours(24));
+    }
 }

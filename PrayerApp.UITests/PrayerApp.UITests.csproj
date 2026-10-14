@@ -43,6 +43,8 @@
     <!-- Database service (unit tests skip this; UI tests need a real SQLite file) -->
     <Compile Include="../PrayerApp/Services/IDBService.cs" />
     <Compile Include="../PrayerApp/Services/DBService.cs" />
+    <Compile Include="../PrayerApp/Services/NotifyDateMigration.cs" />
+    <Compile Include="../PrayerApp/Helpers/NotificationHelper.cs" />
 
     <!-- DBService.cs invokes PerfLog (Slice 5/6 perf tracing instrumentation).
          PerfLog routes through Diagnostics.ResolveLog() on iOS for diagnostics.log

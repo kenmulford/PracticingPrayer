@@ -201,6 +201,16 @@
                                 <TimePicker AutomationId="Detail_Picker_ReminderTime" Time="{Binding NotifyTime}" />
                             </VerticalStackLayout>
 
+                            <!-- Reminder Date (One-time and Yearly only) -->
+                            <VerticalStackLayout Spacing="4" IsVisible="{Binding ShowNotifyDate}">
+                                <Label Text="Reminder Date" Style="{StaticResource FormLabel}" />
+                                <DatePicker AutomationId="Detail_Picker_ReminderDate"
+                                            MinimumDate="{Binding NotifyMinimumDate}"
+                                            Date="{Binding NotifyDate}"
+                                            SemanticProperties.Description="Reminder date"
+                                            SemanticProperties.Hint="Choose the day this reminder fires" />
+                            </VerticalStackLayout>
+
                             <!-- Day of Week (Weekly only) -->
                             <VerticalStackLayout Spacing="4" IsVisible="{Binding ShowDayOfWeek}">
                                 <Label Text="Day of Week" Style="{StaticResource FormLabel}" />

@@ -29,4 +29,9 @@ public static class TestSeedFixtures
     // TestDataSeedConsistencyTests enumerates.
     public const string ImportSkipsDuplicatesCard = "UITest Card ImportExisting_SkipsDuplicates";
     public const string ImportSkipsDuplicatesPrayer = "UITest Prayer ImportExisting_SkipsDuplicates";
+
+    // Owned by PrayerListTests.OneTimeReminder_FutureDate_ShowsOnceOnInReadView alone, which edits
+    // and saves the prayer; no other test reads it.
+    public const string ReminderDateCard = "UITest Card OneTimeReminder_ShowsDate";
+    public const string ReminderDatePrayer = "UITest Prayer OneTimeReminder_ShowsDate";
 }

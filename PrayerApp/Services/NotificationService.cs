@@ -1,3 +1,4 @@
+using PrayerApp.Helpers;
 using PrayerApp.Models;
 
 namespace PrayerApp.Services;
@@ -72,9 +73,24 @@ public class NotificationService : INotificationService
             return;
         }
 
-        // Daily/Weekly/OneTime/Yearly — use existing plugin path
+        if (prayer.PrayerFrequency == PrayerFrequency.OneTime)
+        {
+            var fire = NotificationHelper.OneTimeFire(prayer);
+            if (fire <= DateTime.Now)
+                return;
+            await _center.ShowAsync(prayer.Id, "Practicing Prayer", prayer.Title, fire, NotifyRepeat.No, null);
+            return;
+        }
+
+        // Daily/Weekly/Yearly — use existing plugin path
         DateTime notifyTime;
-        if (prayer.PrayerFrequency == PrayerFrequency.Weekly && prayer.NotifyDayOfWeek >= 0)
+        if (prayer.PrayerFrequency == PrayerFrequency.Yearly)
+        {
+            // One-shot at the next anniversary avoids leap-year drift; a null date anchors on the first fire after creation.
+            var anchor = prayer.NotifyDate ?? NotificationHelper.GetFirstFireTime(prayer.CreatedAt, hour, minute).Date;
+            notifyTime = NotificationHelper.NextYearlyFire(anchor, hour, minute, DateTime.Now);
+        }
+        else if (prayer.PrayerFrequency == PrayerFrequency.Weekly && prayer.NotifyDayOfWeek >= 0)
         {
             notifyTime = GetNextDayOfWeek((DayOfWeek)prayer.NotifyDayOfWeek, hour, minute);
         }
@@ -85,32 +101,12 @@ public class NotificationService : INotificationService
                 notifyTime = notifyTime.AddDays(1);
         }
 
-        NotifyRepeat repeatType;
-        TimeSpan? repeatInterval = null;
-
-        switch (prayer.PrayerFrequency)
+        var repeatType = prayer.PrayerFrequency switch
         {
-            case PrayerFrequency.Daily:
-                repeatType = NotifyRepeat.Daily;
-                break;
-            case PrayerFrequency.Weekly:
-                repeatType = NotifyRepeat.Weekly;
-                break;
-            case PrayerFrequency.Yearly:
-            {
-                // Schedule one-shot at next anniversary to avoid leap-year drift.
-                // Compute from today's date at the specified time, then find next year.
-                var candidate = DateTime.Now.Date.AddHours(hour).AddMinutes(minute);
-                if (candidate <= DateTime.Now)
-                    candidate = candidate.AddYears(1);
-                notifyTime = candidate;
-                repeatType = NotifyRepeat.No;
-                break;
-            }
-            default: // OneTime
-                repeatType = NotifyRepeat.No;
-                break;
-        }
+            PrayerFrequency.Daily => NotifyRepeat.Daily,
+            PrayerFrequency.Weekly => NotifyRepeat.Weekly,
+            _ => NotifyRepeat.No
+        };
 
         await _center.ShowAsync(
             prayer.Id,
@@ -118,7 +114,7 @@ public class NotificationService : INotificationService
             prayer.Title,
             notifyTime,
             repeatType,
-            repeatInterval);
+            null);
         }
         catch (Exception ex)
         {
