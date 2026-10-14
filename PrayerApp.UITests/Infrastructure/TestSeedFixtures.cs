@@ -40,4 +40,7 @@ public static class TestSeedFixtures
     // TestDataSeedConsistencyTests enumerates.
     public const string PickerSafeAreaCard = "UITest Card Cards_CollectionPicker_Close_KeepsTitleBelowNavBar";
     public const string PickerSafeAreaPrayer = "UITest Prayer Cards_CollectionPicker_Close_KeepsTitleBelowNavBar";
+
+    // Owned by Cards_SaveAndNew_CreatesTwoCardsInCollection alone; the test adds its cards here.
+    public const string SaveAndNewCollection = "UITest Collection Cards_SaveAndNew_CreatesTwoCardsInCollection";
 }

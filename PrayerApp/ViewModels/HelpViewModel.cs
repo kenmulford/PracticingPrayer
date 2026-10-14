@@ -13,7 +13,7 @@ public class HelpViewModel
         {
             // Getting Started
             new("How do I create a prayer card?",
-                "Tap the Prayer Cards tab, then tap \"Add Card\" in the top right. Give your card a name — a person, topic, or place — then tap Save.",
+                "Tap the Prayer Cards tab, then tap \"Add Card\" in the top right. Give your card a name — a person, topic, or place — then tap Save, or Save + to save it and start another card in the same collection.",
                 accessibilityService),
 
             new("How do I add a prayer request?",

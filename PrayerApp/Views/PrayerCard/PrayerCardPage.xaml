@@ -8,12 +8,6 @@
              x:DataType="viewModels:PrayerCardViewModel"
              Title="Prayer Card"
              SafeAreaEdges="{OnPlatform iOS='Container, Container, Container, All', Default=Container}">
-    <ContentPage.ToolbarItems>
-        <ToolbarItem Text="Save"
-                     Command="{Binding SaveCommand}"
-                     SemanticProperties.Hint="Save prayer card changes"
-                     x:DataType="viewModels:PrayerCardViewModel" />
-    </ContentPage.ToolbarItems>
 
     <Grid RowDefinitions="*,Auto">
 

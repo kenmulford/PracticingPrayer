@@ -184,6 +184,73 @@ public class PrayerCardTests
         driver.WaitForElementGone("Card_Entry_Title");
     }
 
+    /// <summary>
+    /// #336: "Save +" on the new-card page saves the card, clears the form, and keeps the chosen
+    /// collection, so two cards in a row land in the same collection without leaving the page.
+    /// </summary>
+    [SkippableFact]
+    public void Cards_SaveAndNew_CreatesTwoCardsInCollection()
+    {
+        Skip.IfNot(TestConfig.IsIOS, "iOS-only: the collection picker helpers drive the iOS wheel picker");
+
+        _setup.Driver.ResetAppUIState(_setup);
+        _setup.Driver.EnsureOnTab("Home", _setup);
+        _setup.Driver.EnsureOnTab("Prayer Cards", _setup);
+        var driver = _setup.Driver;
+
+        var stamp = DateTime.Now.ToString("HHmmss");
+        var titleA = $"SaveAndNew A {stamp}";
+        var titleB = $"SaveAndNew B {stamp}";
+
+        driver.TapToolbarItemById("Add Card");
+        driver.WaitForElement("Card_Entry_Title", timeoutSeconds: 10);
+
+        driver.EnterText("Card_Entry_Title", titleA);
+        driver.DismissKeyboardIfPresent();
+        driver.WaitAndTap("Card_Picker_Box");
+        driver.SelectIOSPickerValue(TestSeedFixtures.SaveAndNewCollection);
+        driver.CloseIOSPicker();
+        Assert.Equal(TestSeedFixtures.SaveAndNewCollection, driver.IOSPickerFieldValue("Card_Picker_Box"));
+        // TapToolbarItem finds buttons by name on the main bar only; Save + is a Secondary item.
+        driver.TapToolbarItemById("Save +");
+        Thread.Sleep(TestConfig.DelayAfterSave);
+
+        // The form reset to a blank card but kept the collection.
+        new WebDriverWait(driver, TimeSpan.FromSeconds(10))
+            .Until(_ => driver.WaitForElement("Card_Entry_Title").Text != titleA);
+        Assert.Equal(TestSeedFixtures.SaveAndNewCollection, driver.IOSPickerFieldValue("Card_Picker_Box"));
+
+        driver.EnterText("Card_Entry_Title", titleB);
+        driver.DismissKeyboardIfPresent();
+        driver.TapToolbarItemById("Save +");
+        Thread.Sleep(TestConfig.DelayAfterSave);
+        new WebDriverWait(driver, TimeSpan.FromSeconds(10))
+            .Until(_ => driver.WaitForElement("Card_Entry_Title").Text != titleB);
+
+        driver.GoBack();
+        driver.DismissAlertIfPresent();
+        driver.WaitForElementGone("Card_Entry_Title");
+
+        foreach (var title in new[] { titleA, titleB })
+        {
+            driver.EnsureCardVisible(title);
+            Assert.True(driver.IsTextContainsDisplayed(title, timeoutSeconds: 5),
+                $"'{title}' should be listed after Save +.");
+        }
+
+        // Reopen card B: its stored collection proves the second save kept the chosen collection.
+        EnsureCardExpanded(driver, titleB);
+        Assert.True(IsCardHeaderExpanded(driver, titleB),
+            $"'{titleB}' did not expand, so Cards_Btn_Edit would open another card.");
+        driver.WaitAndTap("Cards_Btn_Edit");
+        new WebDriverWait(driver, TimeSpan.FromSeconds(10))
+            .Until(_ => driver.WaitForElement("Card_Entry_Title").Text == titleB);
+        Assert.Equal(TestSeedFixtures.SaveAndNewCollection, driver.IOSPickerFieldValue("Card_Picker_Box"));
+        driver.GoBack();
+        driver.DismissAlertIfPresent();
+        driver.WaitForElementGone("Card_Entry_Title");
+    }
+
     // ── Slice 6c real + 6g — expand realize + post-save overlay continuity ──
 
     /// <summary>

@@ -97,6 +97,7 @@ public class PrayerCardViewModelTests
     [Fact]
     public async Task SaveCommand_NewCard_AdvancesOnboarding()
     {
+        _onboardingService.CurrentStep.Returns(OnboardingStep.NameCard);
         var sut = CreateSut();
         sut.Title = "First Card";
 
@@ -468,6 +469,235 @@ public class PrayerCardViewModelTests
 
         await _cardService.Received(1).SaveCardAsync(
             Arg.Is<PrayerCard>(c => c.BoxId == 5));
+    }
+
+    [Fact]
+    public async Task SaveAndNewCommand_ValidTitle_SavesWithSelectedBoxAndResets()
+    {
+        _boxService.GetBoxesAsync().Returns(new List<CardBox>
+        {
+            new() { Id = 5, Name = "Family" }
+        }.AsReadOnly());
+
+        var sut = CreateSut();
+        sut.Title = "Test Card";
+        await sut.LoadBoxPickerAsync();
+        var family = sut.AvailableBoxes.OfType<RealBoxPickerItem>().First(b => b.BoxId == 5);
+        sut.SelectedBox = family;
+
+        await ((IAsyncRelayCommand)sut.SaveAndNewCommand).ExecuteAsync(null);
+
+        await _cardService.Received(1).SaveCardAsync(Arg.Is<PrayerCard>(c => c.BoxId == 5));
+        Assert.Equal(string.Empty, sut.Title);
+        Assert.True(sut.IsNew);
+        Assert.False(sut.IsDirty);
+        Assert.Same(family, sut.SelectedBox);
+        Assert.True(sut.PendingFocusTitle);
+        await _navigationService.DidNotReceive().GoToAsync(Arg.Any<string>());
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task SaveAndNewCommand_BlankTitle_ShowsAlertAndSavesNothing(string title)
+    {
+        var sut = CreateSut();
+        sut.Title = title;
+
+        await ((IAsyncRelayCommand)sut.SaveAndNewCommand).ExecuteAsync(null);
+
+        await _navigationService.Received(1).DisplayAlertAsync("Required", "Please enter a card title.", "OK");
+        await _cardService.DidNotReceive().SaveCardAsync(Arg.Any<PrayerCard>());
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task SaveCommand_BlankTitle_ShowsAlertAndSavesNothing(string title)
+    {
+        var sut = CreateSut();
+        sut.Title = title;
+
+        await ((IAsyncRelayCommand)sut.SaveCommand).ExecuteAsync(null);
+
+        await _navigationService.Received(1).DisplayAlertAsync("Required", "Please enter a card title.", "OK");
+        await _cardService.DidNotReceive().SaveCardAsync(Arg.Any<PrayerCard>());
+        await _navigationService.DidNotReceive().GoToAsync(Arg.Any<string>());
+    }
+
+    [Fact]
+    public void ShowSaveAndNew_ExistingCard_False()
+    {
+        var sut = new PrayerCardViewModel(new PrayerCard { Id = 7 }, _cardService, _prayerService,
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings,
+            _confidentialAccessService);
+
+        Assert.False(sut.ShowSaveAndNew);
+    }
+
+    [Fact]
+    public async Task SaveAndNewCommand_NotifiesCanExecuteWhileBusy()
+    {
+        var sut = CreateSut();
+        sut.Title = "Test";
+        bool saveCanExecuteWhileBusy = true;
+        var saveAndNewCanExecuteChanged = 0;
+        sut.SaveAndNewCommand.CanExecuteChanged += (_, _) => saveAndNewCanExecuteChanged++;
+        _cardService.SaveCardAsync(Arg.Any<PrayerCard>()).Returns(call =>
+        {
+            saveCanExecuteWhileBusy = sut.SaveCommand.CanExecute(null);
+            return Task.FromResult((PrayerCard)call[0]);
+        });
+
+        await ((IAsyncRelayCommand)sut.SaveAndNewCommand).ExecuteAsync(null);
+
+        Assert.False(saveCanExecuteWhileBusy);
+        Assert.True(sut.SaveAndNewCommand.CanExecute(null));
+        Assert.True(saveAndNewCanExecuteChanged >= 2);
+    }
+
+    [Fact]
+    public async Task SaveAndNewCommand_RunTwice_SavesTwoDistinctCards()
+    {
+        var sut = CreateSut();
+        var savedIds = new List<int>();
+        var savedTitles = new List<string>();
+        _cardService.SaveCardAsync(Arg.Any<PrayerCard>()).Returns(call =>
+        {
+            var card = (PrayerCard)call[0];
+            savedIds.Add(card.Id);
+            savedTitles.Add(card.Title);
+            card.Id = 100 + savedIds.Count;
+            return Task.FromResult(card);
+        });
+
+        sut.Title = "First";
+        await ((IAsyncRelayCommand)sut.SaveAndNewCommand).ExecuteAsync(null);
+        sut.Title = "Second";
+        await ((IAsyncRelayCommand)sut.SaveAndNewCommand).ExecuteAsync(null);
+
+        Assert.Equal(new[] { 0, 0 }, savedIds);
+        Assert.Equal(new[] { "First", "Second" }, savedTitles);
+    }
+
+    [Fact]
+    public async Task ShowSaveAndNew_False_WhileLoadPending()
+    {
+        var tcs = new TaskCompletionSource<PrayerCard>();
+        _db.GetByIdAsync<PrayerCard>(7).Returns(tcs.Task);
+        var sut = CreateSut();
+        Assert.True(sut.ShowSaveAndNew);
+
+        ((IQueryAttributable)sut).ApplyQueryAttributes(new Dictionary<string, object> { ["load"] = "7" });
+
+        Assert.True(sut.IsLoadRequested);
+        Assert.False(sut.ShowSaveAndNew);
+
+        tcs.SetResult(new PrayerCard { Id = 7, Title = "Existing" });
+        for (var i = 0; i < 100 && sut.IsNew; i++)
+            await Task.Delay(10);
+
+        Assert.False(sut.IsNew);
+        Assert.False(sut.ShowSaveAndNew);
+    }
+
+    [Fact]
+    public async Task ShowSaveAndNew_LoadThrows_StaysFalse()
+    {
+        _db.GetByIdAsync<PrayerCard>(7).Returns(Task.FromException<PrayerCard>(new InvalidOperationException("boom")));
+        var sut = CreateSut();
+
+        ((IQueryAttributable)sut).ApplyQueryAttributes(new Dictionary<string, object> { ["load"] = "7" });
+        await _navigationService.Received(1).DisplayAlertAsync("Error", Arg.Is<string>(m => m.Contains("boom")), "OK");
+
+        Assert.True(sut.IsNew);
+        Assert.False(sut.ShowSaveAndNew);
+    }
+
+    [Fact]
+    public void ShowSaveAndNew_OnboardingNameCardStep_False()
+    {
+        _onboardingService.CurrentStep.Returns(OnboardingStep.NameCard);
+        var sut = CreateSut();
+
+        Assert.False(sut.ShowSaveAndNew);
+    }
+
+    [Fact]
+    public async Task SaveAndNewCommand_PendingFocusUnconsumed_SignalsFocusAgain()
+    {
+        var sut = CreateSut();
+        var raised = 0;
+        sut.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(PrayerCardViewModel.PendingFocusTitle) && sut.PendingFocusTitle) raised++;
+        };
+
+        sut.Title = "One";
+        await ((IAsyncRelayCommand)sut.SaveAndNewCommand).ExecuteAsync(null);
+        sut.Title = "Two";
+        await ((IAsyncRelayCommand)sut.SaveAndNewCommand).ExecuteAsync(null);
+
+        Assert.Equal(2, raised);
+    }
+
+    [Fact]
+    public async Task SaveAndNewCommand_DoesNotAnnounce()
+    {
+        var sut = CreateSut();
+        sut.Title = "Card";
+
+        await ((IAsyncRelayCommand)sut.SaveAndNewCommand).ExecuteAsync(null);
+
+        _accessibilityService.DidNotReceive().Announce("Card saved");
+    }
+
+    [Fact]
+    public async Task SaveCommand_NonNameCardStep_DoesNotAdvanceOnboarding()
+    {
+        _onboardingService.CurrentStep.Returns(OnboardingStep.AddRequest);
+        var sut = CreateSut();
+        sut.Title = "Card";
+
+        await ((IAsyncRelayCommand)sut.SaveCommand).ExecuteAsync(null);
+
+        _onboardingService.DidNotReceive().Advance();
+    }
+
+    [Fact]
+    public async Task SaveAndNewCommand_ResetCard_CarriesSelectedBoxId()
+    {
+        _boxService.GetBoxesAsync().Returns(new List<CardBox> { new() { Id = 5, Name = "Family" } }.AsReadOnly());
+        var sut = CreateSut();
+        sut.Title = "A";
+        await sut.LoadBoxPickerAsync();
+        sut.SelectedBox = sut.AvailableBoxes.OfType<RealBoxPickerItem>().First(b => b.BoxId == 5);
+        PrayerCard? second = null;
+        var calls = 0;
+        _cardService.SaveCardAsync(Arg.Any<PrayerCard>()).Returns(call =>
+        {
+            if (++calls == 2) second = (PrayerCard)call[0];
+            return Task.FromResult((PrayerCard)call[0]);
+        });
+
+        await ((IAsyncRelayCommand)sut.SaveAndNewCommand).ExecuteAsync(null);
+        Assert.Equal(5, sut.BoxId);
+        sut.Title = "B";
+        await ((IAsyncRelayCommand)sut.SaveAndNewCommand).ExecuteAsync(null);
+
+        Assert.Equal(5, second!.BoxId);
+    }
+
+    [Fact]
+    public async Task SaveAndNewCommand_NonNameCardStep_DoesNotAdvanceOnboarding()
+    {
+        _onboardingService.CurrentStep.Returns(OnboardingStep.AddRequest);
+        var sut = CreateSut();
+        sut.Title = "Card";
+
+        await ((IAsyncRelayCommand)sut.SaveAndNewCommand).ExecuteAsync(null);
+
+        _onboardingService.DidNotReceive().Advance();
     }
 
     [Fact]
