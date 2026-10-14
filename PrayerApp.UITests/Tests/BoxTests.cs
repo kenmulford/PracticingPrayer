@@ -97,4 +97,63 @@ public class BoxTests
         Thread.Sleep(TestConfig.DelayAfterNavigation);
     }
 
+    /// <summary>#335: protection radios respond to taps once Protect All Cards is on, and the choice persists.</summary>
+    [Fact]
+    public void Boxes_ProtectAllCards_RadiosSelectAndPersist()
+    {
+        _setup.Driver.ResetAppUIState(_setup);
+        _setup.Driver.EnsureOnTab("Prayer Cards", _setup);
+        var driver = _setup.Driver;
+
+        driver.TapToolbarItemById("Collections");
+        driver.WaitForElement("Boxes_List_Boxes", timeoutSeconds: 10);
+
+        driver.TapToolbarItem("Add");
+        driver.WaitForElement("BoxDetail_Entry_Name", timeoutSeconds: 10);
+
+        var collectionName = $"Protect Radios UITest {DateTime.UtcNow.Ticks}";
+        driver.EnterText("BoxDetail_Entry_Name", collectionName);
+
+        // Protect All Cards is off: the radios are disabled and ignore taps.
+        driver.WaitAndTap("BoxDetail_Radio_ProtectionHidden");
+        Assert.False(driver.IsRadioChecked("BoxDetail_Radio_ProtectionHidden"),
+            "Radio must not select while Protect All Cards is off");
+        Assert.True(driver.WaitForRadioChecked("BoxDetail_Radio_ProtectionOff"),
+            "Off radio must stay checked while Protect All Cards is off");
+
+        driver.WaitAndTap("BoxDetail_Switch_ProtectAllCards");
+        driver.WaitAndTap("BoxDetail_Radio_ProtectionLocked");
+        Assert.True(driver.WaitForRadioChecked("BoxDetail_Radio_ProtectionLocked"),
+            "Locked radio should select once Protect All Cards is on");
+
+        driver.TapToolbarItem("Save");
+        Thread.Sleep(TestConfig.DelayAfterSave);
+
+        var onList = driver.IsDisplayed("Boxes_List_Boxes", timeoutSeconds: 10);
+        if (!onList && TestConfig.IsIOS)
+        {
+            driver.GoBack();
+            Thread.Sleep(TestConfig.DelayAfterNavigation);
+        }
+
+        // Row tap only selects; the Edit chip opens the detail page.
+        driver.ResetIOSListScrollToTop("Boxes_List_Boxes");
+        driver.ScrollDownToTextContains(collectionName, scrollableAutomationId: "Boxes_List_Boxes");
+        driver.TapByTextContains(collectionName);
+        driver.WaitAndTap("Boxes_Btn_Edit");
+        driver.WaitForElement("BoxDetail_Entry_Name", timeoutSeconds: 10);
+        Assert.True(driver.WaitForRadioChecked("BoxDetail_Radio_ProtectionLocked"),
+            "Saved protection level should persist after reopening the collection");
+
+        // Off then on re-enables the radios; Hidden must still be selectable.
+        driver.WaitAndTap("BoxDetail_Switch_ProtectAllCards");
+        driver.WaitAndTap("BoxDetail_Switch_ProtectAllCards");
+        driver.WaitAndTap("BoxDetail_Radio_ProtectionHidden");
+        Assert.True(driver.WaitForRadioChecked("BoxDetail_Radio_ProtectionHidden"),
+            "Hidden radio should select after toggling Protect All Cards off and on");
+
+        driver.GoBack();
+        driver.DismissAlertIfPresent();
+    }
+
 }

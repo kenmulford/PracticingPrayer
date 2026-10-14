@@ -589,12 +589,13 @@ public static class AppExtensions
     /// <c>mobile: scroll direction=up</c> (the inverse of <see cref="ScrollDown"/>).
     /// Mirrors the iOS branch of <see cref="ResetCardsListScroll"/>, parameterised for any
     /// container so <see cref="ScrollToPrayerAndTap"/> can land on a known top position before
-    /// its down-only search. Best-effort: silently no-ops if the container isn't on screen.
+    /// its down-only search. Best-effort: silently no-ops off iOS or if the container isn't on screen.
     /// Iterating from an already-top list is a harmless no-op (a list can't scroll past its top).
     /// </summary>
-    private static void ResetIOSListScrollToTop(AppiumDriver driver, string containerAutomationId)
+    public static void ResetIOSListScrollToTop(this AppiumDriver driver, string containerAutomationId)
     {
         const int MaxIterations = 8;
+        if (!TestConfig.IsIOS) return;
 
         string listId;
         try { listId = driver.FindElement(MobileBy.AccessibilityId(containerAutomationId)).Id; }
@@ -1948,6 +1949,34 @@ public static class AppExtensions
     public static string GetAccessibleHint(this AppiumDriver driver, string automationId)
         => ReadToolbarAccessibleAttribute(driver, automationId,
             androidAttr: "hint", iosAttr: "value");
+
+    /// <summary>Whether a RadioButton is checked: Android reads the checked attribute, iOS reads value ("1").</summary>
+    public static bool IsRadioChecked(this AppiumDriver driver, string automationId)
+    {
+        var el = driver.FindByAutomationId(automationId);
+        return TestConfig.IsAndroid
+            ? string.Equals(el.GetDomAttribute("checked"), "true", StringComparison.OrdinalIgnoreCase)
+            : el.GetDomAttribute("value") == "1";
+    }
+
+    /// <summary>Poll until a RadioButton's checked state equals <paramref name="expected"/>; false on timeout.</summary>
+    public static bool WaitForRadioChecked(this AppiumDriver driver, string automationId,
+        bool expected = true, int timeoutSeconds = 10)
+    {
+        var wait = new WebDriverWait(driver, TimeSpan.FromSeconds(timeoutSeconds))
+        {
+            PollingInterval = TimeSpan.FromMilliseconds(TestConfig.DelayShortSettle),
+        };
+        wait.IgnoreExceptionTypes(typeof(NotFoundException), typeof(StaleElementReferenceException));
+        try
+        {
+            return wait.Until(d => driver.IsRadioChecked(automationId) == expected);
+        }
+        catch (WebDriverTimeoutException)
+        {
+            return false;
+        }
+    }
 
     /// <summary>
     /// Shared implementation: read an accessibility attribute by AutomationId, with

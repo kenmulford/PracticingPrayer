@@ -66,20 +66,22 @@
                     <VerticalStackLayout Spacing="6">
                         <Label Text="Protection Level" Style="{StaticResource FormLabel}" />
                         <HorizontalStackLayout Spacing="16"
-                                               IsEnabled="{Binding IsCascadeModeEnabled}"
                                                AutomationId="BoxDetail_Picker_CardProtectionMode"
                                                SemanticProperties.Description="Protection level for all cards in this collection"
                                                SemanticProperties.Hint="Choose whether cascaded cards are locked or hidden">
                             <RadioButton Content="Off"
                                          AutomationId="BoxDetail_Radio_ProtectionOff"
+                                         IsEnabled="{Binding IsCascadeModeEnabled}"
                                          GroupName="BoxCardProtectionMode"
                                          IsChecked="{Binding CardProtectionMode, Converter={StaticResource EnumToBool}, ConverterParameter=None}" />
                             <RadioButton Content="Locked"
                                          AutomationId="BoxDetail_Radio_ProtectionLocked"
+                                         IsEnabled="{Binding IsCascadeModeEnabled}"
                                          GroupName="BoxCardProtectionMode"
                                          IsChecked="{Binding CardProtectionMode, Converter={StaticResource EnumToBool}, ConverterParameter=LockedVisible}" />
                             <RadioButton Content="Hidden"
                                          AutomationId="BoxDetail_Radio_ProtectionHidden"
+                                         IsEnabled="{Binding IsCascadeModeEnabled}"
                                          GroupName="BoxCardProtectionMode"
                                          IsChecked="{Binding CardProtectionMode, Converter={StaticResource EnumToBool}, ConverterParameter=Hidden}" />
                         </HorizontalStackLayout>
