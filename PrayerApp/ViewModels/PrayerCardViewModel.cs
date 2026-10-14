@@ -17,6 +17,8 @@ namespace PrayerApp.ViewModels
         private bool _prayersLoaded;
         private bool _addingPrayer;
         private string _originalTitle = string.Empty;
+        private CardProtectionMode _originalProtectionMode;
+        private int _originalBoxId;
         private readonly ICardService _cardService;
         private readonly IPrayerService _prayerService;
         private readonly IOnboardingService _onboardingService;
@@ -47,11 +49,15 @@ namespace PrayerApp.ViewModels
             {
                 // PerfLog.Log($"PrayerCardViewModel.IsBusy.set({value}) prev={_isBusy}");
                 if (SetProperty(ref _isBusy, value))
+                {
                     (SaveCommand as IAsyncRelayCommand)?.NotifyCanExecuteChanged();
+                    (SaveAndNewCommand as IAsyncRelayCommand)?.NotifyCanExecuteChanged();
+                }
             }
         }
 
         public ICommand SaveCommand { get; private set; }
+        public ICommand SaveAndNewCommand { get; private set; }
         public ICommand DeleteCommand { get; private set; }
         public ICommand ArchiveCommand { get; }
         public ICommand SelectCardCommand { get; }
@@ -224,6 +230,40 @@ namespace PrayerApp.ViewModels
         public int BoxId => _prayerCard.BoxId;
         public bool IsNew => _prayerCard.Id == 0;
         public bool CanDelete => !IsSystem && !IsNew;
+        // Plain Save keeps the first-run flow (NameCard advances onboarding on navigation).
+        public bool ShowSaveAndNew => IsNew && !_isLoadRequested
+            && _onboardingService.CurrentStep != OnboardingStep.NameCard;
+
+        // Set when a card id arrives and never cleared: ApplyQueryAttributes loads
+        // fire-and-forget, so an existing card reads IsNew until the load completes, and
+        // a failed load leaves the placeholder behind.
+        private bool _isLoadRequested;
+        public bool IsLoadRequested
+        {
+            get => _isLoadRequested;
+            private set
+            {
+                if (SetProperty(ref _isLoadRequested, value))
+                    OnPropertyChanged(nameof(ShowSaveAndNew));
+            }
+        }
+
+        /// <summary>
+        /// Lifecycle-gated focus signal raised after Save + resets the form. The page
+        /// focuses the title entry on the dispatcher channel and then consumes the signal.
+        /// </summary>
+        private bool _pendingFocusTitle;
+        public bool PendingFocusTitle
+        {
+            get => _pendingFocusTitle;
+            private set
+            {
+                _pendingFocusTitle = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public void ConsumePendingFocusTitle() => PendingFocusTitle = false;
 
         /// <summary>
         /// Gates the Share action (issue #255): disabled (not hidden — per
@@ -240,7 +280,13 @@ namespace PrayerApp.ViewModels
         public bool IsArchived => _prayerCard.BoxId == _settings.ArchivedFolderId;
         public string ArchiveLabel => IsArchived ? "Unarchive" : "Archive";
 
-        public bool IsDirty => Title != _originalTitle;
+        private int SelectedBoxId => _selectedBox is RealBoxPickerItem real ? real.BoxId : 0;
+
+        // A new card with no title has nothing savable to lose.
+        public bool IsDirty => !(IsNew && string.IsNullOrWhiteSpace(Title))
+            && (Title != _originalTitle
+                || ProtectionMode != _originalProtectionMode
+                || SelectedBoxId != _originalBoxId);
 
         public async Task<bool> CanLeaveAsync()
         {
@@ -401,6 +447,7 @@ namespace PrayerApp.ViewModels
             _settings = settings;
             _confidentialAccessService = confidentialAccessService;
             SaveCommand = new AsyncRelayCommand(SaveAsync, () => !IsBusy);
+            SaveAndNewCommand = new AsyncRelayCommand(SaveAndNewAsync, () => !IsBusy);
             DeleteCommand = new AsyncRelayCommand(DeleteAsync, () => !IsSystem);
             ArchiveCommand = new AsyncRelayCommand(ArchiveAsync, () => !IsSystem);
             SelectCardCommand = new AsyncRelayCommand(SelectPrayerCardAsync, () => !IsSystem);
@@ -470,34 +517,71 @@ namespace PrayerApp.ViewModels
 
         private async Task SaveAsync()
         {
-            // PerfLog.Log("PrayerCardViewModel.SaveAsync.entry");
-            // if (IsBusy) { PerfLog.Log("SaveAsync.early-return (already busy)"); return; }
             if (IsBusy) return;
+            if (string.IsNullOrWhiteSpace(Title))
+            {
+                await _navigationService.DisplayAlertAsync("Required", "Please enter a card title.", "OK");
+                return;
+            }
             try
             {
                 IsBusy = true;
-                bool isNew = _prayerCard.Id == 0;
-                // Card-edit picker is RealBoxPickerItem-only; defensive
-                // pattern-match keeps the read type-safe and returns the
-                // Loose-Cards default if a future refactor admits a sentinel.
-                _prayerCard.BoxId = _selectedBox is RealBoxPickerItem real ? real.BoxId : 0;
-                // PerfLog.Log("SaveAsync.before SaveCardAsync");
-                await _cardService.SaveCardAsync(_prayerCard);
-                // PerfLog.Log("SaveAsync.after SaveCardAsync");
-                _originalTitle = Title; // Reset dirty state before navigation
-                if (isNew)
-                    _onboardingService.Advance(); // NameCard → AddRequest
+                await CoreSaveAsync();
                 _accessibilityService.Announce("Card saved");
-                // PerfLog.Log("SaveAsync.before GoToAsync");
                 await _navigationService.GoToAsync($"..?{Routes.QueryKeys.Saved}={Identifier}");
-                // PerfLog.Log("SaveAsync.after GoToAsync");
             }
             finally
             {
-                // PerfLog.Log("SaveAsync.finally entering");
                 IsBusy = false;
-                // PerfLog.Log("SaveAsync.finally exited");
             }
+        }
+
+        private async Task SaveAndNewAsync()
+        {
+            if (IsBusy) return;
+            if (string.IsNullOrWhiteSpace(Title))
+            {
+                await _navigationService.DisplayAlertAsync("Required", "Please enter a card title.", "OK");
+                return;
+            }
+            try
+            {
+                IsBusy = true;
+                var savedTitle = Title;
+                await CoreSaveAsync();
+                ResetForNewCard();
+                try { await CommunityToolkit.Maui.Alerts.Toast.Make($"Saved \"{savedTitle}\"").Show(); }
+                catch (Exception ex) { Diagnostics.ResolveLog()?.Log("PrayerCardViewModel.SaveAndNew toast", ex); }
+            }
+            finally
+            {
+                IsBusy = false;
+            }
+        }
+
+        private async Task CoreSaveAsync()
+        {
+            bool isNew = _prayerCard.Id == 0;
+            // Card-edit picker is RealBoxPickerItem-only; defensive
+            // pattern-match keeps the read type-safe and returns the
+            // Loose-Cards default if a future refactor admits a sentinel.
+            // Only a picker change relative to its baseline moves the card; otherwise a stale
+            // picker would undo an archive/unarchive that changed BoxId directly.
+            if (SelectedBoxId != _originalBoxId)
+                _prayerCard.BoxId = SelectedBoxId;
+            await _cardService.SaveCardAsync(_prayerCard);
+            CaptureOriginals(); // Reset dirty state before navigation
+            if (isNew && _onboardingService.CurrentStep == OnboardingStep.NameCard)
+                _onboardingService.Advance(); // NameCard → AddRequest
+        }
+
+        // _selectedBox is kept so the next card lands in the same collection.
+        private void ResetForNewCard()
+        {
+            _prayerCard = new PrayerCard { BoxId = SelectedBoxId };
+            CaptureOriginals();
+            RefreshProperties();
+            PendingFocusTitle = true;
         }
 
         private async Task DeleteAsync()
@@ -518,6 +602,7 @@ namespace PrayerApp.ViewModels
             foreach (var prayer in prayers)
                 await _prayerService.DeletePrayerAsync(prayer);
             await _cardService.DeleteCardAsync(_prayerCard);
+            CaptureOriginals(); // A deleted card must not trigger the Unsaved Changes prompt
             _accessibilityService.Announce("Card deleted");
             await _navigationService.GoToAsync($"..?{Routes.QueryKeys.Deleted}={Identifier}");
         }
@@ -644,6 +729,14 @@ namespace PrayerApp.ViewModels
                 }
 
                 await _cardService.AssignBoxAsync(_prayerCard, target);
+
+                // AssignBoxAsync saved the whole card; follow the picker to the new box when it
+                // lists it (the Archived system box is not listed) and reset the baseline.
+                var moved = AvailableBoxes.OfType<RealBoxPickerItem>().FirstOrDefault(b => b.BoxId == target);
+                if (moved is not null)
+                    SelectedBox = moved;
+                CaptureOriginals();
+
                 OnPropertyChanged(nameof(IsArchived));
                 OnPropertyChanged(nameof(ArchiveLabel));
 
@@ -710,6 +803,7 @@ namespace PrayerApp.ViewModels
             {
                 if (int.TryParse(query["load"].ToString(), out int _id))
                 {
+                    IsLoadRequested = true;
                     LoadPrayerCardAsync(_id).SafeFireAndForget();
                 }
             }
@@ -737,7 +831,7 @@ namespace PrayerApp.ViewModels
                 return;
             }
 
-            _originalTitle = _prayerCard.Title ?? string.Empty;
+            CaptureOriginals();
             RefreshProperties();
             await LoadBoxPickerAsync();
         }
@@ -760,6 +854,14 @@ namespace PrayerApp.ViewModels
                               .OfType<RealBoxPickerItem>()
                               .FirstOrDefault(b => b.BoxId == _prayerCard.BoxId)
                           ?? looseCards;
+            _originalBoxId = SelectedBoxId;
+        }
+
+        private void CaptureOriginals()
+        {
+            _originalTitle = Title ?? string.Empty;
+            _originalProtectionMode = ProtectionMode;
+            _originalBoxId = SelectedBoxId;
         }
 
         public void Reload()
@@ -778,6 +880,7 @@ namespace PrayerApp.ViewModels
             OnPropertyChanged(nameof(BoxId));
             OnPropertyChanged(nameof(IsNew));
             OnPropertyChanged(nameof(CanDelete));
+            OnPropertyChanged(nameof(ShowSaveAndNew));
             OnPropertyChanged(nameof(CanShare));
             OnPropertyChanged(nameof(HasPrayers));
             OnPropertyChanged(nameof(IsAnswered));

@@ -112,12 +112,12 @@ internal static class ConfidentialBackupImporter
             """
             INSERT INTO PrayerRequest
                 (Id, PrayerCardId, Title, Details, CanNotify, PrayerFrequency, NotifyHour, NotifyMinute,
-                 NotifyDayOfWeek, NotifyDayOfMonth, IsImported, IsAnswered, AnsweredAt, CreatedAt, UpdatedAt)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 NotifyDayOfWeek, NotifyDayOfMonth, NotifyDate, IsImported, IsAnswered, AnsweredAt, CreatedAt, UpdatedAt)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             prayer.Id, prayer.PrayerCardId, prayer.Title, prayer.Details, prayer.CanNotify,
             prayer.PrayerFrequency, prayer.NotifyHour, prayer.NotifyMinute, prayer.NotifyDayOfWeek,
-            prayer.NotifyDayOfMonth, prayer.IsImported, prayer.IsAnswered, prayer.AnsweredAt,
+            prayer.NotifyDayOfMonth, prayer.NotifyDate, prayer.IsImported, prayer.IsAnswered, prayer.AnsweredAt,
             prayer.CreatedAt, prayer.UpdatedAt);
 
     private static Task<int> InsertInteractionAsync(SQLiteAsyncConnection connection, PrayerInteraction interaction) =>

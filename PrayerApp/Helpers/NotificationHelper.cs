@@ -21,6 +21,26 @@ public static class NotificationHelper
             if (!prayer.CanNotify || prayer.IsAnswered)
                 continue;
 
+            if (prayer.NotifyDate.HasValue
+                && prayer.PrayerFrequency is PrayerFrequency.OneTime or PrayerFrequency.Yearly)
+            {
+                DateTime fire;
+                if (prayer.PrayerFrequency == PrayerFrequency.OneTime)
+                {
+                    fire = OneTimeFire(prayer);
+                }
+                else
+                {
+                    fire = YearlyFireOn(now.Year, prayer.NotifyDate.Value, prayer.NotifyHour, prayer.NotifyMinute);
+                    if (fire > now)
+                        fire = YearlyFireOn(now.Year - 1, prayer.NotifyDate.Value, prayer.NotifyHour, prayer.NotifyMinute);
+                }
+
+                if (fire >= prayer.CreatedAt && fire <= now && now - fire <= _recentWindow)
+                    result.Add(prayer.Id);
+                continue;
+            }
+
             var firstFire = GetFirstFireTime(prayer.CreatedAt, prayer.NotifyHour, prayer.NotifyMinute);
             if (firstFire > now)
                 continue;
@@ -32,6 +52,33 @@ public static class NotificationHelper
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// The one-time fire: <see cref="Prayer.NotifyDate"/> at the prayer's notify time; a null date
+    /// falls back to the first fire after <see cref="Prayer.CreatedAt"/>.
+    /// </summary>
+    internal static DateTime OneTimeFire(Prayer prayer) =>
+        prayer.NotifyDate is { } date
+            ? date.Date.AddHours(prayer.NotifyHour).AddMinutes(prayer.NotifyMinute)
+            : GetFirstFireTime(prayer.CreatedAt, prayer.NotifyHour, prayer.NotifyMinute);
+
+    /// <summary>
+    /// The yearly fire time in <paramref name="year"/>; Feb 29 maps to Feb 28 in non-leap years.
+    /// </summary>
+    internal static DateTime YearlyFireOn(int year, DateTime notifyDate, int hour, int minute)
+    {
+        var day = Math.Min(notifyDate.Day, DateTime.DaysInMonth(year, notifyDate.Month));
+        return new DateTime(year, notifyDate.Month, day, hour, minute, 0);
+    }
+
+    /// <summary>
+    /// The next yearly fire strictly after <paramref name="now"/>: this year's if still ahead, else next year's.
+    /// </summary>
+    internal static DateTime NextYearlyFire(DateTime notifyDate, int hour, int minute, DateTime now)
+    {
+        var thisYear = YearlyFireOn(now.Year, notifyDate, hour, minute);
+        return thisYear > now ? thisYear : YearlyFireOn(now.Year + 1, notifyDate, hour, minute);
     }
 
     /// <summary>

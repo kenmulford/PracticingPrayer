@@ -240,4 +240,63 @@ public class NotificationHelperTests
 
         Assert.Empty(result);
     }
+
+    // ── NotifyDate ─────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void NextYearlyFire_Feb29_MapsToFeb28InNonLeapYear()
+    {
+        var result = NotificationHelper.NextYearlyFire(
+            new DateTime(2024, 2, 29), 9, 0, new DateTime(2027, 1, 10, 8, 0, 0));
+
+        Assert.Equal(new DateTime(2027, 2, 28, 9, 0, 0), result);
+    }
+
+    [Fact]
+    public void GetRecentlyNotifiedPrayerIds_OneTimeNotifyDateInWindow_Returned()
+    {
+        var now = new DateTime(2027, 2, 28, 10, 0, 0);
+        var prayer = MakePrayer(1, PrayerFrequency.OneTime, new DateTime(2027, 1, 1));
+        prayer.NotifyDate = new DateTime(2027, 2, 28);
+
+        var result = NotificationHelper.GetRecentlyNotifiedPrayerIds(new[] { prayer }, now);
+
+        Assert.Equal(new[] { 1 }, result);
+    }
+
+    [Fact]
+    public void GetRecentlyNotifiedPrayerIds_YearlyFeb29InNonLeapYear_Returned()
+    {
+        var now = new DateTime(2027, 2, 28, 10, 0, 0);
+        var prayer = MakePrayer(2, PrayerFrequency.Yearly, new DateTime(2024, 1, 1));
+        prayer.NotifyDate = new DateTime(2024, 2, 29);
+
+        var result = NotificationHelper.GetRecentlyNotifiedPrayerIds(new[] { prayer }, now);
+
+        Assert.Equal(new[] { 2 }, result);
+    }
+
+    [Fact]
+    public void GetRecentlyNotifiedPrayerIds_YearlyCreatedAfterThisYearsFire_NotReturned()
+    {
+        var now = new DateTime(2027, 3, 5, 10, 0, 0);
+        var prayer = MakePrayer(3, PrayerFrequency.Yearly, new DateTime(2027, 3, 5, 9, 30, 0));
+        prayer.NotifyDate = new DateTime(2027, 3, 5);
+
+        var result = NotificationHelper.GetRecentlyNotifiedPrayerIds(new[] { prayer }, now);
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void GetRecentlyNotifiedPrayerIds_OneTimeCreatedAfterItsDate_NotReturned()
+    {
+        var now = new DateTime(2027, 3, 5, 10, 0, 0);
+        var prayer = MakePrayer(4, PrayerFrequency.OneTime, new DateTime(2027, 3, 5, 9, 30, 0));
+        prayer.NotifyDate = new DateTime(2027, 3, 5);
+
+        var result = NotificationHelper.GetRecentlyNotifiedPrayerIds(new[] { prayer }, now);
+
+        Assert.Empty(result);
+    }
 }

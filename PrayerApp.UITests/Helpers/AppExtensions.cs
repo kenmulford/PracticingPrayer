@@ -169,6 +169,7 @@ public static class AppExtensions
     {
         var locator = AutomationIdLocator(automationId);
         var wait = new WebDriverWait(driver, TimeSpan.FromSeconds(timeoutSeconds));
+        var priorWait = driver.Manage().Timeouts().ImplicitWait;
         try
         {
             driver.Manage().Timeouts().ImplicitWait = TestConfig.ShortTimeout;
@@ -178,10 +179,28 @@ public static class AppExtensions
                 catch (NoSuchElementException) { return true; }
             });
         }
-        finally
+        finally { driver.Manage().Timeouts().ImplicitWait = priorWait; }
+    }
+
+    /// <summary>
+    /// Read an element's on-screen Y until three consecutive reads match, so a layout animation or
+    /// a late relayout is not sampled mid-flight. Fails the test if it has not settled within
+    /// <paramref name="maxReads"/>.
+    /// </summary>
+    public static int WaitForStableY(this AppiumDriver driver, string automationId, int maxReads = 15)
+    {
+        var previous = driver.WaitForElement(automationId).Location.Y;
+        var matches = 1;
+        for (int read = 1; read < maxReads; read++)
         {
-            driver.Manage().Timeouts().ImplicitWait = TestConfig.DefaultTimeout;
+            Thread.Sleep(TestConfig.DelayShortSettle);
+            var current = driver.WaitForElement(automationId).Location.Y;
+            matches = current == previous ? matches + 1 : 1;
+            if (matches == 3) return current;
+            previous = current;
         }
+        Assert.Fail($"{automationId} Y did not settle within {maxReads} reads (last {previous})");
+        return previous;
     }
 
     // ── Actions ──────────────────────────────────────────────────
@@ -589,12 +608,13 @@ public static class AppExtensions
     /// <c>mobile: scroll direction=up</c> (the inverse of <see cref="ScrollDown"/>).
     /// Mirrors the iOS branch of <see cref="ResetCardsListScroll"/>, parameterised for any
     /// container so <see cref="ScrollToPrayerAndTap"/> can land on a known top position before
-    /// its down-only search. Best-effort: silently no-ops if the container isn't on screen.
+    /// its down-only search. Best-effort: silently no-ops off iOS or if the container isn't on screen.
     /// Iterating from an already-top list is a harmless no-op (a list can't scroll past its top).
     /// </summary>
-    private static void ResetIOSListScrollToTop(AppiumDriver driver, string containerAutomationId)
+    public static void ResetIOSListScrollToTop(this AppiumDriver driver, string containerAutomationId)
     {
         const int MaxIterations = 8;
+        if (!TestConfig.IsIOS) return;
 
         string listId;
         try { listId = driver.FindElement(MobileBy.AccessibilityId(containerAutomationId)).Id; }
@@ -1418,6 +1438,23 @@ public static class AppExtensions
         Thread.Sleep(TestConfig.DelayAfterTap);
     }
 
+    /// <summary>The single spinning wheel of an open iOS <c>Picker</c> (the app's pickers are single-column).</summary>
+    /// <remarks>
+    /// XPath element type, not By.ClassName: in this Selenium version By.ClassName emits a CSS
+    /// selector ('.XCUIElementTypePickerWheel'), which Appium's iOS driver rejects
+    /// (InvalidSelectorException).
+    /// </remarks>
+    private static readonly By IOSPickerWheel = By.XPath("//XCUIElementTypePickerWheel");
+
+    /// <summary>The Done button of MAUI's iOS Picker input-accessory toolbar (<c>MauiDoneAccessoryView</c>).</summary>
+    private static readonly By IOSPickerDoneButton =
+        By.XPath("//XCUIElementTypeOther[@name='DoneAccessory']//XCUIElementTypeButton[@name='Done']");
+
+    /// <summary>iOS: the displayed value of the MAUI <c>Picker</c> field named <paramref name="automationId"/>.</summary>
+    /// <remarks>The AutomationId also names the field's non-accessible wrapper, which carries no value.</remarks>
+    public static string? IOSPickerFieldValue(this AppiumDriver driver, string automationId)
+        => driver.FindElement(By.XPath($"//XCUIElementTypeButton[@name='{automationId}']")).GetAttribute("value");
+
     /// <summary>
     /// iOS-only: select <paramref name="value"/> in a MAUI <c>Picker</c> that is already open.
     /// Call AFTER tapping the Picker open. No-op on Android (whose Picker opens a dialog of
@@ -1431,9 +1468,8 @@ public static class AppExtensions
     /// tapping the option by its text (<see cref="TapByText"/> / <see cref="TapByTextContains"/>)
     /// can never match on iOS and dies with a NoSuchElement timeout. Instead set the wheel's value
     /// (Appium's picker-wheel pattern, which maps to XCUITest <c>adjustToPickerWheelValue:</c>) and
-    /// return — there is no "Done" affordance to tap (page-source dump of the open picker on this
-    /// MAUI 10 / iOS 26.4 build shows the inline wheel and a page toolbar, but no Done button) and
-    /// none is needed: the iOS Picker's default <c>UpdateMode</c> is <c>Immediately</c> (Microsoft
+    /// return, leaving the picker open; <see cref="CloseIOSPicker"/> taps its Done button. No Done tap
+    /// is needed to commit: the iOS Picker's default <c>UpdateMode</c> is <c>Immediately</c> (Microsoft
     /// docs: "item selection occurs as the user browses items … the default behavior in .NET MAUI";
     /// <c>Detail_Picker_Card</c> sets no override), so settling the wheel fires the handler's
     /// <c>didSelectRow</c> and writes <c>SelectedItem</c> back live. The caller's own
@@ -1444,12 +1480,47 @@ public static class AppExtensions
     {
         if (!TestConfig.IsIOS) return;
 
-        // The open picker exposes exactly one spinning wheel (the card picker is single-column).
-        // Locate it by XPath element type, not By.ClassName — in this Selenium version
-        // By.ClassName emits a CSS selector ('.XCUIElementTypePickerWheel'), which Appium's
-        // iOS driver rejects (InvalidSelectorException). XPath is the iOS-native strategy used
-        // elsewhere in this file (e.g. IOSButtonByNameOrLabel).
-        var wheelBy = By.XPath("//XCUIElementTypePickerWheel");
+        SetIOSPickerWheel(driver, IOSPickerWheel, value, maxAttempts);
+    }
+
+    /// <summary>
+    /// Sets one wheel of the open iOS date picker. <paramref name="wheelIndex"/> is 1-based.
+    /// The UIDatePicker is the DatePicker field's InputView, so it sits in the keyboard window rather
+    /// than under the field's AutomationId; the lookup is scoped to the XCUIElementTypeDatePicker.
+    /// </summary>
+    public static void SelectIOSPickerWheelValue(this AppiumDriver driver, int wheelIndex, string value, int maxAttempts = 6)
+    {
+        if (!TestConfig.IsIOS) return;
+        const string wheels = "//XCUIElementTypeDatePicker//XCUIElementTypePickerWheel";
+        var wait = new WebDriverWait(driver, TimeSpan.FromSeconds(10));
+        wait.Until(d => d.FindElements(By.XPath(wheels)).Count > 0);
+        // Wheels are month / day / year, so the year is wheel 3 (en-US simulator locale).
+        var count = driver.FindElements(By.XPath(wheels)).Count;
+        if (count != 3)
+            throw new Xunit.Sdk.XunitException($"Expected 3 date picker wheels, found {count}.");
+        SetIOSPickerWheel(driver, By.XPath($"({wheels})[{wheelIndex}]"), value, maxAttempts);
+    }
+
+    /// <summary>
+    /// iOS-only: closes the open Picker/DatePicker input view via its Done accessory button.
+    /// HideKeyboard does not close it, and taps on other fields may not land while it is open.
+    /// </summary>
+    public static void CloseIOSPicker(this AppiumDriver driver, int timeoutSeconds = 10)
+    {
+        if (!TestConfig.IsIOS) return;
+        var wait = new WebDriverWait(driver, TimeSpan.FromSeconds(timeoutSeconds));
+        wait.Until(d => d.FindElement(IOSPickerDoneButton)).Click();
+        // The accessory is torn down while we poll; a stale element means it is gone.
+        wait.Until(d => d.FindElements(IOSPickerDoneButton).All(e =>
+        {
+            try { return !e.Displayed; }
+            catch (StaleElementReferenceException) { return true; }
+        }));
+        Thread.Sleep(TestConfig.DelayAfterTap);
+    }
+
+    private static void SetIOSPickerWheel(AppiumDriver driver, By wheelBy, string value, int maxAttempts)
+    {
         var wait = new WebDriverWait(driver, TimeSpan.FromSeconds(10));
         wait.Until(d => d.FindElement(wheelBy));
 
@@ -1948,6 +2019,34 @@ public static class AppExtensions
     public static string GetAccessibleHint(this AppiumDriver driver, string automationId)
         => ReadToolbarAccessibleAttribute(driver, automationId,
             androidAttr: "hint", iosAttr: "value");
+
+    /// <summary>Whether a RadioButton is checked: Android reads the checked attribute, iOS reads value ("1").</summary>
+    public static bool IsRadioChecked(this AppiumDriver driver, string automationId)
+    {
+        var el = driver.FindByAutomationId(automationId);
+        return TestConfig.IsAndroid
+            ? string.Equals(el.GetDomAttribute("checked"), "true", StringComparison.OrdinalIgnoreCase)
+            : el.GetDomAttribute("value") == "1";
+    }
+
+    /// <summary>Poll until a RadioButton's checked state equals <paramref name="expected"/>; false on timeout.</summary>
+    public static bool WaitForRadioChecked(this AppiumDriver driver, string automationId,
+        bool expected = true, int timeoutSeconds = 10)
+    {
+        var wait = new WebDriverWait(driver, TimeSpan.FromSeconds(timeoutSeconds))
+        {
+            PollingInterval = TimeSpan.FromMilliseconds(TestConfig.DelayShortSettle),
+        };
+        wait.IgnoreExceptionTypes(typeof(NotFoundException), typeof(StaleElementReferenceException));
+        try
+        {
+            return wait.Until(d => driver.IsRadioChecked(automationId) == expected);
+        }
+        catch (WebDriverTimeoutException)
+        {
+            return false;
+        }
+    }
 
     /// <summary>
     /// Shared implementation: read an accessibility attribute by AutomationId, with

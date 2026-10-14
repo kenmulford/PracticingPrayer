@@ -280,6 +280,23 @@ internal static class TestDataSeed
         {
             (TestSeedFixtures.ImportSkipsDuplicatesPrayer, "Duplicate-skip fixture.", false),
         });
+
+        // PrayerListTests.OneTimeReminder_FutureDate_ShowsOnceOnInReadView edits and saves this prayer.
+        await SeedCardWithPrayersAsync(boxId: 0, TestSeedFixtures.ReminderDateCard, new[]
+        {
+            (TestSeedFixtures.ReminderDatePrayer, "One-time reminder date fixture.", false),
+        });
+
+        // Cards_CollectionPicker_Close_KeepsTitleBelowNavBar: opens this card's editor and
+        // backs out without saving.
+        await SeedCardWithPrayersAsync(boxId: 0, TestSeedFixtures.PickerSafeAreaCard, new[]
+        {
+            (TestSeedFixtures.PickerSafeAreaPrayer, "Opened by Cards_CollectionPicker_Close_KeepsTitleBelowNavBar.", false),
+        });
+
+        // Cards_SaveAndNew_CreatesTwoCardsInCollection: saves two new cards into this empty collection.
+        var saveAndNewCol = new CardBox { Name = TestSeedFixtures.SaveAndNewCollection, IsSystem = false, SortOrder = 0, CreatedAt = now, UpdatedAt = now };
+        await saveAndNewCol.SaveAsync();
     }
 
     private static async Task SeedCardWithPrayersAsync(int boxId, string cardTitle,

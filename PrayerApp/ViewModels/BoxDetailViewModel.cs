@@ -15,6 +15,8 @@ namespace PrayerApp.ViewModels
         private readonly IAccessibilityService _accessibilityService;
         private CardBox _box = new();
         private string _originalName = string.Empty;
+        private bool _originalProtectAllCards;
+        private CardProtectionMode _originalCardProtectionMode;
 
         public string Name
         {
@@ -74,7 +76,10 @@ namespace PrayerApp.ViewModels
         /// </summary>
         public bool IsCascadeModeEnabled => ProtectAllCards;
 
-        public bool IsDirty => Name != _originalName;
+        public bool IsDirty => Name != _originalName
+            || ProtectAllCards != _originalProtectAllCards
+            || ((ProtectAllCards || _originalProtectAllCards)
+                && CardProtectionMode != _originalCardProtectionMode);
 
         public async Task<bool> CanLeaveAsync()
         {
@@ -176,6 +181,8 @@ namespace PrayerApp.ViewModels
         private void CaptureOriginals()
         {
             _originalName = Name ?? string.Empty;
+            _originalProtectAllCards = ProtectAllCards;
+            _originalCardProtectionMode = CardProtectionMode;
         }
     }
 }
