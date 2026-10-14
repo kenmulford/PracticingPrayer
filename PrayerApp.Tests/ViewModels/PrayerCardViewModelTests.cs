@@ -79,6 +79,105 @@ public class PrayerCardViewModelTests
         // This is correct: user typed, then cleared. The form is modified.
     }
 
+    [Fact]
+    public void IsDirty_ProtectionModeChanged_True()
+    {
+        var sut = CreateSut();
+        sut.Title = "Card";
+        sut.ProtectionMode = CardProtectionMode.LockedVisible;
+        Assert.True(sut.IsDirty);
+    }
+
+    [Fact]
+    public void IsDirty_ProtectionModeReverted_False()
+    {
+        var sut = CreateSut();
+        sut.ProtectionMode = CardProtectionMode.LockedVisible;
+        sut.ProtectionMode = CardProtectionMode.None;
+        Assert.False(sut.IsDirty);
+    }
+
+    [Fact]
+    public async Task IsDirty_ProtectionMode_CleanAfterSave()
+    {
+        var sut = CreateSut();
+        sut.Title = "Protected";
+        sut.ProtectionMode = CardProtectionMode.Hidden;
+
+        await ((IAsyncRelayCommand)sut.SaveCommand).ExecuteAsync(null);
+
+        Assert.False(sut.IsDirty);
+    }
+
+    [Fact]
+    public async Task IsDirty_LoadedProtectedCard_NotDirty()
+    {
+        _db.GetByIdAsync<PrayerCard>(7).Returns(new PrayerCard { Id = 7, Title = "Existing", ProtectionMode = CardProtectionMode.Hidden });
+        var sut = CreateSut();
+
+        ((IQueryAttributable)sut).ApplyQueryAttributes(new Dictionary<string, object> { ["load"] = "7" });
+        for (var i = 0; i < 100 && sut.IsNew; i++)
+            await Task.Delay(10);
+
+        Assert.False(sut.IsNew);
+        Assert.False(sut.IsDirty);
+    }
+
+    [Fact]
+    public async Task IsDirty_SelectedBoxChanged_True()
+    {
+        _boxService.GetBoxesAsync().Returns(new List<CardBox> { new() { Id = 5, Name = "Family" } }.AsReadOnly());
+        var sut = CreateSutFor(new PrayerCard { Id = 3 });
+        await sut.LoadBoxPickerAsync();
+        Assert.False(sut.IsDirty);
+
+        sut.SelectedBox = sut.AvailableBoxes.OfType<RealBoxPickerItem>().First(b => b.BoxId == 5);
+
+        Assert.True(sut.IsDirty);
+    }
+
+    [Fact]
+    public async Task IsDirty_SelectedBoxReverted_False()
+    {
+        _boxService.GetBoxesAsync().Returns(new List<CardBox> { new() { Id = 5, Name = "Family" } }.AsReadOnly());
+        var sut = CreateSut();
+        await sut.LoadBoxPickerAsync();
+        var loose = sut.SelectedBox;
+        sut.SelectedBox = sut.AvailableBoxes.OfType<RealBoxPickerItem>().First(b => b.BoxId == 5);
+
+        sut.SelectedBox = loose;
+
+        Assert.False(sut.IsDirty);
+    }
+
+    [Fact]
+    public async Task IsDirty_SelectedBox_CleanAfterSave()
+    {
+        _boxService.GetBoxesAsync().Returns(new List<CardBox> { new() { Id = 5, Name = "Family" } }.AsReadOnly());
+        var sut = CreateSut();
+        sut.Title = "Test";
+        await sut.LoadBoxPickerAsync();
+        sut.SelectedBox = sut.AvailableBoxes.OfType<RealBoxPickerItem>().First(b => b.BoxId == 5);
+
+        await ((IAsyncRelayCommand)sut.SaveCommand).ExecuteAsync(null);
+
+        Assert.False(sut.IsDirty);
+    }
+
+    [Fact]
+    public async Task IsDirty_LoadBoxPicker_ExistingCardInBox_NotDirty()
+    {
+        _boxService.GetBoxesAsync().Returns(new List<CardBox> { new() { Id = 5, Name = "Family" } }.AsReadOnly());
+        var card = new PrayerCard { Id = 1, BoxId = 5 };
+        var sut = new PrayerCardViewModel(card, _cardService, _prayerService,
+            _onboardingService, _navigationService, _accessibilityService, _boxService, _settings, _confidentialAccessService);
+
+        await sut.LoadBoxPickerAsync();
+
+        Assert.Equal(5, Assert.IsType<RealBoxPickerItem>(sut.SelectedBox).BoxId);
+        Assert.False(sut.IsDirty);
+    }
+
     // ── SaveAsync ─────────────────────────────────────────────────────
 
     [Fact]
@@ -1003,6 +1102,96 @@ public class PrayerCardViewModelTests
 
         // Count segment drops out (gated by !IsExpanded); state flips to Expanded.
         Assert.Equal("Family, Expanded", sut.AccessibleCardHeader);
+    }
+
+    // ── Post-review #340 ─────────────────────────────────────────────────
+
+    private PrayerCardViewModel CreateSutFor(PrayerCard card) =>
+        new(card, _cardService, _prayerService, _onboardingService, _navigationService,
+            _accessibilityService, _boxService, _settings, _confidentialAccessService);
+
+    private void AssignBoxSetsCardBoxId() =>
+        _cardService.AssignBoxAsync(Arg.Any<PrayerCard>(), Arg.Any<int>())
+            .Returns(ci => { ci.Arg<PrayerCard>().BoxId = ci.Arg<int>(); return Task.CompletedTask; });
+
+    [Fact]
+    public async Task Archive_ThenSave_KeepsArchivedBoxId()
+    {
+        AssignBoxSetsCardBoxId();
+        _boxService.GetBoxesAsync().Returns(new List<CardBox> { new() { Id = 5, Name = "Family" } }.AsReadOnly());
+        var card = new PrayerCard { Id = 7, Title = "Test", BoxId = 5 };
+        var sut = CreateSutFor(card);
+        await sut.LoadBoxPickerAsync();
+
+        await ((IAsyncRelayCommand)sut.ArchiveCommand).ExecuteAsync(null);
+        await ((IAsyncRelayCommand)sut.SaveCommand).ExecuteAsync(null);
+
+        Assert.Equal(ArchivedBoxId, card.BoxId);
+    }
+
+    [Fact]
+    public async Task Unarchive_ThenSave_KeepsRestoredBoxId()
+    {
+        AssignBoxSetsCardBoxId();
+        _boxService.GetBoxesAsync().Returns(new List<CardBox> { new() { Id = 5, Name = "Family" } }.AsReadOnly());
+        var card = new PrayerCard { Id = 7, Title = "Test", BoxId = ArchivedBoxId, PreArchiveBoxId = 5 };
+        var sut = CreateSutFor(card);
+        await sut.LoadBoxPickerAsync();
+
+        await ((IAsyncRelayCommand)sut.ArchiveCommand).ExecuteAsync(null);
+        await ((IAsyncRelayCommand)sut.SaveCommand).ExecuteAsync(null);
+
+        Assert.Equal(5, card.BoxId);
+        Assert.Equal(5, Assert.IsType<RealBoxPickerItem>(sut.SelectedBox).BoxId);
+    }
+
+    [Fact]
+    public async Task Archive_AfterEdits_IsNotDirty()
+    {
+        AssignBoxSetsCardBoxId();
+        var card = new PrayerCard { Id = 7, Title = "Test", BoxId = 0 };
+        var sut = CreateSutFor(card);
+        await sut.LoadBoxPickerAsync();
+        sut.Title = "Edited";
+
+        await ((IAsyncRelayCommand)sut.ArchiveCommand).ExecuteAsync(null);
+
+        Assert.False(sut.IsDirty);
+    }
+
+    [Fact]
+    public async Task DeleteCommand_Confirmed_ClearsDirtyBeforeNavigating()
+    {
+        var card = new PrayerCard { Id = 7, Title = "Test" };
+        var sut = CreateSutFor(card);
+        sut.Title = "Edited";
+        _prayerService.GetPrayersByCardAsync(7).Returns(new List<Prayer>());
+        var dirtyAtNavigation = true;
+        _navigationService.GoToAsync(Arg.Any<string>())
+            .Returns(_ => { dirtyAtNavigation = sut.IsDirty; return Task.CompletedTask; });
+
+        await ((IAsyncRelayCommand)sut.DeleteCommand).ExecuteAsync(null);
+
+        Assert.False(dirtyAtNavigation);
+    }
+
+    [Fact]
+    public void IsDirty_NewCardBlankTitle_False()
+    {
+        var sut = CreateSut();
+        sut.ProtectionMode = CardProtectionMode.Hidden;
+        Assert.False(sut.IsDirty);
+
+        sut.Title = "   ";
+        Assert.False(sut.IsDirty);
+    }
+
+    [Fact]
+    public void IsDirty_ExistingCardBlankTitleProtectionChanged_True()
+    {
+        var sut = CreateSutFor(new PrayerCard { Id = 7 });
+        sut.ProtectionMode = CardProtectionMode.Hidden;
+        Assert.True(sut.IsDirty);
     }
 
     // ── ArchiveCommand ───────────────────────────────────────────────────

@@ -96,6 +96,81 @@ public class BoxDetailViewModelTests
         Assert.False(sut.IsDirty);
     }
 
+    [Fact]
+    public void IsDirty_ProtectAllCardsChanged_True()
+    {
+        var sut = CreateSut();
+        sut.ProtectAllCards = true;
+        Assert.True(sut.IsDirty);
+    }
+
+    [Fact]
+    public void IsDirty_ProtectAllCardsReverted_False()
+    {
+        var sut = CreateSut();
+        sut.ProtectAllCards = true;
+        sut.ProtectAllCards = false;
+        Assert.False(sut.IsDirty);
+    }
+
+    [Fact]
+    public void IsDirty_CardProtectionModeChanged_ProtectAllOn_True()
+    {
+        var sut = CreateSut();
+        sut.ProtectAllCards = true;
+        sut.CardProtectionMode = CardProtectionMode.Hidden;
+        Assert.True(sut.IsDirty);
+    }
+
+    [Fact]
+    public void IsDirty_CardProtectionModeChanged_ProtectAllOff_False()
+    {
+        var sut = CreateSut();
+        sut.CardProtectionMode = CardProtectionMode.Hidden;
+        Assert.False(sut.IsDirty);
+    }
+
+    [Fact]
+    public void IsDirty_CardProtectionModeReverted_False()
+    {
+        var sut = CreateSut();
+        sut.CardProtectionMode = CardProtectionMode.Hidden;
+        sut.CardProtectionMode = CardProtectionMode.None;
+        Assert.False(sut.IsDirty);
+    }
+
+    [Fact]
+    public async Task SaveCommand_ResetsProtectionDirtyState()
+    {
+        _boxService.SaveBoxAsync(Arg.Any<CardBox>()).Returns(ci => ci.Arg<CardBox>());
+        var sut = CreateSut();
+        sut.Name = "Test";
+        sut.ProtectAllCards = true;
+        sut.CardProtectionMode = CardProtectionMode.LockedVisible;
+
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync(null);
+
+        Assert.False(sut.IsDirty);
+    }
+
+    [Fact]
+    public async Task ApplyQueryAttributes_LoadedProtection_NotDirty()
+    {
+        var box = new CardBox { Id = 5, Name = "Family", ProtectAllCards = true, CardProtectionMode = CardProtectionMode.Hidden };
+        var db = Substitute.For<IDBService>();
+        CardBox.SetDBService(db);
+        db.GetByIdAsync<CardBox>(5).Returns(box);
+
+        var sut = CreateSut();
+        ((IQueryAttributable)sut).ApplyQueryAttributes(
+            new Dictionary<string, object> { { "load", "5" } });
+        for (var i = 0; i < 100 && !sut.IsExisting; i++)
+            await Task.Delay(10);
+
+        Assert.True(sut.IsExisting);
+        Assert.False(sut.IsDirty);
+    }
+
     // ── CanLeaveAsync ─────────────────────────────────────────────────
 
     [Fact]

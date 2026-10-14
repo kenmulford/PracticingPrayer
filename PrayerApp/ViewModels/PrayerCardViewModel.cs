@@ -17,6 +17,8 @@ namespace PrayerApp.ViewModels
         private bool _prayersLoaded;
         private bool _addingPrayer;
         private string _originalTitle = string.Empty;
+        private CardProtectionMode _originalProtectionMode;
+        private int _originalBoxId;
         private readonly ICardService _cardService;
         private readonly IPrayerService _prayerService;
         private readonly IOnboardingService _onboardingService;
@@ -278,7 +280,13 @@ namespace PrayerApp.ViewModels
         public bool IsArchived => _prayerCard.BoxId == _settings.ArchivedFolderId;
         public string ArchiveLabel => IsArchived ? "Unarchive" : "Archive";
 
-        public bool IsDirty => Title != _originalTitle;
+        private int SelectedBoxId => _selectedBox is RealBoxPickerItem real ? real.BoxId : 0;
+
+        // A new card with no title has nothing savable to lose.
+        public bool IsDirty => !(IsNew && string.IsNullOrWhiteSpace(Title))
+            && (Title != _originalTitle
+                || ProtectionMode != _originalProtectionMode
+                || SelectedBoxId != _originalBoxId);
 
         public async Task<bool> CanLeaveAsync()
         {
@@ -557,9 +565,12 @@ namespace PrayerApp.ViewModels
             // Card-edit picker is RealBoxPickerItem-only; defensive
             // pattern-match keeps the read type-safe and returns the
             // Loose-Cards default if a future refactor admits a sentinel.
-            _prayerCard.BoxId = _selectedBox is RealBoxPickerItem real ? real.BoxId : 0;
+            // Only a picker change relative to its baseline moves the card; otherwise a stale
+            // picker would undo an archive/unarchive that changed BoxId directly.
+            if (SelectedBoxId != _originalBoxId)
+                _prayerCard.BoxId = SelectedBoxId;
             await _cardService.SaveCardAsync(_prayerCard);
-            _originalTitle = Title; // Reset dirty state before navigation
+            CaptureOriginals(); // Reset dirty state before navigation
             if (isNew && _onboardingService.CurrentStep == OnboardingStep.NameCard)
                 _onboardingService.Advance(); // NameCard → AddRequest
         }
@@ -567,8 +578,8 @@ namespace PrayerApp.ViewModels
         // _selectedBox is kept so the next card lands in the same collection.
         private void ResetForNewCard()
         {
-            _prayerCard = new PrayerCard { BoxId = _selectedBox is RealBoxPickerItem real ? real.BoxId : 0 };
-            _originalTitle = _prayerCard.Title ?? string.Empty;
+            _prayerCard = new PrayerCard { BoxId = SelectedBoxId };
+            CaptureOriginals();
             RefreshProperties();
             PendingFocusTitle = true;
         }
@@ -591,6 +602,7 @@ namespace PrayerApp.ViewModels
             foreach (var prayer in prayers)
                 await _prayerService.DeletePrayerAsync(prayer);
             await _cardService.DeleteCardAsync(_prayerCard);
+            CaptureOriginals(); // A deleted card must not trigger the Unsaved Changes prompt
             _accessibilityService.Announce("Card deleted");
             await _navigationService.GoToAsync($"..?{Routes.QueryKeys.Deleted}={Identifier}");
         }
@@ -717,6 +729,14 @@ namespace PrayerApp.ViewModels
                 }
 
                 await _cardService.AssignBoxAsync(_prayerCard, target);
+
+                // AssignBoxAsync saved the whole card; follow the picker to the new box when it
+                // lists it (the Archived system box is not listed) and reset the baseline.
+                var moved = AvailableBoxes.OfType<RealBoxPickerItem>().FirstOrDefault(b => b.BoxId == target);
+                if (moved is not null)
+                    SelectedBox = moved;
+                CaptureOriginals();
+
                 OnPropertyChanged(nameof(IsArchived));
                 OnPropertyChanged(nameof(ArchiveLabel));
 
@@ -811,7 +831,7 @@ namespace PrayerApp.ViewModels
                 return;
             }
 
-            _originalTitle = _prayerCard.Title ?? string.Empty;
+            CaptureOriginals();
             RefreshProperties();
             await LoadBoxPickerAsync();
         }
@@ -834,6 +854,14 @@ namespace PrayerApp.ViewModels
                               .OfType<RealBoxPickerItem>()
                               .FirstOrDefault(b => b.BoxId == _prayerCard.BoxId)
                           ?? looseCards;
+            _originalBoxId = SelectedBoxId;
+        }
+
+        private void CaptureOriginals()
+        {
+            _originalTitle = Title ?? string.Empty;
+            _originalProtectionMode = ProtectionMode;
+            _originalBoxId = SelectedBoxId;
         }
 
         public void Reload()

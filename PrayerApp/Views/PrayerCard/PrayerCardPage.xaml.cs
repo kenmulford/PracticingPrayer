@@ -53,7 +53,8 @@ public partial class PrayerCardPage : ContentPage
             });
 
             // Load boxes for the picker (new cards won't have ApplyQueryAttributes trigger this)
-            if (vm.AvailableBoxes.Count == 0)
+            // A requested card load owns the picker load; a second one could wipe a pick made in between.
+            if (vm.AvailableBoxes.Count == 0 && !vm.IsLoadRequested)
                 await vm.LoadBoxPickerAsync();
             if (vm.IsNew && !vm.IsLoadRequested)
             {

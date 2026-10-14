@@ -178,9 +178,9 @@ public class PrayerCardTests
         driver.CloseIOSPicker();
         Assert.InRange(driver.WaitForStableY("Card_Entry_Title"), baselineY - 2, baselineY + 2);
 
-        // The collection choice persists only on Save, so backing out keeps the fixture in Loose Cards.
+        // Backing out prompts Unsaved Changes; Discard keeps the fixture in Loose Cards.
         driver.GoBack();
-        driver.DismissAlertIfPresent();
+        driver.TapAlertButton("Discard");
         driver.WaitForElementGone("Card_Entry_Title");
     }
 

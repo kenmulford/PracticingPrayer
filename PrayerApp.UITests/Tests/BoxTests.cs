@@ -153,7 +153,7 @@ public class BoxTests
             "Hidden radio should select after toggling Protect All Cards off and on");
 
         driver.GoBack();
-        driver.DismissAlertIfPresent();
+        driver.TapAlertButton("Discard");
     }
 
 }
