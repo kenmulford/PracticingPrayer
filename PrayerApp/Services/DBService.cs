@@ -190,6 +190,14 @@ namespace PrayerApp.Services
             try { await _db.ExecuteAsync("ALTER TABLE PrayerRequest ADD COLUMN NotifyMinute INTEGER DEFAULT 0"); } catch { }
             try { await _db.ExecuteAsync("ALTER TABLE PrayerRequest ADD COLUMN NotifyDayOfWeek INTEGER DEFAULT -1"); } catch { }
             try { await _db.ExecuteAsync("ALTER TABLE PrayerRequest ADD COLUMN NotifyDayOfMonth INTEGER DEFAULT -1"); } catch { }
+            try
+            {
+                await NotifyDateMigration.ApplyAsync(_db);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[UpdateSchema] NotifyDate backfill: {ex.Message}");
+            }
 
             try
             {

@@ -66,20 +66,30 @@
                     <VerticalStackLayout Spacing="6">
                         <Label Text="Protection Level" Style="{StaticResource FormLabel}" />
                         <HorizontalStackLayout Spacing="16"
-                                               IsEnabled="{Binding IsCascadeModeEnabled}"
                                                AutomationId="BoxDetail_Picker_CardProtectionMode"
                                                SemanticProperties.Description="Protection level for all cards in this collection"
                                                SemanticProperties.Hint="Choose whether cascaded cards are locked or hidden">
+                            <!-- InputTransparent, not IsEnabled: iOS RadioButtons stay dead to taps after IsEnabled goes false then true. -->
+                            <HorizontalStackLayout.Triggers>
+                                <DataTrigger TargetType="HorizontalStackLayout"
+                                             Binding="{Binding IsCascadeModeEnabled}"
+                                             Value="False">
+                                    <Setter Property="Opacity" Value="0.5" />
+                                </DataTrigger>
+                            </HorizontalStackLayout.Triggers>
                             <RadioButton Content="Off"
                                          AutomationId="BoxDetail_Radio_ProtectionOff"
+                                         InputTransparent="{Binding IsCascadeModeEnabled, Converter={StaticResource InverseBool}}"
                                          GroupName="BoxCardProtectionMode"
                                          IsChecked="{Binding CardProtectionMode, Converter={StaticResource EnumToBool}, ConverterParameter=None}" />
                             <RadioButton Content="Locked"
                                          AutomationId="BoxDetail_Radio_ProtectionLocked"
+                                         InputTransparent="{Binding IsCascadeModeEnabled, Converter={StaticResource InverseBool}}"
                                          GroupName="BoxCardProtectionMode"
                                          IsChecked="{Binding CardProtectionMode, Converter={StaticResource EnumToBool}, ConverterParameter=LockedVisible}" />
                             <RadioButton Content="Hidden"
                                          AutomationId="BoxDetail_Radio_ProtectionHidden"
+                                         InputTransparent="{Binding IsCascadeModeEnabled, Converter={StaticResource InverseBool}}"
                                          GroupName="BoxCardProtectionMode"
                                          IsChecked="{Binding CardProtectionMode, Converter={StaticResource EnumToBool}, ConverterParameter=Hidden}" />
                         </HorizontalStackLayout>

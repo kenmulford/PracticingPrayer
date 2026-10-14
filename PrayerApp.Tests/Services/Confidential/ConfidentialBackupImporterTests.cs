@@ -137,6 +137,21 @@ public class ConfidentialBackupImporterTests : IDisposable
         Assert.Equal(1, result.TagJunctionsRestored);
     }
 
+    [Fact]
+    public async Task ImportAsync_PrayerWithNotifyDate_RoundTripsDate()
+    {
+        var connection = await CreateSchemaAsync();
+        var payload = SamplePayload();
+        payload.Prayers[0].NotifyDate = new DateTime(2027, 3, 5);
+        var blob = BuildSidecarBlob(payload, Passphrase);
+
+        var result = await ConfidentialBackupImporter.ImportAsync(_dbPath, blob, Passphrase);
+
+        Assert.True(result.Success);
+        var prayers = await connection.Table<Prayer>().ToListAsync();
+        Assert.Equal(new DateTime(2027, 3, 5), prayers[0].NotifyDate);
+    }
+
     // ── Wrong passphrase: nothing inserted, main data untouched ─────────
 
     [Fact]

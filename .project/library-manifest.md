@@ -9,7 +9,7 @@ headings stable — they are citation anchors.
 
 ## Runtime & frameworks
 The platform/runtime and primary frameworks, with versions. (Mirror these into milestone-driver `nonNegotiables` where they're hard constraints.)
-> .NET MAUI 10 (TFMs `net10.0-android`, `net10.0-ios`); built against the iOS 26.5 SDK / Android API 36; minimum supported iOS 16.0 / Android API 24. Hard constraint (milestone-driver `nonNegotiables`): MAUI .NET 10 + Community Toolkit.
+> .NET MAUI 10 (TFMs `net10.0-android`, `net10.0-ios`); built against the iOS 27 SDK / Android API 36; minimum supported iOS 16.0 / Android API 24. Hard constraint (milestone-driver `nonNegotiables`): MAUI .NET 10 + Community Toolkit.
 
 ## Approved libraries (by purpose)
 One approved choice per purpose, so a redundant alternative is easy to spot.
@@ -17,7 +17,7 @@ One approved choice per purpose, so a redundant alternative is easy to spot.
 | Purpose | Library | Notes |
 |---|---|---|
 | MVVM | CommunityToolkit.Mvvm 8.4.1 | `ObservableObject` only — explicit `SetProperty` + `new (Async)RelayCommand`; no source generators |
-| MAUI controls & behaviors | CommunityToolkit.Maui 14.0.1 (+ .Core) | Requires `Microsoft.Maui.Controls >= 10.0.41` (pinned 10.0.50) — do not downgrade |
+| MAUI controls & behaviors | CommunityToolkit.Maui 14.0.1 (+ .Core) | Requires `Microsoft.Maui.Controls >= 10.0.41` (pinned 10.0.110) — do not downgrade |
 | Local database | sqlite-net-pcl 1.9.172 + SQLitePCLRaw.bundle_e_sqlite3 2.1.10 | Active Record model pattern |
 | Local notifications | Plugin.LocalNotification 14.0.0 | Per-platform reminders |
 | HTTP factory | Microsoft.Extensions.Http 10.0.5 | Only for strategic privacy-safe online tools; offline by default |

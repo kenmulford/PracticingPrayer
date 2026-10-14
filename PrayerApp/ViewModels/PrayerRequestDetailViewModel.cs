@@ -81,6 +81,7 @@ namespace PrayerApp.ViewModels
         private int _originalNotifyMinute;
         private int _originalDayOfWeek;
         private int _originalDayOfMonth;
+        private DateTime? _originalNotifyDate;
 
         public bool ReturnToCards { get; set; }
         public bool IsNew => _prayer.Id == 0;
@@ -132,7 +133,20 @@ namespace PrayerApp.ViewModels
             _prayer.NotifyHour != _originalNotifyHour ||
             _prayer.NotifyMinute != _originalNotifyMinute ||
             _prayer.NotifyDayOfWeek != _originalDayOfWeek ||
-            _prayer.NotifyDayOfMonth != _originalDayOfMonth;
+            _prayer.NotifyDayOfMonth != _originalDayOfMonth ||
+            NotifyDateChanged();
+
+        private bool NotifyDateChanged() => PrayerFrequency switch
+        {
+            PrayerFrequency.OneTime => _prayer.NotifyDate != _originalNotifyDate,
+            // Yearly's year is display-only.
+            PrayerFrequency.Yearly => _prayer.NotifyDate?.Month != _originalNotifyDate?.Month
+                                      || _prayer.NotifyDate?.Day != _originalNotifyDate?.Day,
+            _ => false
+        };
+
+        private static bool IsDated(PrayerFrequency frequency) =>
+            frequency is PrayerFrequency.OneTime or PrayerFrequency.Yearly;
 
         public async Task<bool> CanLeaveAsync()
         {
@@ -208,6 +222,7 @@ namespace PrayerApp.ViewModels
                     OnPropertyChanged(nameof(ShowNotifyTime));
                     OnPropertyChanged(nameof(ShowDayOfWeek));
                     OnPropertyChanged(nameof(ShowDayOfMonth));
+                    OnPropertyChanged(nameof(ShowNotifyDate));
                     // Request OS permission immediately when user enables notifications here
                     // (e.g. during tutorial) rather than waiting for Settings page visit.
                     if (value && _settings.AllowNotifications)
@@ -223,11 +238,30 @@ namespace PrayerApp.ViewModels
             {
                 if (_prayer.PrayerFrequency != value)
                 {
+                    var previous = _prayer.PrayerFrequency;
                     _prayer.PrayerFrequency = value;
+                    if (!IsDated(value))
+                    {
+                        _prayer.NotifyDate = null;
+                    }
+                    else
+                    {
+                        var (sourceFrequency, date) =
+                            value == _originalFrequency && IsDated(_originalFrequency) ? (value, _originalNotifyDate)
+                            : IsDated(previous) ? (previous, _prayer.NotifyDate)
+                            : (_originalFrequency, IsDated(_originalFrequency) ? _originalNotifyDate : null);
+                        if (value == PrayerFrequency.OneTime && sourceFrequency == PrayerFrequency.Yearly && date is { } anchor)
+                            date = NotificationHelper.NextYearlyFire(anchor, _prayer.NotifyHour, _prayer.NotifyMinute, DateTime.Now).Date;
+                        _prayer.NotifyDate = date
+                            ?? NotificationHelper.GetFirstFireTime(DateTime.Now, _prayer.NotifyHour, _prayer.NotifyMinute).Date;
+                    }
                     OnPropertyChanged();
                     OnPropertyChanged(nameof(PrayerFrequencyDisplay));
                     OnPropertyChanged(nameof(ShowDayOfWeek));
                     OnPropertyChanged(nameof(ShowDayOfMonth));
+                    OnPropertyChanged(nameof(ShowNotifyDate));
+                    OnPropertyChanged(nameof(NotifyMinimumDate));
+                    OnPropertyChanged(nameof(NotifyDate));
 
                     // Materialize defaults so the displayed Picker value matches
                     // what actually gets saved (avoids -1 sentinel persisting).
@@ -254,7 +288,11 @@ namespace PrayerApp.ViewModels
                     PrayerFrequency.Monthly when _prayer.NotifyDayOfMonth > 0 =>
                         $"Monthly on the {OrdinalSuffix(_prayer.NotifyDayOfMonth)} at {timeStr}",
                     PrayerFrequency.Monthly => $"Monthly at {timeStr}",
+                    PrayerFrequency.Yearly when _prayer.NotifyDate.HasValue =>
+                        $"Yearly on {_prayer.NotifyDate:d MMM} at {timeStr}",
                     PrayerFrequency.Yearly => $"Yearly at {timeStr}",
+                    PrayerFrequency.OneTime when _prayer.NotifyDate.HasValue =>
+                        $"Once on {_prayer.NotifyDate:d MMM yyyy} at {timeStr}",
                     PrayerFrequency.OneTime => $"Once at {timeStr}",
                     _ => PrayerFrequency.ToString()
                 };
@@ -270,12 +308,60 @@ namespace PrayerApp.ViewModels
                 _prayer.NotifyMinute = value.Minutes;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(PrayerFrequencyDisplay));
+                OnPropertyChanged(nameof(NotifyDate));
             }
         }
 
         public bool ShowNotifyTime => CanNotify;
         public bool ShowDayOfWeek => CanNotify && PrayerFrequency == PrayerFrequency.Weekly;
         public bool ShowDayOfMonth => CanNotify && PrayerFrequency == PrayerFrequency.Monthly;
+        public bool ShowNotifyDate => CanNotify && PrayerFrequency is PrayerFrequency.OneTime or PrayerFrequency.Yearly;
+
+        public DateTime NotifyDate
+        {
+            get => PrayerFrequency == PrayerFrequency.Yearly
+                ? _prayer.NotifyDate is { } stored
+                    ? NotificationHelper.NextYearlyFire(stored, _prayer.NotifyHour, _prayer.NotifyMinute, DateTime.Now).Date
+                    : DateTime.Today
+                : _prayer.NotifyDate?.Date ?? DateTime.Today;
+            set
+            {
+                if (!IsDated(PrayerFrequency)) return;
+                var stored = _prayer.NotifyDate;
+                if (stored.HasValue && PrayerFrequency == PrayerFrequency.Yearly)
+                {
+                    var shown = NotifyDate;
+                    // A Feb 29 anchor shows as Feb 28 in non-leap years; writing that back must not move it.
+                    if (value.Date == shown || (value.Month == stored.Value.Month && value.Day == stored.Value.Day))
+                    {
+                        if (value.Date != shown)
+                            OnPropertyChanged();
+                        return;
+                    }
+                }
+                else if (stored.HasValue && value.Date == stored.Value.Date)
+                {
+                    return;
+                }
+
+                _prayer.NotifyDate = value.Date;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(PrayerFrequencyDisplay));
+            }
+        }
+
+        // One-time may not start after an already-stored past date; yearly is a month/day pick, so the
+        // year is unconstrained.
+        public DateTime NotifyMinimumDate
+        {
+            get
+            {
+                if (PrayerFrequency == PrayerFrequency.Yearly)
+                    return new DateTime(1900, 1, 1);
+                var original = _originalFrequency == PrayerFrequency.OneTime ? _originalNotifyDate?.Date : null;
+                return original.HasValue && original.Value < DateTime.Today ? original.Value : DateTime.Today;
+            }
+        }
 
         public List<string> DaysOfWeek { get; } =
             ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -571,9 +657,29 @@ namespace PrayerApp.ViewModels
             return isNew;
         }
 
+        private bool IsOneTimeReminderInPast()
+        {
+            if (!CanNotify || PrayerFrequency != PrayerFrequency.OneTime) return false;
+            var changed = _prayer.NotifyDate != _originalNotifyDate ||
+                          _prayer.NotifyHour != _originalNotifyHour ||
+                          _prayer.NotifyMinute != _originalNotifyMinute ||
+                          PrayerFrequency != _originalFrequency ||
+                          CanNotify != _originalCanNotify;
+            if (!changed) return false;
+            return NotificationHelper.OneTimeFire(_prayer) <= DateTime.Now;
+        }
+
+        private async Task ShowPastReminderAlertAsync() =>
+            await _navigationService.DisplayAlertAsync("Reminder", "Pick a future date and time for this reminder.", "OK");
+
         private async Task SaveAsync()
         {
             if (IsBusy) return;
+            if (IsOneTimeReminderInPast())
+            {
+                await ShowPastReminderAlertAsync();
+                return;
+            }
             try
             {
                 IsBusy = true;
@@ -605,6 +711,11 @@ namespace PrayerApp.ViewModels
                 await _navigationService.DisplayAlertAsync("Required", "Please enter a prayer title.", "OK");
                 return;
             }
+            if (IsOneTimeReminderInPast())
+            {
+                await ShowPastReminderAlertAsync();
+                return;
+            }
 
             try
             {
@@ -632,8 +743,8 @@ namespace PrayerApp.ViewModels
             _prayedCount = 0;
             RecomputePrayedSummary();
             SelectedTags.Clear();
-            RefreshProperties();
             CaptureOriginals();
+            RefreshProperties();
             OnPropertyChanged(nameof(IsNew));
             OnPropertyChanged(nameof(ShowSaveAndNew));
             PendingFocusTitle = true;
@@ -796,8 +907,9 @@ namespace PrayerApp.ViewModels
             }
             _prayedCount = await _prayerService.GetInteractionCountByPrayerAsync(_prayer.Id);
             RecomputePrayedSummary();
-            RefreshProperties();
+            // Originals first: NotifyMinimumDate reads them, and a stale minimum would coerce the DatePicker.
             CaptureOriginals();
+            RefreshProperties();
             await LoadCardsAsync();
             await LoadTagsAsync();
         }
@@ -914,6 +1026,7 @@ namespace PrayerApp.ViewModels
             _originalNotifyMinute = _prayer.NotifyMinute;
             _originalDayOfWeek = _prayer.NotifyDayOfWeek;
             _originalDayOfMonth = _prayer.NotifyDayOfMonth;
+            _originalNotifyDate = _prayer.NotifyDate;
         }
 
         private void RefreshProperties()
@@ -938,6 +1051,9 @@ namespace PrayerApp.ViewModels
             OnPropertyChanged(nameof(ShowNotifyTime));
             OnPropertyChanged(nameof(ShowDayOfWeek));
             OnPropertyChanged(nameof(ShowDayOfMonth));
+            OnPropertyChanged(nameof(ShowNotifyDate));
+            OnPropertyChanged(nameof(NotifyMinimumDate));
+            OnPropertyChanged(nameof(NotifyDate));
             OnPropertyChanged(nameof(SelectedDayOfWeek));
             OnPropertyChanged(nameof(SelectedDayOfMonth));
             OnPropertyChanged(nameof(IsReadOnly));

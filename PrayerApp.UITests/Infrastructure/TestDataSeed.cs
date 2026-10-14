@@ -41,7 +41,7 @@ internal static class TestDataSeed
         // Mirrors PrayerApp.Services.Settings: Preferences.Set(nameof(OnboardingComplete), true)
         // — `defaults write -bool YES` is the NSUserDefaults equivalent of bool=true.
         await RunSimctlAsync(
-            $"spawn booted defaults write {TestConfig.IOSBundleId} OnboardingComplete -bool YES");
+            $"spawn {TestConfig.IOSUdid} defaults write {TestConfig.IOSBundleId} OnboardingComplete -bool YES");
     }
 
     /// <summary>
@@ -280,6 +280,23 @@ internal static class TestDataSeed
         {
             (TestSeedFixtures.ImportSkipsDuplicatesPrayer, "Duplicate-skip fixture.", false),
         });
+
+        // PrayerListTests.OneTimeReminder_FutureDate_ShowsOnceOnInReadView edits and saves this prayer.
+        await SeedCardWithPrayersAsync(boxId: 0, TestSeedFixtures.ReminderDateCard, new[]
+        {
+            (TestSeedFixtures.ReminderDatePrayer, "One-time reminder date fixture.", false),
+        });
+
+        // Cards_CollectionPicker_Close_KeepsTitleBelowNavBar: opens this card's editor and
+        // backs out without saving.
+        await SeedCardWithPrayersAsync(boxId: 0, TestSeedFixtures.PickerSafeAreaCard, new[]
+        {
+            (TestSeedFixtures.PickerSafeAreaPrayer, "Opened by Cards_CollectionPicker_Close_KeepsTitleBelowNavBar.", false),
+        });
+
+        // Cards_SaveAndNew_CreatesTwoCardsInCollection: saves two new cards into this empty collection.
+        var saveAndNewCol = new CardBox { Name = TestSeedFixtures.SaveAndNewCollection, IsSystem = false, SortOrder = 0, CreatedAt = now, UpdatedAt = now };
+        await saveAndNewCol.SaveAsync();
     }
 
     private static async Task SeedCardWithPrayersAsync(int boxId, string cardTitle,
@@ -354,12 +371,14 @@ internal static class TestDataSeed
 
         var bundleId = TestConfig.IOSBundleId;
 
-        await RunSimctlAsync($"terminate booted {bundleId}", allowFailure: true);
+        var udid = TestConfig.IOSUdid;
 
-        string? container = await RunSimctlCaptureAsync($"get_app_container booted {bundleId} data");
+        await RunSimctlAsync($"terminate {udid} {bundleId}", allowFailure: true);
+
+        string? container = await RunSimctlCaptureAsync($"get_app_container {udid} {bundleId} data");
         if (string.IsNullOrWhiteSpace(container))
             throw new InvalidOperationException(
-                $"Could not resolve data container for {bundleId}. Is the app installed on the booted simulator?");
+                $"Could not resolve data container for {bundleId}. Is the app installed on simulator {udid}?");
 
         container = container.Trim();
         var destPath = Path.Combine(container, TestConfig.IOSAppDbRelativePath);

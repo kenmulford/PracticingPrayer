@@ -29,4 +29,18 @@ public static class TestSeedFixtures
     // TestDataSeedConsistencyTests enumerates.
     public const string ImportSkipsDuplicatesCard = "UITest Card ImportExisting_SkipsDuplicates";
     public const string ImportSkipsDuplicatesPrayer = "UITest Prayer ImportExisting_SkipsDuplicates";
+
+    // Owned by PrayerListTests.OneTimeReminder_FutureDate_ShowsOnceOnInReadView alone, which edits
+    // and saves the prayer; no other test reads it.
+    public const string ReminderDateCard = "UITest Card OneTimeReminder_ShowsDate";
+    public const string ReminderDatePrayer = "UITest Prayer OneTimeReminder_ShowsDate";
+
+    // Owned by Cards_CollectionPicker_Close_KeepsTitleBelowNavBar alone; the test backs out
+    // without saving, so the card is never mutated. Outside the Delete Target family that
+    // TestDataSeedConsistencyTests enumerates.
+    public const string PickerSafeAreaCard = "UITest Card Cards_CollectionPicker_Close_KeepsTitleBelowNavBar";
+    public const string PickerSafeAreaPrayer = "UITest Prayer Cards_CollectionPicker_Close_KeepsTitleBelowNavBar";
+
+    // Owned by Cards_SaveAndNew_CreatesTwoCardsInCollection alone; the test adds its cards here.
+    public const string SaveAndNewCollection = "UITest Collection Cards_SaveAndNew_CreatesTwoCardsInCollection";
 }

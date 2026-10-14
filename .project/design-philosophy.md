@@ -23,7 +23,7 @@ Ranked priorities, and the explicit non-goals that follow from them.
 
 ## One-way doors
 Decisions that require human sign-off *before* they're made — irreversible or expensive-to-reverse choices.
-> Require human sign-off before they're made: adding any third-party dependency (PAUSE — see `library-manifest.md`); SQLite schema / migration changes (`DBService.UpdateSchema()`); anything introducing a network, account, or backend dependency (violates privacy-first); the display-version bump at a release milestone. Build SDKs are non-negotiable: MAUI .NET 10, iOS 26.5 / Android API 36.
+> Require human sign-off before they're made: adding any third-party dependency (PAUSE — see `library-manifest.md`); SQLite schema / migration changes (`DBService.UpdateSchema()`); anything introducing a network, account, or backend dependency (violates privacy-first); the display-version bump at a release milestone. Build SDKs are non-negotiable: MAUI .NET 10, Xcode 27 / iOS 27 SDK (minimum iOS 16.0), Android API 36.
 
 ## Error & failure philosophy
 How the system handles and surfaces failure: fail-open vs fail-closed, the user-facing error policy, logging expectations.

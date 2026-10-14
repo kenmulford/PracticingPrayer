@@ -1,6 +1,6 @@
 ---
 name: prayer-app-platform
-description: Use when working on Android/iOS platform-specific code in PrayerApp — MainActivity IntentFilters, CustomShellRenderer, ModalPageSheetHandler, handler Configure() registration, ColorPickerService, deep linking, file import (.prayercard), Universal Links, Entitlements, PrivacyInfo, conditional compilation, orientation, or build config.
+description: Use when working on Android/iOS platform-specific code in PrayerApp — MainActivity IntentFilters, CustomShellRenderer, PageSheetPresentation, handler Configure() registration, ColorPickerService, deep linking, file import (.prayercard), Universal Links, Entitlements, PrivacyInfo, conditional compilation, orientation, or build config.
 ---
 
 # PrayerApp Platform-Specific Code
@@ -35,14 +35,13 @@ Platform code lives under `PrayerApp/Platforms/Android/` and `PrayerApp/Platform
 | `Platforms/iOS/OrientationService.cs` | `UIWindowSceneGeometryPreferencesIOS` orientation update |
 | `Platforms/iOS/ColorPickerService.cs` | `IColorPickerService` — wraps `NativeColorPicker` |
 | `Platforms/iOS/Handlers/EnglishLocaleTimePickerHandler.cs` | Forces `UIDatePicker` locale to `en_US` |
-| `Platforms/iOS/Handlers/ModalPageSheetHandler.cs` | `PageSheet` presentation for `IPageSheetModal` pages |
 | `Platforms/iOS/Helpers/SwipeBackHelper.cs` | Disable/enable iOS swipe-back gesture on edit pages |
 | `Platforms/iOS/Info.plist` | Device families, orientations, UTI declarations, bundle version |
 | `Platforms/iOS/Entitlements.plist` | `com.apple.developer.associated-domains` for Universal Links |
 | `Platforms/iOS/Resources/PrivacyInfo.xcprivacy` | Apple Privacy Manifest (required since iOS 17.4) |
 | `Platforms/iOS/LinkerConfig.xml` | Trim preservation for SQLite-net AOT compatibility |
 | `MauiProgram.cs` | Handler registration, lifecycle hooks, platform service DI |
-| `PrayerApp.csproj` | Target frameworks, signing, `CodesignEntitlements` (both configs) |
+| `PrayerApp.csproj` | Target frameworks, signing, `CodesignEntitlements` (single `net10.0-ios` PropertyGroup, every configuration) |
 
 ---
 
@@ -97,8 +96,6 @@ PrayerApp.Platforms.iOS.Handlers.EnglishLocaleTimePickerHandler.Configure();
 #endif
 ```
 
-`ModalPageSheetHandler` (iOS-only) also uses `.Configure()` — registered in the same region.
-
 The global `SwitchHandler` thumb-color patch uses `AppendToMapping` directly on the mapper (no `#if`):
 
 ```csharp
@@ -111,9 +108,9 @@ Microsoft.Maui.Handlers.SwitchHandler.Mapper.AppendToMapping("SyncInitialThumbCo
 
 ---
 
-## iOS — ModalPageSheetHandler
+## iOS — PageSheetPresentation
 
-`Platforms/iOS/Handlers/ModalPageSheetHandler.cs` — uses `PageHandler.Mapper.AppendToMapping` to set `UIModalPresentationStyle.PageSheet` for pages that implement `IPageSheetModal`. Pages that should stay full-screen (e.g. `RestoreProgressPage`) do not implement the interface.
+`Views/PageSheetPresentation.cs` — on `Application.ModalPushing` it sets `UIModalPresentationStyle.PageSheet` for a page that implements `IPageSheetModal` or a `NavigationPage` whose `RootPage` implements it. Marked pages are page sheets on iPhone and iPad. Pages that should stay full-screen (e.g. `RestoreProgressPage`) do not implement the interface.
 
 ---
 
@@ -131,7 +128,7 @@ Three lifecycle hooks registered under `#elif IOS`:
 
 **`Entitlements.plist`** (`Platforms/iOS/Entitlements.plist`)
 - `com.apple.developer.associated-domains`: `applinks:practicingprayerapp.com`
-- Required for Universal Links; referenced via `CodesignEntitlements` in **both** Debug and Release `PropertyGroup`s in the csproj.
+- Required for Universal Links; referenced via `CodesignEntitlements` in the single `net10.0-ios` `PropertyGroup` in `PrayerApp/PrayerApp.csproj`, so it applies to every configuration, Debug included.
 
 **`PrivacyInfo.xcprivacy`** (`Platforms/iOS/Resources/PrivacyInfo.xcprivacy`)
 - Apple Privacy Manifest required since iOS 17.4 for App Store submission.
@@ -176,7 +173,7 @@ builder.Services.AddSingleton<IColorPickerService, PrayerApp.Platforms.iOS.Color
 
 - `ApplicationDisplayVersion`: `1.2.5`, `ApplicationVersion`: `64`
 - iOS minimum: 16.0; Android minimum: API 24
-- `CodesignEntitlements` is set in **both** Debug and Release iOS PropertyGroups — required for Universal Links in both configurations
+- `CodesignEntitlements` is set in the single `net10.0-ios` PropertyGroup in `PrayerApp/PrayerApp.csproj`, so it applies to every configuration; Universal Links need it in Debug builds too
 - Android signing via env vars `ANDROID_SIGNING_STORE_PASS` / `ANDROID_SIGNING_KEY_PASS`; build succeeds debug-signed when absent
 
 ---
@@ -187,7 +184,7 @@ builder.Services.AddSingleton<IColorPickerService, PrayerApp.Platforms.iOS.Color
 |---------|-----------------|
 | Using `handlers.AddHandler<TimePicker, MyHandler>()` for the time/date picker handlers | Use the static `.Configure()` pattern; handlers use `AppendToMapping` internally |
 | Forgetting the second `IntentFilter` for `.prayercard` file import | `MainActivity.cs` has two filters — one for HTTPS deep links, one for `content://` file URIs |
-| Missing `CodesignEntitlements` in Debug configuration | Both Debug and Release PropertyGroups in the csproj must reference `Entitlements.plist` — Universal Links require it even in debug builds |
+| Adding a per-configuration iOS PropertyGroup that sets `CodesignEntitlements` differently | The single `net10.0-ios` group covers Debug and Release; Universal Links need `Entitlements.plist` in debug builds too |
 | Omitting `PrivacyInfo.xcprivacy` | Required since iOS 17.4; App Store will reject submissions without it |
 | Implementing tab-tap pop-to-root in Shell XAML or `AppShell.xaml.cs` | The fix lives in `CustomShellRenderer` (Android-only); iOS uses a different renderer stack |
 | Hardcoding `UIModalPresentationStyle.PageSheet` on all modals | Only pages implementing `IPageSheetModal` get PageSheet; blocking/progress pages must stay full-screen |

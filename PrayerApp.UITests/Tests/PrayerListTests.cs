@@ -31,4 +31,48 @@ public class PrayerListTests
         Assert.True(driver.IsDisplayed("List_Filter_Active", timeoutSeconds: 10)
                  || driver.IsDisplayed("List_List_Prayers", timeoutSeconds: 3));
     }
+
+    /// <summary>
+    /// Issue #338: a One-time reminder takes a date, not just a time. Picks next year on the date
+    /// picker's year wheel (future in any month) and checks the read view shows "Once on ...".
+    /// </summary>
+    [SkippableFact]
+    public void OneTimeReminder_FutureDate_ShowsOnceOnInReadView()
+    {
+        Skip.IfNot(TestConfig.IsIOS, "Date wheel selection is iOS-only (UIDatePicker wheels).");
+        _setup.Driver.ResetAppUIState(_setup);
+        var driver = _setup.Driver;
+        driver.EnsureOnTab("Prayers", _setup);
+        driver.WaitForElement("List_List_Prayers", timeoutSeconds: 10);
+
+        driver.ScrollToPrayerAndTap(TestSeedFixtures.ReminderDatePrayer);
+        driver.TapToolbarItemById("Edit");
+        driver.WaitForElement("Detail_Entry_Title", timeoutSeconds: 10);
+
+        driver.ScrollDownTo("Detail_Switch_Reminders");
+        driver.WaitAndTap("Detail_Switch_Reminders");
+        driver.ScrollDownTo("Detail_Picker_Frequency");
+        driver.WaitAndTap("Detail_Picker_Frequency");
+        driver.SelectIOSPickerValue("OneTime");
+        driver.CloseIOSPicker();
+        Assert.Equal("OneTime", driver.IOSPickerFieldValue("Detail_Picker_Frequency"));
+
+        // The default date is the first 9:00 fire (today before 9 a.m., else tomorrow); the wheel changes only the year.
+        var defaultDate = DateTime.Now.Hour < 9 ? DateTime.Today : DateTime.Today.AddDays(1);
+        var nextYear = (DateTime.Now.Year + 1).ToString();
+        var expectedDate = new DateTime(DateTime.Now.Year + 1, defaultDate.Month, defaultDate.Day);
+        driver.ScrollDownTo("Detail_Picker_ReminderDate");
+        driver.WaitAndTap("Detail_Picker_ReminderDate");
+        driver.SelectIOSPickerWheelValue(3, nextYear);
+        driver.CloseIOSPicker();
+        Assert.EndsWith(nextYear, driver.IOSPickerFieldValue("Detail_Picker_ReminderDate"));
+
+        // Save pops back to the Prayers list; the read view is reopened from there.
+        driver.TapToolbarItemById("Save");
+        Thread.Sleep(TestConfig.DelayAfterSave);
+        Assert.True(driver.IsDisplayed("List_List_Prayers", timeoutSeconds: 10), "Save did not return to the Prayers list.");
+
+        driver.ScrollToPrayerAndTap(TestSeedFixtures.ReminderDatePrayer);
+        Assert.NotNull(driver.FindByTextContains($"Once on {expectedDate:d MMM yyyy}"));
+    }
 }

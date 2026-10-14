@@ -51,10 +51,10 @@ Practicing Prayer is offline-first by design:
 
 ## Build and run
 
-You'll need a .NET 10.0.3xx SDK (`global.json` pins the band) with the MAUI workloads at workload set 10.0.301.1, the set the release builds with:
+You'll need a .NET 10.0.4xx SDK (`global.json` pins the band) with the MAUI workloads at workload set 10.0.401.1, which `global.json` also pins. Run the install from the repo root so it picks up that pin:
 
 ```bash
-dotnet workload install maui --version 10.0.301.1
+dotnet workload install maui
 ```
 
 Then, from the repo root:
@@ -63,7 +63,7 @@ Then, from the repo root:
 # Android (emulator or USB-debugging device)
 dotnet build PrayerApp/PrayerApp.csproj -t:Run -f net10.0-android
 
-# iOS (macOS + Xcode required)
+# iOS (macOS + Xcode 27.0 required)
 dotnet build PrayerApp/PrayerApp.csproj -t:Run -f net10.0-ios
 # For an iOS Simulator Debug build/run, add -r iossimulator-arm64 — it selects the
 # simulator native-lib slice; without it the link step fails (see issue #150).

@@ -75,6 +75,7 @@ public class AppiumCollection : ICollectionFixture<AppiumSetup> { }
 | `DefaultTimeout` | **10 s** | Standard element wait (base; see note) |
 | `ShortTimeout` | 3 s | Quick presence checks |
 | `SessionTimeout` | 60 s | Driver session |
+| `IOSSessionTimeout` | 240 s | iOS driver session |
 
 > `WaitForElement` and `WaitAndTap` default to **15 s** (`timeoutSeconds: 15`), not `DefaultTimeout`.
 > `DefaultTimeout` (10 s) is the implicit-wait fallback, not the polling-wait default.
@@ -112,15 +113,16 @@ noReset:     true (when APK not provided)
 ```
 BundleId:              com.multithreadedllc.prayercards
 Automation:            XCUITest
-Device:                env IOS_SIMULATOR ?? "iPad (A16)"
-PlatformVersion:       env IOS_VERSION ?? "26.4"
+Device:                env IOS_SIMULATOR ?? "Test iPad"   (an iPad (A16))
+PlatformVersion:       env IOS_VERSION ?? "27.0"
+Udid:                  TestConfig.IOSUdid (env IOS_UDID, else resolved from Device + PlatformVersion)
 connectHardwareKeyboard: true
 noReset:               true
 ```
 
 **Why iPad?** iPhone has no keyboard dismiss button; `DismissKeyboardIfPresent` fails there, causing cascade failures on text-input tests.
 
-**Why `connectHardwareKeyboard`?** Hardware keyboard hides the software keyboard, preventing `SendKeys` from hitting dictation/emoji intercepts. Only works when Appium boots the simulator; shut the simulator down before a test run.
+**Why `connectHardwareKeyboard`?** Hardware keyboard hides the software keyboard, preventing `SendKeys` from hitting dictation/emoji intercepts. Only works when Appium boots the simulator.
 
 ---
 

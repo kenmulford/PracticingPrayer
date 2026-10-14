@@ -18,6 +18,7 @@ namespace PrayerApp
         public App()
         {
             InitializeComponent();
+            ModalPushing += OnModalPushing;
         }
 
         protected override Window CreateWindow(IActivationState? activationState)
@@ -47,6 +48,9 @@ namespace PrayerApp
 #endif
             return window;
         }
+
+        private static void OnModalPushing(object? sender, ModalPushingEventArgs e) =>
+            Views.PageSheetPresentation.Apply(e.Modal);
 
         private static void OnWindowDeactivated(object? sender, EventArgs e)
         {

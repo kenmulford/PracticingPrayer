@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.Input;
 using NSubstitute;
+using PrayerApp.Helpers;
 using PrayerApp.Models;
 using PrayerApp.Services;
 using PrayerApp.ViewModels;
@@ -1014,5 +1015,382 @@ public class PrayerRequestDetailViewModelTests
 
         // Reaching this line without an exception proves the guard returned early.
         Assert.False(sut.CanShare);
+    }
+
+    // ── NotifyDate — one-time / yearly reminder day ───────────────────
+
+    private PrayerRequestDetailViewModel CreateReminderSut(PrayerFrequency frequency)
+    {
+        var sut = CreateSut();
+        sut.Title = "Reminder prayer";
+        sut.CanNotify = true;
+        sut.PrayerFrequency = frequency;
+        return sut;
+    }
+
+    private void SetupLoadedReminder(int id, DateTime? notifyDate, PrayerFrequency frequency = PrayerFrequency.OneTime,
+        bool canNotify = true)
+    {
+        _db.GetByIdAsync<Prayer>(id).Returns(Task.FromResult(new Prayer
+        {
+            Id = id, Title = "Loaded reminder", CanNotify = canNotify, PrayerFrequency = frequency,
+            NotifyDate = notifyDate, CreatedAt = DateTime.Today.AddDays(-9)
+        }));
+        _prayerService.GetInteractionCountByPrayerAsync(id).Returns(Task.FromResult(0));
+        _cardService.GetCardsAsync().Returns(Task.FromResult<IReadOnlyList<PrayerCard>>(new List<PrayerCard> { new() { Id = 1, Title = "C" } }));
+        _tagService.GetTagsAsync().Returns(Task.FromResult<IReadOnlyList<PrayerTag>>(new List<PrayerTag>()));
+        _tagService.GetTagsByRequestIdAsync(id).Returns(Task.FromResult<IReadOnlyList<PrayerTag>>(new List<PrayerTag>()));
+    }
+
+    [Fact]
+    public void PrayerFrequencyDisplay_OneTimeWithDate()
+    {
+        var sut = CreateReminderSut(PrayerFrequency.OneTime);
+        sut.NotifyDate = new DateTime(2027, 3, 5);
+
+        Assert.Equal("Once on 5 Mar 2027 at 9:00 AM", sut.PrayerFrequencyDisplay);
+    }
+
+    [Fact]
+    public void PrayerFrequencyDisplay_YearlyWithDate()
+    {
+        var sut = CreateReminderSut(PrayerFrequency.Yearly);
+        sut.NotifyDate = new DateTime(2027, 3, 5);
+
+        Assert.Equal("Yearly on 5 Mar at 9:00 AM", sut.PrayerFrequencyDisplay);
+    }
+
+    [Fact]
+    public async Task NotifyDate_Change_MarksDirty()
+    {
+        SetupLoadedReminder(81, DateTime.Today.AddDays(10));
+        var sut = CreateSut();
+        await LoadAndDrainAsync(sut, 81);
+        var before = sut.IsDirty;
+
+        sut.NotifyDate = DateTime.Today.AddDays(40);
+
+        Assert.False(before);
+        Assert.True(sut.IsDirty);
+    }
+
+    [Fact]
+    public async Task NotifyDate_YearlyYearOnlyChange_LeavesStoredMonthDay()
+    {
+        SetupLoadedReminder(82, new DateTime(2027, 3, 5), PrayerFrequency.Yearly);
+        var sut = CreateSut();
+        await LoadAndDrainAsync(sut, 82);
+        var next = sut.NotifyDate;
+
+        sut.NotifyDate = next.AddYears(3);
+
+        Assert.False(sut.IsDirty);
+        Assert.Equal("Yearly on 5 Mar at 9:00 AM", sut.PrayerFrequencyDisplay);
+    }
+
+    [Fact]
+    public async Task SaveCommand_PastOneTimeChanged_ShowsAlertAndDoesNotSave()
+    {
+        var sut = CreateReminderSut(PrayerFrequency.OneTime);
+        sut.NotifyDate = DateTime.Today.AddDays(-1);
+
+        await ((IAsyncRelayCommand)sut.SaveCommand).ExecuteAsync(null);
+
+        await _navigationService.Received(1).DisplayAlertAsync("Reminder", Arg.Any<string>(), "OK");
+        await _prayerService.DidNotReceive().SavePrayerAsync(Arg.Any<Prayer>());
+    }
+
+    [Fact]
+    public async Task SaveAndNewCommand_PastOneTimeChanged_ShowsAlertAndDoesNotSave()
+    {
+        var sut = CreateReminderSut(PrayerFrequency.OneTime);
+        sut.NotifyDate = DateTime.Today.AddDays(-1);
+
+        await ((IAsyncRelayCommand)sut.SaveAndNewCommand).ExecuteAsync(null);
+
+        await _navigationService.Received(1).DisplayAlertAsync("Reminder", Arg.Any<string>(), "OK");
+        await _prayerService.DidNotReceive().SavePrayerAsync(Arg.Any<Prayer>());
+    }
+
+    [Fact]
+    public async Task SaveCommand_PastOneTimeUnchanged_Saves()
+    {
+        SetupLoadedReminder(80, DateTime.Today.AddDays(-5));
+        var sut = CreateSut();
+        await LoadAndDrainAsync(sut, 80);
+
+        await ((IAsyncRelayCommand)sut.SaveCommand).ExecuteAsync(null);
+
+        await _prayerService.Received(1).SavePrayerAsync(Arg.Any<Prayer>());
+        await _navigationService.DidNotReceive().DisplayAlertAsync("Reminder", Arg.Any<string>(), Arg.Any<string>());
+    }
+
+    [Fact]
+    public async Task Load_PastOneTime_RaisesNotifyMinimumDateBeforeNotifyDate()
+    {
+        var stored = DateTime.Today.AddDays(-5);
+        SetupLoadedReminder(83, stored);
+        var sut = CreateSut();
+        var raised = new List<string?>();
+        var minimumAtDateRaise = new List<DateTime>();
+        sut.PropertyChanged += (_, e) =>
+        {
+            raised.Add(e.PropertyName);
+            if (e.PropertyName == nameof(sut.NotifyDate))
+                minimumAtDateRaise.Add(sut.NotifyMinimumDate);
+        };
+
+        await LoadAndDrainAsync(sut, 83);
+
+        Assert.Contains(nameof(sut.NotifyDate), raised);
+        Assert.True(raised.IndexOf(nameof(sut.NotifyMinimumDate)) < raised.IndexOf(nameof(sut.NotifyDate)));
+        Assert.True(raised.LastIndexOf(nameof(sut.NotifyMinimumDate)) < raised.LastIndexOf(nameof(sut.NotifyDate)));
+        Assert.All(minimumAtDateRaise, m => Assert.True(m <= stored));
+    }
+
+    [Fact]
+    public async Task PrayerFrequency_YearlyToOneTime_ProjectsNextOccurrence()
+    {
+        var anchor = new DateTime(2020, DateTime.Today.AddDays(-5).Month, DateTime.Today.AddDays(-5).Day);
+        SetupLoadedReminder(84, anchor, PrayerFrequency.Yearly);
+        var sut = CreateSut();
+        await LoadAndDrainAsync(sut, 84);
+        var expected = NotificationHelper.NextYearlyFire(anchor, 9, 0, DateTime.Now).Date;
+
+        sut.PrayerFrequency = PrayerFrequency.OneTime;
+        await ((IAsyncRelayCommand)sut.SaveCommand).ExecuteAsync(null);
+
+        Assert.Equal(expected, sut.NotifyDate);
+        await _navigationService.DidNotReceive().DisplayAlertAsync("Reminder", Arg.Any<string>(), Arg.Any<string>());
+        await _prayerService.Received(1).SavePrayerAsync(Arg.Is<Prayer>(p => p.NotifyDate == expected));
+    }
+
+    [Fact]
+    public async Task PrayerFrequency_OneTimeToDaily_SavesNullNotifyDate()
+    {
+        SetupLoadedReminder(89, new DateTime(2025, 3, 5));
+        var sut = CreateSut();
+        await LoadAndDrainAsync(sut, 89);
+
+        sut.PrayerFrequency = PrayerFrequency.Daily;
+        await ((IAsyncRelayCommand)sut.SaveCommand).ExecuteAsync(null);
+
+        await _prayerService.Received(1).SavePrayerAsync(Arg.Is<Prayer>(p => p.NotifyDate == null));
+    }
+
+    [Fact]
+    public async Task PrayerFrequency_OneTimeToDailyAndBack_RestoresDateNotDirty()
+    {
+        var stored = new DateTime(2025, 3, 5);
+        SetupLoadedReminder(90, stored);
+        var sut = CreateSut();
+        await LoadAndDrainAsync(sut, 90);
+
+        sut.PrayerFrequency = PrayerFrequency.Daily;
+        sut.PrayerFrequency = PrayerFrequency.OneTime;
+
+        Assert.Equal(stored, sut.NotifyDate);
+        Assert.False(sut.IsDirty);
+    }
+
+    [Fact]
+    public async Task PrayerFrequency_YearlyToOneTimeAndBack_NotDirty()
+    {
+        SetupLoadedReminder(91, new DateTime(2020, 3, 5), PrayerFrequency.Yearly);
+        var sut = CreateSut();
+        await LoadAndDrainAsync(sut, 91);
+
+        sut.PrayerFrequency = PrayerFrequency.OneTime;
+        sut.PrayerFrequency = PrayerFrequency.Yearly;
+
+        Assert.False(sut.IsDirty);
+        Assert.Equal("Yearly on 5 Mar at 9:00 AM", sut.PrayerFrequencyDisplay);
+    }
+
+    [Fact]
+    public async Task NotifyDate_YearlyFeb29WriteBackOfDisplayedDate_KeepsStoredDate()
+    {
+        SetupLoadedReminder(92, new DateTime(2028, 2, 29), PrayerFrequency.Yearly);
+        var sut = CreateSut();
+        await LoadAndDrainAsync(sut, 92);
+
+        sut.NotifyDate = sut.NotifyDate;
+
+        Assert.False(sut.IsDirty);
+        Assert.Equal("Yearly on 29 Feb at 9:00 AM", sut.PrayerFrequencyDisplay);
+    }
+
+    [Fact]
+    public async Task NotifyDate_YearlyYearOnlyChange_RaisesNotifyDateToSnapBack()
+    {
+        SetupLoadedReminder(93, new DateTime(2027, 3, 5), PrayerFrequency.Yearly);
+        var sut = CreateSut();
+        await LoadAndDrainAsync(sut, 93);
+        var next = sut.NotifyDate;
+        var raised = new List<string?>();
+        sut.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        sut.NotifyDate = next.AddYears(3);
+
+        Assert.Contains(nameof(sut.NotifyDate), raised);
+        Assert.Equal(next, sut.NotifyDate);
+    }
+
+    [Fact]
+    public async Task NotifyMinimumDate_PastPick_DoesNotRatchet()
+    {
+        SetupLoadedReminder(94, DateTime.Today.AddDays(10));
+        var sut = CreateSut();
+        await LoadAndDrainAsync(sut, 94);
+
+        sut.NotifyDate = DateTime.Today.AddDays(-3);
+
+        Assert.Equal(DateTime.Today, sut.NotifyMinimumDate);
+    }
+
+    [Fact]
+    public async Task PrayerFrequency_OneTimeToYearlyAndBack_RestoresDateNotDirty()
+    {
+        var stored = new DateTime(2028, 6, 1);
+        SetupLoadedReminder(95, stored);
+        var sut = CreateSut();
+        await LoadAndDrainAsync(sut, 95);
+
+        sut.PrayerFrequency = PrayerFrequency.Yearly;
+        sut.PrayerFrequency = PrayerFrequency.OneTime;
+
+        Assert.Equal(stored, sut.NotifyDate);
+        Assert.False(sut.IsDirty);
+    }
+
+    [Fact]
+    public async Task PrayerFrequency_PastOneTimeToYearlyAndBack_RestoresPastDate()
+    {
+        var stored = new DateTime(2025, 3, 5);
+        SetupLoadedReminder(96, stored);
+        var sut = CreateSut();
+        await LoadAndDrainAsync(sut, 96);
+
+        sut.PrayerFrequency = PrayerFrequency.Yearly;
+        sut.PrayerFrequency = PrayerFrequency.OneTime;
+
+        Assert.Equal(stored, sut.NotifyDate);
+    }
+
+    [Fact]
+    public async Task NotifyDate_SetWhileDaily_SavesNullNotifyDate()
+    {
+        SetupLoadedReminder(97, DateTime.Today.AddDays(10));
+        var sut = CreateSut();
+        await LoadAndDrainAsync(sut, 97);
+
+        sut.PrayerFrequency = PrayerFrequency.Daily;
+        sut.NotifyDate = DateTime.Today.AddDays(5);
+        await ((IAsyncRelayCommand)sut.SaveCommand).ExecuteAsync(null);
+
+        await _prayerService.Received(1).SavePrayerAsync(Arg.Is<Prayer>(p => p.NotifyDate == null));
+    }
+
+    [Fact]
+    public async Task SaveCommand_ReenableCanNotifyOnPastOneTime_ShowsAlert()
+    {
+        SetupLoadedReminder(85, DateTime.Today.AddDays(-5), canNotify: false);
+        var sut = CreateSut();
+        await LoadAndDrainAsync(sut, 85);
+
+        sut.CanNotify = true;
+        await ((IAsyncRelayCommand)sut.SaveCommand).ExecuteAsync(null);
+
+        await _navigationService.Received(1).DisplayAlertAsync("Reminder", Arg.Any<string>(), "OK");
+        await _prayerService.DidNotReceive().SavePrayerAsync(Arg.Any<Prayer>());
+    }
+
+    [Fact]
+    public async Task SaveCommand_PastOneTimeTitleEditOnly_Saves()
+    {
+        SetupLoadedReminder(86, DateTime.Today.AddDays(-5));
+        var sut = CreateSut();
+        await LoadAndDrainAsync(sut, 86);
+
+        sut.Title = "Renamed reminder";
+        await ((IAsyncRelayCommand)sut.SaveCommand).ExecuteAsync(null);
+
+        await _prayerService.Received(1).SavePrayerAsync(Arg.Any<Prayer>());
+        await _navigationService.DidNotReceive().DisplayAlertAsync("Reminder", Arg.Any<string>(), Arg.Any<string>());
+    }
+
+    [Fact]
+    public async Task NotifyDate_PickTodayOnNullOneTimeRow_Persists()
+    {
+        SetupLoadedReminder(87, null);
+        var sut = CreateSut();
+        await LoadAndDrainAsync(sut, 87);
+
+        sut.NotifyDate = DateTime.Today;
+
+        Assert.True(sut.IsDirty);
+        Assert.StartsWith($"Once on {DateTime.Today:d MMM yyyy}", sut.PrayerFrequencyDisplay);
+    }
+
+    [Fact]
+    public void NotifyTime_Change_RaisesNotifyDate()
+    {
+        var sut = CreateReminderSut(PrayerFrequency.Yearly);
+        var raised = new List<string?>();
+        sut.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        sut.NotifyTime = new TimeSpan(14, 15, 0);
+
+        Assert.Contains(nameof(sut.NotifyDate), raised);
+    }
+
+    [Fact]
+    public async Task PrayerFrequency_DailyToOneTimeAndBack_NotDirty()
+    {
+        SetupLoadedReminder(88, null, PrayerFrequency.Daily);
+        var sut = CreateSut();
+        await LoadAndDrainAsync(sut, 88);
+
+        sut.PrayerFrequency = PrayerFrequency.OneTime;
+        sut.PrayerFrequency = PrayerFrequency.Daily;
+
+        Assert.False(sut.IsDirty);
+    }
+
+    [Fact]
+    public async Task PrayerFrequency_DailyToOneTimeAfterTodaysTime_DefaultsTomorrowAndSaves()
+    {
+        SetupLoadedReminder(98, null, PrayerFrequency.Daily);
+        var sut = CreateSut();
+        await LoadAndDrainAsync(sut, 98);
+        // Midnight is always behind DateTime.Now, so today's fire has passed on any run.
+        sut.NotifyTime = TimeSpan.Zero;
+
+        sut.PrayerFrequency = PrayerFrequency.OneTime;
+        await ((IAsyncRelayCommand)sut.SaveCommand).ExecuteAsync(null);
+
+        Assert.Equal(DateTime.Today.AddDays(1), sut.NotifyDate);
+        await _navigationService.DidNotReceive().DisplayAlertAsync("Reminder", Arg.Any<string>(), Arg.Any<string>());
+        await _prayerService.Received(1).SavePrayerAsync(Arg.Any<Prayer>());
+    }
+
+    [Fact]
+    public async Task SaveAndNewCommand_AfterPastOneTime_RaisesNotifyMinimumDateAsToday()
+    {
+        SetupLoadedReminder(99, DateTime.Today.AddDays(-5));
+        var sut = CreateSut();
+        await LoadAndDrainAsync(sut, 99);
+        var minimumAtRaise = new List<DateTime>();
+        sut.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(sut.NotifyMinimumDate))
+                minimumAtRaise.Add(sut.NotifyMinimumDate);
+        };
+
+        await ((IAsyncRelayCommand)sut.SaveAndNewCommand).ExecuteAsync(null);
+
+        Assert.True(sut.IsNew);
+        Assert.NotEmpty(minimumAtRaise);
+        Assert.Equal(DateTime.Today, minimumAtRaise[^1]);
     }
 }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -49,6 +49,9 @@ namespace PrayerApp.Models
 
         [Column("NotifyDayOfMonth")]
         public int NotifyDayOfMonth { get; set; } = -1;  // 1-31, -1=use creation day
+
+        [Column("NotifyDate")]
+        public DateTime? NotifyDate { get; set; }  // OneTime/Yearly reminder day (date only); null = legacy CreatedAt path
 
         [Column("IsImported")]
         public bool IsImported { get; set; } = false;

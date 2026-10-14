@@ -42,7 +42,7 @@ def create_session(udid, device_name):
             "alwaysMatch": {
                 "platformName": "iOS",
                 "appium:automationName": "XCUITest",
-                "appium:platformVersion": "26.4",
+                "appium:platformVersion": "27.0",
                 "appium:deviceName": device_name,
                 "appium:udid": udid,
                 "appium:bundleId": BUNDLE_ID,

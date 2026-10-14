@@ -44,8 +44,6 @@ namespace PrayerApp
                     ViewCompat.SetBackgroundTintList(editText, ColorStateList.ValueOf(Android.Graphics.Color.Transparent));
                 }
             });
-#elif IOS
-            Platforms.iOS.Handlers.ModalPageSheetHandler.Configure();
 #endif
 
             // register explicit routes for child pages
