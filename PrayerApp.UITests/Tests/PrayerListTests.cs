@@ -57,7 +57,10 @@ public class PrayerListTests
         driver.CloseIOSPicker();
         Assert.Equal("OneTime", driver.IOSPickerFieldValue("Detail_Picker_Frequency"));
 
+        // The default date is the first 9:00 fire (today before 9 a.m., else tomorrow); the wheel changes only the year.
+        var defaultDate = DateTime.Now.Hour < 9 ? DateTime.Today : DateTime.Today.AddDays(1);
         var nextYear = (DateTime.Now.Year + 1).ToString();
+        var expectedDate = new DateTime(DateTime.Now.Year + 1, defaultDate.Month, defaultDate.Day);
         driver.ScrollDownTo("Detail_Picker_ReminderDate");
         driver.WaitAndTap("Detail_Picker_ReminderDate");
         driver.SelectIOSPickerWheelValue(3, nextYear);
@@ -70,6 +73,6 @@ public class PrayerListTests
         Assert.True(driver.IsDisplayed("List_List_Prayers", timeoutSeconds: 10), "Save did not return to the Prayers list.");
 
         driver.ScrollToPrayerAndTap(TestSeedFixtures.ReminderDatePrayer);
-        Assert.NotNull(driver.FindByTextContains($"Once on {DateTime.Today.AddYears(1):d MMM yyyy}"));
+        Assert.NotNull(driver.FindByTextContains($"Once on {expectedDate:d MMM yyyy}"));
     }
 }

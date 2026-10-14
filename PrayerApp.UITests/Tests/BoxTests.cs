@@ -154,6 +154,10 @@ public class BoxTests
 
         driver.GoBack();
         driver.TapAlertButton("Discard");
+
+        // Leave the Collections list so the next test does not start on a pushed page.
+        driver.GoBack();
+        Thread.Sleep(TestConfig.DelayAfterNavigation);
     }
 
 }
