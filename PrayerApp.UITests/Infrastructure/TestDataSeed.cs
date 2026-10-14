@@ -286,6 +286,13 @@ internal static class TestDataSeed
         {
             (TestSeedFixtures.ReminderDatePrayer, "One-time reminder date fixture.", false),
         });
+
+        // Cards_CollectionPicker_Close_KeepsTitleBelowNavBar: opens this card's editor and
+        // backs out without saving.
+        await SeedCardWithPrayersAsync(boxId: 0, TestSeedFixtures.PickerSafeAreaCard, new[]
+        {
+            (TestSeedFixtures.PickerSafeAreaPrayer, "Opened by Cards_CollectionPicker_Close_KeepsTitleBelowNavBar.", false),
+        });
     }
 
     private static async Task SeedCardWithPrayersAsync(int boxId, string cardTitle,

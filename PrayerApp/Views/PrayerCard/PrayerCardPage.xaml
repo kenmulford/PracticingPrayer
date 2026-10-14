@@ -7,7 +7,7 @@
              x:Class="PrayerApp.Views.PrayerCard.PrayerCardPage"
              x:DataType="viewModels:PrayerCardViewModel"
              Title="Prayer Card"
-             SafeAreaEdges="Container">
+             SafeAreaEdges="{OnPlatform iOS='Container, Container, Container, All', Default=Container}">
     <ContentPage.ToolbarItems>
         <ToolbarItem Text="Save"
                      Command="{Binding SaveCommand}"

@@ -1,4 +1,3 @@
-using OpenQA.Selenium;
 using PrayerApp.UITests.Helpers;
 using PrayerApp.UITests.Infrastructure;
 using Xunit;
@@ -56,14 +55,14 @@ public class PrayerListTests
         driver.WaitAndTap("Detail_Picker_Frequency");
         driver.SelectIOSPickerValue("OneTime");
         driver.CloseIOSPicker();
-        Assert.Equal("OneTime", IOSPickerFieldValue(driver, "Detail_Picker_Frequency"));
+        Assert.Equal("OneTime", driver.IOSPickerFieldValue("Detail_Picker_Frequency"));
 
         var nextYear = (DateTime.Now.Year + 1).ToString();
         driver.ScrollDownTo("Detail_Picker_ReminderDate");
         driver.WaitAndTap("Detail_Picker_ReminderDate");
         driver.SelectIOSPickerWheelValue(3, nextYear);
         driver.CloseIOSPicker();
-        Assert.EndsWith(nextYear, IOSPickerFieldValue(driver, "Detail_Picker_ReminderDate"));
+        Assert.EndsWith(nextYear, driver.IOSPickerFieldValue("Detail_Picker_ReminderDate"));
 
         // Save pops back to the Prayers list; the read view is reopened from there.
         driver.TapToolbarItemById("Save");
@@ -73,8 +72,4 @@ public class PrayerListTests
         driver.ScrollToPrayerAndTap(TestSeedFixtures.ReminderDatePrayer);
         Assert.NotNull(driver.FindByTextContains($"Once on {DateTime.Today.AddYears(1):d MMM yyyy}"));
     }
-
-    // The AutomationId also names the field's non-accessible wrapper, which carries no value.
-    private static string? IOSPickerFieldValue(OpenQA.Selenium.Appium.AppiumDriver driver, string automationId)
-        => driver.FindElement(By.XPath($"//XCUIElementTypeButton[@name='{automationId}']")).GetAttribute("value");
 }

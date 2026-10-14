@@ -1,5 +1,6 @@
 using OpenQA.Selenium;
 using OpenQA.Selenium.Appium;
+using OpenQA.Selenium.Support.UI;
 using PrayerApp.Helpers;
 using PrayerApp.UITests.Helpers;
 using PrayerApp.UITests.Infrastructure;
@@ -136,6 +137,53 @@ public class PrayerCardTests
             driver.IsTextDisplayed("Recycle Big Prayer 4", timeoutSeconds: 3));
     }
 
+    /// <summary>
+    /// #337: closing the collection picker, with or without choosing a value, must leave the card
+    /// title at its original layout position. Simulators do not reproduce #337, so this guards the
+    /// layout position only; the fix itself was owner-verified on a physical iPhone.
+    /// </summary>
+    [SkippableFact]
+    public void Cards_CollectionPicker_Close_KeepsTitleBelowNavBar()
+    {
+        Skip.IfNot(TestConfig.IsIOS, "iOS-only: the Picker input-view auto-scroll (#337) is iOS behavior");
+
+        _setup.Driver.ResetAppUIState(_setup);
+        _setup.Driver.EnsureOnTab("Home", _setup);
+        _setup.Driver.EnsureOnTab("Prayer Cards", _setup);
+        var driver = _setup.Driver;
+
+        EnsureCardExpanded(driver, TestSeedFixtures.PickerSafeAreaCard);
+        Assert.True(IsCardHeaderExpanded(driver, TestSeedFixtures.PickerSafeAreaCard),
+            $"'{TestSeedFixtures.PickerSafeAreaCard}' did not expand, so Cards_Btn_Edit would open another card.");
+        driver.WaitAndTap("Cards_Btn_Edit");
+        // The card load is fire-and-forget and OnAppearing can read IsNew before it lands and focus
+        // the title, so the keyboard is dismissed only after the loaded title proves that focus is spent.
+        // The owner's repro starts with no field focused and no keyboard.
+        new WebDriverWait(driver, TimeSpan.FromSeconds(10))
+            .Until(_ => driver.WaitForElement("Card_Entry_Title").Text == TestSeedFixtures.PickerSafeAreaCard);
+        driver.DismissKeyboardIfPresent();
+        new WebDriverWait(driver, TimeSpan.FromSeconds(10))
+            .Until(_ => !driver.IsKeyboardShown());
+        var baselineY = driver.WaitForStableY("Card_Entry_Title");
+
+        // Owner repro: from a fresh editor, open the picker, choose a value, close it.
+        driver.WaitAndTap("Card_Picker_Box");
+        driver.SelectIOSPickerValue("Work");
+        driver.CloseIOSPicker();
+        Assert.Equal("Work", driver.IOSPickerFieldValue("Card_Picker_Box"));
+        Assert.InRange(driver.WaitForStableY("Card_Entry_Title"), baselineY - 2, baselineY + 2);
+
+        // Open the picker again and close it without choosing.
+        driver.WaitAndTap("Card_Picker_Box");
+        driver.CloseIOSPicker();
+        Assert.InRange(driver.WaitForStableY("Card_Entry_Title"), baselineY - 2, baselineY + 2);
+
+        // The collection choice persists only on Save, so backing out keeps the fixture in Loose Cards.
+        driver.GoBack();
+        driver.DismissAlertIfPresent();
+        driver.WaitForElementGone("Card_Entry_Title");
+    }
+
     // ── Slice 6c real + 6g — expand realize + post-save overlay continuity ──
 
     /// <summary>
@@ -185,13 +233,14 @@ public class PrayerCardTests
         var by = TestConfig.IsIOS
             ? By.XPath($"//*[contains(@label,'{cardName}') and contains(@label,', Expanded')]")
             : By.XPath($"//*[contains(@content-desc,'{cardName}') and contains(@content-desc,', Expanded')]");
+        var priorWait = driver.Manage().Timeouts().ImplicitWait;
         try
         {
             driver.Manage().Timeouts().ImplicitWait = TimeSpan.FromSeconds(1);
             return driver.FindElement(by).Displayed;
         }
         catch (WebDriverException) { return false; }
-        finally { driver.Manage().Timeouts().ImplicitWait = TestConfig.DefaultTimeout; }
+        finally { driver.Manage().Timeouts().ImplicitWait = priorWait; }
     }
 
     /// <summary>
