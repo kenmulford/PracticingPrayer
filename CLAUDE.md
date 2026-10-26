@@ -13,7 +13,8 @@ The full branch model and contribution process are in [CONTRIBUTING.md](CONTRIBU
   - `hotfix/*` → branch from `master`
 - **One concern per branch.** If a new concern surfaces mid-branch, branch separately off the appropriate base.
 - **PR flow:** push the branch → `gh pr create --base <dev|master> --fill` → wait for CI green → `gh pr merge --squash --delete-branch`.
-- **Closing issues:** `Closes #N` only auto-closes when a PR merges into the **default** branch (`master`). Work merges into `dev`, so the keyword never fires — close the issue manually after merge with `gh issue close <n>`.
+- **Closing issues:** `dev` is the default branch, so `Closes #N` in a PR auto-closes the issue when it merges into `dev`.
+- **Dependabot** opens PRs against `dev`, the default branch. Version updates are configured in `.github/dependabot.yml`.
 - **`release/*` and `hotfix/*` merge twice:** into `master` (then tag the release) **and** back into `dev`, so the fix isn't lost in the next release.
 - **`release/*` is optional ceremony:** cut one only when `dev` must keep moving while a build is frozen for stabilization / App Store review; otherwise `dev → master` directly is equivalent.
 - **Commits are squashed**, so the PR title/description become the landed commit message — write them release-quality.
