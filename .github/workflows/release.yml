@@ -30,7 +30,7 @@ jobs:
         with:
           fetch-depth: 0            # full history: Directory.Build.props needs `git rev-list --count HEAD`
 
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
 
@@ -79,7 +79,7 @@ jobs:
         with:
           xcode-version: '27.0'
 
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
 
