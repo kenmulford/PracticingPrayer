@@ -98,14 +98,14 @@ jobs:
           p12-password: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
 
       # Download the App Store profiles for BOTH targets via the ASC API key.
-      - uses: apple-actions/download-provisioning-profiles@v6
+      - uses: apple-actions/download-provisioning-profiles@v7
         with:
           bundle-id: com.multithreadedllc.prayercards
           profile-type: IOS_APP_STORE
           issuer-id: ${{ secrets.ASC_ISSUER_ID }}
           api-key-id: ${{ secrets.ASC_KEY_ID }}
           api-private-key: ${{ secrets.ASC_API_KEY_P8 }}
-      - uses: apple-actions/download-provisioning-profiles@v6
+      - uses: apple-actions/download-provisioning-profiles@v7
         with:
           bundle-id: com.multithreadedllc.prayercards.actionextension
           profile-type: IOS_APP_STORE
