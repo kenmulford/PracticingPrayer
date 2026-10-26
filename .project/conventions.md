@@ -32,7 +32,7 @@ The reference implementations to copy when building something similar. Point at 
 
 ## Commits & PRs
 Message format and PR expectations.
-> Squash-merge, one commit per PR — the PR title/description become the landed commit message (write them release-quality). `feature/*` → PR `--base dev`; the `Unit Tests` CI check must pass. `master` and `dev` are branch-protected (no direct push). Close issues manually after merge to `dev` (`Closes #N` only auto-fires on the default branch `master`). No Claude co-authoring on public-facing commits, PRs, or issues. See CONTRIBUTING.md.
+> Squash-merge, one commit per PR — the PR title/description become the landed commit message (write them release-quality). `feature/*` → PR `--base dev`; the `Unit Tests` CI check must pass. `master` and `dev` are branch-protected (no direct push). `dev` is the default branch, so `Closes #N` auto-closes the issue on merge to `dev`. No Claude co-authoring on public-facing commits, PRs, or issues. See CONTRIBUTING.md.
 
 ## Versioning
 Does the project follow semantic versioning? If so, **where the version lives** (e.g. `pyproject.toml`, `package.json`, `*.csproj`, a `VERSION` file) and the **bump cadence** (per feature / milestone). When semver is on, `milestone-driver` applies the bump per PR and `milestone-feeder` names milestones as versions so the driver can derive the target.

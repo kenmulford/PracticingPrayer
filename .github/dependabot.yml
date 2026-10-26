@@ -1,0 +1,36 @@
+# Weekly version updates. PRs target the default branch (dev).
+# Minor and patch bumps are grouped into one PR per ecosystem to keep PR count low.
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directory: "/"
+    schedule:
+      interval: weekly
+    labels: [dependencies]
+    ignore:
+      # Major versions of these track the .NET release, and the app is pinned to .NET 10.
+      - dependency-name: "Microsoft.Maui.*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "Microsoft.Extensions.*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      nuget-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: bundler
+    directory: "/"
+    schedule:
+      interval: weekly
+    labels: [dependencies]
+    groups:
+      bundler-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    labels: [dependencies]
+    groups:
+      actions-minor-patch:
+        update-types: [minor, patch]
