@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ "master", "dev", "feature/**", "fix/**", "release/**", "hotfix/**" ]
+    branches: [ "master", "dev", "ios-2.0-refactor", "feature/**", "fix/**", "release/**", "hotfix/**" ]
   pull_request:
-    branches: [ "master", "dev" ]
+    branches: [ "master", "dev", "ios-2.0-refactor" ]
   workflow_dispatch:
 
 jobs:

@@ -1,5 +1,5 @@
 {
-  "integrationBranch": "dev",
+  "integrationBranch": "ios-2.0-refactor",
   "protectedBranch": "master",
   "parallel": true,
   "sourceGlobs": ["PrayerApp/**", "PrayerApp.Tests/**", "PrayerApp.UITests/**"],
