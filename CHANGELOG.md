@@ -2,6 +2,20 @@
 
 Release notes for Practicing Prayer, newest first.
 
+## v1.7.1 - Android dark-mode dialog crashes
+
+**Theme:** On Android, the collection picker and the default reminder time picker no longer crash in dark mode.
+
+| Issue | PR | What |
+|---|---|---|
+| #353 Android: Material dialogs crash in dark mode (collection picker, reminder time) | #354 | The app's `Maui.SplashTheme` overrides now inherit `Maui.MainTheme.NoActionBar` and set `maui_splash`, so MAUI swaps to its Material theme and Material dialogs resolve `colorSurface`. The dark-mode status bar stays #212121 |
+
+### Consumer notes (upgrading from 1.7.0)
+
+- Android only. iOS code is unchanged.
+- In dark mode, App Settings rows now use the same spacing as light mode.
+- **No schema changes** to the app database.
+
 ## v1.6.2 - Xcode 27 / iOS 27 SDK toolchain
 
 **Theme:** The app builds and ships with Xcode 27 and the iOS 27 SDK on the .NET for iOS 27.0.10722 workload, keeping minimum iOS 16.0, and the five sheet-style pages now open as iOS page sheets on iPhone and iPad.
