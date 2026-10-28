@@ -12,6 +12,8 @@ namespace PrayerApp.Views.Confidential;
 /// </summary>
 public partial class PinPromptPopup : Popup
 {
+    private readonly PopupResultGate _resultGate = new();
+
     /// <summary>The entered 6-digit PIN, or null if the user canceled.</summary>
     public string? EnteredPin { get; private set; }
 
@@ -41,13 +43,11 @@ public partial class PinPromptPopup : Popup
 
     private async void OnCancel(object? sender, EventArgs e)
     {
-        EnteredPin = null;
-        await this.TryCloseAsync();
+        await _resultGate.CompleteAsync(() => this.TryCloseAsync(), () => EnteredPin = null);
     }
 
     private async void OnConfirm(object? sender, EventArgs e)
     {
-        EnteredPin = PinEntry.Text;
-        await this.TryCloseAsync();
+        await _resultGate.CompleteAsync(() => this.TryCloseAsync(), () => EnteredPin = PinEntry.Text, () => EnteredPin = null);
     }
 }

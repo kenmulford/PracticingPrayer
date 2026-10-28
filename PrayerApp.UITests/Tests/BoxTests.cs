@@ -152,6 +152,13 @@ public class BoxTests
         Assert.True(driver.WaitForRadioChecked("BoxDetail_Radio_ProtectionHidden"),
             "Hidden radio should select after toggling Protect All Cards off and on");
 
+        // BoxDetailPage focuses the name entry on appear, so Android's first back press only closes the keyboard.
+        if (TestConfig.IsAndroid && driver.IsKeyboardShown())
+        {
+            try { driver.HideKeyboard(); } catch { /* keyboard closed between the check and the call */ }
+            Thread.Sleep(TestConfig.DelayAfterDismiss);
+        }
+
         driver.GoBack();
         driver.TapAlertButton("Discard");
 

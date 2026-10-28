@@ -168,7 +168,10 @@ public class LocalNotificationCenterWrapper : ILocalNotificationCenter
 #if ANDROID
                 Android = new AndroidScheduleOptions
                 {
-                    AlarmType = AndroidAlarmType.RtcWakeup
+                    AlarmType = AndroidAlarmType.RtcWakeup,
+                    // Without SCHEDULE_EXACT_ALARM (denied by default on Android 14+) alarms fire ~1m20s late;
+                    // the plugin's 1-minute default would drop them as outside the valid range.
+                    AllowedDelay = TimeSpan.FromHours(1)
                 }
 #endif
             },
