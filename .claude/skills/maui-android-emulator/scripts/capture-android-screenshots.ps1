@@ -16,7 +16,7 @@
   Do not kill the build mid-flight: that corrupts obj/ and hangs the next aapt2.
 
 .EXAMPLE
-  ./capture-android-screenshots.ps1 -Filter "FullyQualifiedName~Archive_Capture_Screenshots" -OutDir "screenshots/73-archive"
+  ./capture-android-screenshots.ps1 -Filter "FullyQualifiedName~<YourCaptureTest>" -OutDir "screenshots/<feature>"
 #>
 param(
   [Parameter(Mandatory)] [string]$Filter,                  # xUnit --filter selecting the capture test

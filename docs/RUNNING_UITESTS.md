@@ -1,6 +1,6 @@
 # Running the Appium UI Test Suite
 
-> 81 automated tests across 15 test files. Each `dotnet test` run targets **one** platform. By default the host OS chooses it — **Windows runs Android, macOS runs iOS** — or set the `UITEST_PLATFORM` environment variable (`android` | `ios`) to choose explicitly, which lets **macOS run the Android suite** too. The driver is a single shared session, so run the two platforms as **separate, sequential** `dotnet test` runs — never both at once.
+> 23 Appium tests across 13 test classes, plus 2 host-side `TestConfig` unit-test classes (`Category=Unit`, 17 cases) that need no device. Each `dotnet test` run targets **one** platform. By default the host OS chooses it (**Windows runs Android, macOS runs iOS**), or set the `UITEST_PLATFORM` environment variable (`android` | `ios`) to choose explicitly, which lets **macOS run the Android suite** too. Each run drives one Appium session, so two platforms run at once only against two Appium servers on different ports (see [Mac (Android)](#mac-android--terminal)).
 
 ---
 
@@ -10,9 +10,9 @@
 
 | Tool | Version | Install |
 |------|---------|---------|
-| .NET SDK | 10.0.4xx + workload set 10.0.402 (both pinned in `global.json`) | [dotnet.microsoft.com](https://dotnet.microsoft.com/download) |
-| Node.js | 18+ | [nodejs.org](https://nodejs.org) (needed for Appium) |
-| Appium | 2.x | `npm install -g appium` |
+| .NET SDK | 10.0.401 (`rollForward: latestPatch`) + workload set 10.0.402, both pinned in `global.json` | [dotnet.microsoft.com](https://dotnet.microsoft.com/download) |
+| Node.js | 20.19+, 22.12+, or 24+ | [nodejs.org](https://nodejs.org) (Appium 3's `engines` range) |
+| Appium | 3.x | `npm install -g appium` |
 
 ### PC (Android)
 
@@ -118,14 +118,14 @@ xcrun simctl install "Test iPad" PrayerApp/bin/Debug/net10.0-ios/iossimulator-ar
 
 ### 4. Start the Appium server
 
-In a **separate terminal** (leave it running for the entire test session):
+In a **separate terminal** (leave it running for the entire test session).
 
-**PC (PowerShell):**
-```powershell
-appium
+**Android (PC or Mac):** the `adb_shell` feature is required because helpers such as `ForceStopApp` call `mobile: shell`. Appium 3 accepts it only driver-scoped:
+```bash
+appium --allow-insecure=uiautomator2:adb_shell
 ```
 
-**Mac (Terminal):**
+**iOS (Mac):**
 ```bash
 appium
 ```
@@ -150,46 +150,46 @@ dotnet test PrayerApp.UITests/ --filter "Platform=CrossPlatform|Platform=Android
 ### Mac (iOS — Terminal)
 
 ```bash
-dotnet test PrayerApp.UITests/ --filter "Platform=CrossPlatform|Platform=iOS"
+dotnet test PrayerApp.UITests/ --filter "Platform=CrossPlatform"
 ```
+
+There are no iOS-only tests. Android-only tests are `SkippableFact`s that skip on iOS, so an unfiltered run also works; the filter only excludes the `Category=Unit` tests.
 
 ### Mac (Android — Terminal)
 
-The Mac can run the Android suite too. Set `UITEST_PLATFORM=android` so the harness builds an `AndroidDriver` against the local emulator instead of the iOS default. Boot the Android emulator and install the app first (see [Setup](#setup)), then:
+The Mac can run the Android suite too. Set `UITEST_PLATFORM=android` so the harness builds an `AndroidDriver` against the local emulator instead of the iOS default. On this Mac the AVD is `pp_api36` and the SDK lives in a non-default location; follow the `prayer-app-e2e-run` skill (`.claude/skills/prayer-app-e2e-run/`, script `scripts/run-e2e-mac.sh`) to boot, deploy, and seed, then:
 
 ```bash
-UITEST_PLATFORM=android dotnet test PrayerApp.UITests/ --filter "Platform=CrossPlatform|Platform=Android"
+UITEST_PLATFORM=android ANDROID_AVD=pp_api36 dotnet test PrayerApp.UITests/ --filter "Platform=CrossPlatform|Platform=Android"
 ```
 
-Run only **one** platform per `dotnet test` invocation. To exercise both from the Mac, run the iOS command and the Android command **one after the other** — never in parallel. They share a single Appium driver session and would collide.
+Run only **one** platform per `dotnet test` invocation. With one Appium server, run the iOS and Android commands one after the other. To run both in parallel, start a second Appium server (`appium --port 4725` for iOS), point each run at its own server with `APPIUM_SERVER_URL`, build the test project once, and pass `--no-build` to both runs; the `prayer-app-e2e-run` skill scripts this.
 
 ### Run a single test section
 
-Tests are organized by numbered sections:
+Tests carry a `Section` trait:
 
 | Section | Tests |
 |---------|-------|
-| `1-Onboarding` | Onboarding flow, banner steps |
-| `2-Home` | Dashboard metrics, Quick Add |
-| `3-PrayerCards` | Card CRUD, expand/collapse, action chips |
-| `4-Prayers` | Prayer list, search, filters |
-| `5-UnsavedChanges` | Dirty-form guards on all edit pages |
-| `6-Reminders` | Notification toggle, frequency picker |
-| `7-Tags` | Tag CRUD, color picker |
-| `8-Collections` | Box CRUD, multi-select, move |
-| `8-PrayerTime` | Prayer Time session flow |
-| `9-Settings` | Settings hub, backup, about |
-| `12-EdgeCases` | Empty states, edge behaviors |
-| `13-FeatureGaps` | F-23 card, FAQ accordion, collection scope, overdue, favorite |
-| `14-Android` | Android-only (TimePicker input mode) |
-| `15-Accessibility` | Composed descriptions, chip state, headings, tree exclusion |
+| `2-Home` | Active Cards metric navigates to Cards tab; Quick Add prayer appears on Cards tab |
+| `3-PrayerCards` | Create card, delete expanded card, collection picker close, card Save + |
+| `4-Prayers` | Add prayer; one-time reminder date in read view |
+| `5-UnsavedChanges` | Edited title then back shows the discard dialog |
+| `8-Collections` | Collection section headers, Manage Collections navigation, create collection, protect-all-cards radios |
+| `8-PrayerTime` | Session carousel, tag scope page |
+| `9-Settings` | App Settings row touch target (Android), dark-mode switch thumb (Android, pixel sampling needs Windows) |
+| `12-EdgeCases` | Rapid tab switching |
+| `14-Android` | Hardware back from a clean Settings sub-page, context-menu import, import skips duplicates |
+| `15-Accessibility` | Decorative card elements excluded from the accessibility tree |
+
+`DarkModeRenderingTests` also carries `Host=Windows` so a filter can exclude it off Windows.
 
 ```powershell
 # Run only Home tests
 dotnet test PrayerApp.UITests/ --filter "Section=2-Home"
 
 # Run a single test by name
-dotnet test PrayerApp.UITests/ --filter "FullyQualifiedName~Home_QuickAdd"
+dotnet test PrayerApp.UITests/ --filter "FullyQualifiedName~QuickAdd_PrayerAppearsOnCardsTab"
 ```
 
 ### Rerunning failed tests
@@ -204,13 +204,13 @@ dotnet test PrayerApp.UITests/ --filter "Platform=CrossPlatform|Platform=Android
 
 Mac (Terminal):
 ```bash
-dotnet test PrayerApp.UITests/ --filter "Platform=CrossPlatform|Platform=iOS" -v detailed 2>&1 |
+dotnet test PrayerApp.UITests/ --filter "Platform=CrossPlatform" -v detailed 2>&1 |
   grep -E "Failed|Passed|Skipped"
 ```
 
 **Rerun a specific failed test by name:**
 ```powershell
-dotnet test PrayerApp.UITests/ --filter "FullyQualifiedName~Cards_FilterChip"
+dotnet test PrayerApp.UITests/ --filter "FullyQualifiedName~Cards_SaveAndNew"
 ```
 
 **Rerun all tests in a failed section:**
@@ -225,9 +225,14 @@ dotnet test PrayerApp.UITests/ --logger "trx;LogFileName=results.trx"
 
 The `.trx` file is written to `PrayerApp.UITests/TestResults/results.trx` and shows a tree view of every test with pass/fail status, duration, and failure messages.
 
-### Important: test order matters
+### Important: test isolation
 
-Tests within the `"Appium"` collection share a single driver session (one app launch for the entire run). Onboarding is dismissed once at the start. Running tests out of section order may cause failures if earlier tests create data that later tests expect.
+Tests in the `"Appium"` collection share one driver session and one SQLite database, seeded once by `TestDataSeed.SeedAsync` before the driver starts (`noReset=true`, never re-seeded). On iOS, `TestDataSeed.PreSeedOnboardingCompleteAsync` marks onboarding complete so the welcome popup never appears. Order does not matter, provided every test follows two rules:
+
+1. A test that needs pre-existing data seeds its own uniquely named fixture (names live in `TestSeedFixtures`) and touches only that data.
+2. Every test starts on Home: `ResetAppUIState` and `EnsureOnTab` run at test start.
+
+A test that passes alone but fails in the suite breaks one of these rules; fix the rule, not the timeout.
 
 ---
 
@@ -247,20 +252,20 @@ All optional. Set before running `dotnet test`.
 
 **PC (PowerShell — session-only):**
 ```powershell
-$env:ANDROID_AVD = "Pixel_8_API_35"
+$env:ANDROID_AVD = "pp_api36"
 dotnet test PrayerApp.UITests/ --filter "Platform=CrossPlatform|Platform=Android"
 ```
 
 To set permanently on PC:
 ```powershell
-[System.Environment]::SetEnvironmentVariable("ANDROID_AVD", "Pixel_8_API_35", "User")
+[System.Environment]::SetEnvironmentVariable("ANDROID_AVD", "pp_api36", "User")
 ```
 
 **Mac (Terminal — session-only):**
 ```bash
 export IOS_SIMULATOR="Test iPad"
 export IOS_VERSION="27.0"
-dotnet test PrayerApp.UITests/ --filter "Platform=CrossPlatform|Platform=iOS"
+dotnet test PrayerApp.UITests/ --filter "Platform=CrossPlatform"
 ```
 
 To set permanently on Mac, add to `~/.zshrc`:
@@ -291,7 +296,7 @@ PrayerApp.UITests/bin/Debug/net10.0/diagnostics/
 
 Each file is named `{testName}_{timestamp}.xml` and contains the platform's accessibility tree — all visible elements, their AutomationIds, text, and hierarchy. Open in any text editor to inspect element structure.
 
-Several tests already call `DumpPageSource` on failure paths (EdgeCaseTests, PrayerTimeTests, PrayerListTests).
+`PrayerTimeTests` and the `ScrollToPrayerAndTap` helper call `DumpPageSource` on failure paths.
 
 ### Appium server logs
 
@@ -336,7 +341,7 @@ The app itself maintains an append-only diagnostic log (`IDiagnosticLog` / `Diag
 | `Original error: Couldn't find app` | App not installed; use `adb install` (Android) or `xcrun simctl install` (iOS) |
 | `Session timed out` | App may have crashed; check Appium logs and the in-app diagnostic log |
 | Tests pass individually but fail together | Shared driver state; earlier test may have left app on unexpected page. Check `EnsureOnTab` calls |
-| iOS text input fails | Use iPad simulator (has keyboard dismiss button). If iPhone is needed, ensure `DismissKeyboardIfPresent()` is called |
+| iOS text input fails | Use the `Test iPad` simulator; `DismissKeyboardIfPresent()` fails on iPhone because its keyboard has no dismiss button |
 | Android `resource-id` not found | AutomationId maps to `content-desc` on some elements. The helpers try both strategies automatically |
 | `adb: command not found` | Run the environment variable setup in [Prerequisites](#pc-android) to add `platform-tools` to PATH |
 | `emulator: command not found` | The emulator isn't on PATH by default — use the full path: `& "$env:ANDROID_HOME\emulator\emulator.exe"` |
@@ -348,27 +353,30 @@ The app itself maintains an append-only diagnostic log (`IDiagnosticLog` / `Diag
 
 ```
 PrayerApp.UITests/
-  PrayerApp.UITests.csproj      # net10.0, Appium.WebDriver 8.1.0, xUnit 2.9.2
+  PrayerApp.UITests.csproj      # net10.0, Appium.WebDriver 8.1.0, xUnit 2.9.2, Xunit.SkippableFact 1.5.61
   Infrastructure/
-    AppiumSetup.cs               # IAsyncLifetime — driver lifecycle, retry logic
+    AppiumSetup.cs               # IAsyncLifetime: seed, driver lifecycle, retry logic
     AppiumCollection.cs          # xUnit collection fixture definition
-    TestConfig.cs                # Platform detection, timeouts, device config
+    TestConfig.cs                # Platform resolution, timeouts, device config, iOS UDID
+    TestDataSeed.cs              # One-time seed DB build and push
+    TestSeedFixtures.cs          # Names of per-test seeded fixtures
+    SettingsShim.cs              # Host stand-in for the app's Settings class
   Helpers/
-    AppExtensions.cs             # Element locators, tap/type/scroll, onboarding
+    AppExtensions.cs             # Element locators, tap/type/scroll, navigation reset
   Tests/
-    OnboardingTests.cs           # Section 1 — must run first
-    HomeTests.cs                 # Section 2
-    QuickAddTests.cs             # Section 2
-    PrayerCardTests.cs           # Section 3
-    PrayerListTests.cs           # Section 4
-    UnsavedChangesTests.cs       # Section 5
-    ReminderTests.cs             # Section 6
-    TagTests.cs                  # Section 7
-    BoxTests.cs                  # Section 8
-    PrayerTimeTests.cs           # Section 8
-    SettingsTests.cs             # Section 9
-    EdgeCaseTests.cs             # Section 12
-    FeatureGapTests.cs           # Section 13
-    AndroidTests.cs              # Section 14 (Android-only)
-    AccessibilityTests.cs        # Section 15
+    HomeTests.cs                 # 2-Home
+    QuickAddTests.cs             # 2-Home
+    PrayerCardTests.cs           # 3-PrayerCards
+    PrayerListTests.cs           # 4-Prayers
+    UnsavedChangesTests.cs       # 5-UnsavedChanges
+    BoxTests.cs                  # 8-Collections
+    PrayerTimeTests.cs           # 8-PrayerTime
+    DarkModeRenderingTests.cs    # 9-Settings (Android, Host=Windows)
+    EdgeCaseTests.cs             # 12-EdgeCases
+    AndroidTests.cs              # 14-Android
+    ContextMenuImportTests.cs    # 14-Android
+    ConfirmImportDuplicatesTests.cs  # 14-Android
+    AccessibilityTests.cs        # 15-Accessibility
+    TestConfigPlatformResolutionTests.cs  # Category=Unit
+    TestConfigIOSUdidResolutionTests.cs   # Category=Unit
 ```

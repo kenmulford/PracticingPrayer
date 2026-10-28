@@ -5,7 +5,7 @@ description: >
   seeding, startup recovery, junction table queries, SQL aggregates, WAL checkpoint, PERF-1
   instrumentation, and PRAGMA column-existence guards. Key files: DBService.cs, IDBService.cs,
   MauiProgram.cs. Keywords: migration, UpdateSchema, BUG-58, BUG-21, CardBox, WAL, PRAGMA,
-  ConfigureAwait, PerfLog, SeedDataAsync, SeedAsync, junction table, sqlite-net-pcl.
+  ConfigureAwait, PerfLog, SeedDataAsync, SeedAsync, junction table, sqlite-net-base.
 cso_keywords:
   - PERF-1
   - BUG-58
@@ -25,7 +25,7 @@ cso_keywords:
   - junction table
   - PrayerCardTag
   - UnassignBoxFromCardsAsync
-  - sqlite-net-pcl
+  - sqlite-net-base
 ---
 
 # PrayerApp Database Layer
@@ -41,9 +41,10 @@ Invoke this skill before any work touching `DBService.cs`, `IDBService.cs`, sche
 | Topic | Location |
 |---|---|
 | Interface (all public APIs) | `PrayerApp/Services/IDBService.cs` |
-| Implementation | `PrayerApp/Services/DBService.cs` (~655 lines) |
+| Implementation | `PrayerApp/Services/DBService.cs` |
 | DI registration + seeding | `PrayerApp/MauiProgram.cs` |
 | Perf tracing helper | `PrayerApp/Helpers/PerfLog.cs` |
+| SQLite packages | `sqlite-net-base` 1.9.172 + `SQLitePCLRaw.bundle_e_sqlite3` 3.0.3; provider registered by `SQLitePCL.Batteries_V2.Init()` in `MauiProgram.CreateMauiApp` |
 
 ---
 
@@ -100,16 +101,18 @@ await _db.ExecuteAsync("DELETE FROM PrayerInteraction WHERE PrayerId NOT IN (SEL
 ### Actual Migration Sequence (DBService.UpdateSchema)
 
 1. Create base tables: `PrayerCard`, `Prayer` (`PrayerRequest` table), `PrayerTag`, `PrayerCardTag`, `PrayerInteraction`, `UserColor`
-2. `EnsurePrayerCardColumnsAsync()` — adds `IsFavorite`, `AnsweredAt`, `PrayerRequestId` on `PrayerCardTag`; runs BUG-21 card-to-request tag migration
+2. `EnsurePrayerCardColumnsAsync()` — adds `IsFavorite` and `ProtectionMode` on `PrayerCard`, `AnsweredAt` on `PrayerRequest`, `PrayerRequestId` on `PrayerCardTag`; runs BUG-21 card-to-request tag migration
 3. Add `IsSystem` to `PrayerCard` (must precede `EnsureCardBoxMigrationAsync` which queries `WHERE IsSystem = 1`)
 4. Add `IsImported` to `PrayerCard` and `PrayerRequest` (F-10; must precede `EnsureCardBoxMigrationAsync`)
 5. **BUG-58 backfill** — `UPDATE PrayerCard SET IsSystem = 1 WHERE Title = ? AND IsSystem = 0` for Quick Add and Shared With Me system cards
-6. Create `CardBox` table + `EnsureCardBoxMigrationAsync()` (F-24: seeds System/Archived boxes, adds `BoxId`/`SystemKey` columns, migrates system/imported cards)
-7. `DROP TABLE IF EXISTS PrayerRequestTag` — legacy table removal
-8. Orphan cleanup: delete `PrayerInteraction` rows with no matching prayer; delete `PrayerCardTag` rows with `PrayerRequestId > 0` pointing to deleted prayers
-9. Add `IsDefault` to `UserColor` + backfill 8 seed hex values
-10. Add `IsSystem` to `PrayerTag`
-11. Add notification columns (`NotifyHour`, `NotifyMinute`, `NotifyDayOfWeek`, `NotifyDayOfMonth`) to `PrayerRequest`
+6. Create `CardBox` table + `EnsureCardBoxMigrationAsync()` (F-24: seeds System/Archived boxes, adds `BoxId`/`SystemKey`/`PreArchiveBoxId` columns, migrates system/imported cards)
+7. Add `ProtectAllCards` and `CardProtectionMode` to `CardBox` (Confidential Cards #250; must follow `CardBox` creation)
+8. `DROP TABLE IF EXISTS PrayerRequestTag` — legacy table removal
+9. Orphan cleanup: delete `PrayerInteraction` rows with no matching prayer; delete `PrayerCardTag` rows with `PrayerRequestId > 0` pointing to deleted prayers
+10. Add `IsDefault` to `UserColor`
+11. Add `IsSystem` to `PrayerTag`
+12. Add notification columns (`NotifyHour`, `NotifyMinute`, `NotifyDayOfWeek`, `NotifyDayOfMonth`) to `PrayerRequest`, then `NotifyDateMigration.ApplyAsync` backfills `NotifyDate` for OneTime/Yearly rows (the `NotifyDate` column comes from `CreateTableAsync<Prayer>`)
+13. Backfill `UserColor.IsDefault = 1` for the 8 seed hex values
 
 ### Adding a New Migration
 
@@ -144,11 +147,18 @@ Task<int> DeleteByTagIdAsync(int prayerTagId);                        // Remove 
 Task<int> DeleteJunctionRowsByRequestIdAsync(int prayerRequestId);    // Cleanup on prayer delete
 ```
 
+### Per-Parent Queries
+```csharp
+Task<List<Prayer>> GetPrayersByCardIdAsync(int prayerCardId);
+Task<List<PrayerInteraction>> GetInteractionsByPrayerIdAsync(int prayerId);
+```
+
 ### PrayerInteraction Aggregates
 ```csharp
 Task<List<LatestInteractionResult>> GetLatestInteractionByPrayerAsync();  // GROUP BY PrayerId
 Task<DateTime?> GetMaxInteractionDateAsync();                              // Most recent across all
 Task<int> DeleteInteractionsByPrayerIdAsync(int prayerId);                 // Cascade delete
+Task<int> CountInteractionsByPrayerIdAsync(int prayerId);
 ```
 
 ### CardBox Queries
@@ -169,18 +179,18 @@ Task ReinitializeAsync(string path);  // Reopen at new path (backup/restore)
 
 ## PERF-1 Instrumentation (PerfLog)
 
-`GetAllAsync`, `InsertAsync`, `UpdateAsync`, and `GetPrayersByCardIdAsync` are instrumented with `PerfLog.Log` + `Stopwatch` + `.ConfigureAwait(false)`:
+`GetAllAsync`, `InsertAsync`, `UpdateAsync`, and `GetPrayersByCardIdAsync` keep a `Stopwatch` + `.ConfigureAwait(false)`; their `PerfLog.Log` calls are commented out, so uncomment them to trace:
 
 ```csharp
 public async Task<List<T>> GetAllAsync<T>() where T : new()
 {
-    PrayerApp.Helpers.PerfLog.Log($"DBService.GetAllAsync<{typeof(T).Name}>.entry");
+    // PrayerApp.Helpers.PerfLog.Log($"DBService.GetAllAsync<{typeof(T).Name}>.entry");
     await EnsureInitializedAsync();
     // ...
     var sw = System.Diagnostics.Stopwatch.StartNew();
     var result = await _db.Table<T>().ToListAsync().ConfigureAwait(false);
     sw.Stop();
-    PrayerApp.Helpers.PerfLog.Log($"DBService.GetAllAsync<{typeof(T).Name}>.after ToListAsync (count={result.Count}, taskMs={sw.ElapsedMilliseconds})");
+    // PrayerApp.Helpers.PerfLog.Log($"DBService.GetAllAsync<{typeof(T).Name}>.after ToListAsync (count={result.Count}, taskMs={sw.ElapsedMilliseconds})");
     return result;
 }
 ```
@@ -204,7 +214,7 @@ await _db.CloseAsync();
 // when PRAGMA returns a result row (busy, log, checkpointed columns).
 ```
 
-This is a sqlite-net-pcl gotcha, not a bug — the exception message "not an error" is misleading.
+This is a sqlite-net gotcha, not a bug — the exception message "not an error" is misleading.
 
 ---
 
@@ -259,7 +269,7 @@ await _db.ExecuteAsync("DELETE FROM PrayerCardTag WHERE PrayerTagId = ?", prayer
 // Bulk delete by prayer ID (cascade cleanup on prayer delete)
 await _db.ExecuteAsync("DELETE FROM PrayerCardTag WHERE PrayerRequestId = ?", prayerRequestId);
 
-// GetByTagIdsAsync: sqlite-net-pcl doesn't support Contains in LINQ — filter in memory
+// GetByTagIdsAsync: sqlite-net doesn't support Contains in LINQ — filter in memory
 var idSet = tagIds.ToHashSet();
 var all = await _db.Table<PrayerCardTag>().ToListAsync();
 return all.Where(pct => idSet.Contains(pct.PrayerTagId)).ToList();
@@ -272,7 +282,7 @@ return all.Where(pct => idSet.Contains(pct.PrayerTagId)).ToList();
 `SeedDataAsync()` is on `IDBService` and is called exclusively from `MauiProgram.SeedAsync` inside `#if DEBUG` guarded by `Settings.FirstRun`:
 
 ```csharp
-// MauiProgram.cs (lines ~508-514)
+// MauiProgram.SeedAsync, after notification reconciliation
 #if DEBUG
 if (PrayerApp.Services.Settings.FirstRun)
 {
@@ -320,7 +330,7 @@ For each legacy row (PrayerRequestId == 0):
 ```
 1. Seed System box (SortOrder=900) and Archived box (SortOrder=999) if not present
 2. Persist ArchivedFolderId to Settings
-3. Add BoxId and SystemKey columns to PrayerCard
+3. Add BoxId, SystemKey, and PreArchiveBoxId columns to PrayerCard
 4. Move system/imported cards from BoxId=0 → System box
 5. Backfill SystemKey on known system cards ("quick_add", "shared_with_me")
 ```

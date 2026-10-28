@@ -38,7 +38,7 @@ The UITest suite shares one Appium session and one seeded SQLite database (seede
 
 ## Simulators (shared with ios-budget-app)
 
-This Mac keeps exactly four iOS simulators, shared with the ios-budget-app repo. Never create, boot, or address any other simulator, and never delete or rename these four. Address them by name, never by a default device name.
+This Mac keeps exactly five iOS simulators, shared with the ios-budget-app repo. Never create, boot, or address any other simulator, and never delete or rename these five. Address them by name, never by a default device name.
 
 | Name | Device | Runtime | Use |
 |---|---|---|---|
@@ -46,6 +46,7 @@ This Mac keeps exactly four iOS simulators, shared with the ios-budget-app repo.
 | `Dev iPad` | iPad Pro 13-inch (M5) | iOS 27.0 | Hand checks and App Store iPad screenshots, both repos |
 | `Test iPhone` | iPhone 17 Pro | iOS 27.0 | ios-budget-app automated tests only |
 | `Test iPad` | iPad (A16) | iOS 27.0 | PracticingPrayer E2E only (`IOS_SIMULATOR` default) |
+| `Dev Duo` | iPhone Duo | iOS 27.1 | Duo hand checks and screenshots |
 
 - E2E needs an iPad: the iPhone keyboard has no dismiss button, so `DismissKeyboardIfPresent` fails.
 - Shut down any simulator you booted for hand checks when you finish.

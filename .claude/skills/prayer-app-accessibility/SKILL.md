@@ -45,12 +45,12 @@ Pattern: `{Page}_{Type}_{Name}`
 |------|------|------|---------|
 | Home | Btn | QuickAdd | `Home_Btn_QuickAdd` |
 | Home | Metric | Cards | `Home_Metric_Cards` |
-| Cards | Entry | Search | `Cards_Entry_Search` |
+| TagPicker | Entry | Search | `TagPicker_Entry_Search` |
 | Cards | Section | Header | `Cards_Section_Header` |
-| Detail | Btn | Save | `Detail_Btn_Save` |
+| Detail | Btn | MarkAnswered | `Detail_Btn_MarkAnswered` |
 | PrayerTime | Btn | Pause | `PrayerTime_Btn_Pause` |
 
-**Types used:** Btn, Entry, Label, Metric, Page, List, Toggle, Picker, Card, Section
+**Types used:** Btn, Entry, Picker, List, Metric, Lbl, Label, Radio, Switch, Row, Filter, Seg, Card, Section, Banner
 
 ---
 
@@ -89,7 +89,7 @@ Heading levels used:
 
 Set to `"False"` on any decorative sub-element inside a container that already
 exposes a composite description. This prevents TalkBack/VoiceOver from reading
-the inner elements individually (100+ usages in the codebase).
+the inner elements individually (90+ usages in XAML).
 
 ```xml
 <!-- Decorative triangle icon inside an accessible section header -->
@@ -123,13 +123,13 @@ directly only in code-behind for view-level events (e.g., accordion tap handlers
 
 ### ViewModel usage examples
 ```csharp
-// Answered in PrayerRequestDetailViewModel (line 565)
+// PrayerRequestDetailViewModel: mark answered
 _accessibilityService.Announce("Prayer marked as answered");
 
-// PrayerTime navigation (line 76)
+// PrayerTimeViewModel: navigation
 _accessibilityService.Announce($"Prayer {ProgressDisplay}: {entry.PrayerTitle}");
 
-// PrayerTime session complete (line 349)
+// PrayerTimeViewModel: session complete
 _accessibilityService.Announce("Prayer session complete");
 ```
 
@@ -145,7 +145,7 @@ SemanticScreenReader.Announce(section.IsExpanded
 
 ## Accordion Section Headers
 
-Actual pattern from `PrayerCardsPage.xaml` (lines 140–142):
+Actual pattern from the `GroupHeaderTemplate` in `PrayerCardsPage.xaml`:
 
 ```xml
 <VerticalStackLayout
@@ -184,7 +184,7 @@ private void AnnounceFilterCountDebounced(int count)
 ```
 
 - `PrayerCardsViewModel`: announces `"Showing {count} cards"`
-- `PrayerListViewModel`: announces `"Showing {count} prayers"` (line 421)
+- `PrayerListViewModel`: announces `"Showing {count} prayers"`
 
 **Why 400 ms?** Fast enough to feel responsive, slow enough to avoid overlapping keystrokes.
 
@@ -194,10 +194,10 @@ Both VMs declare a bool that is `true` until the first sync completes, preventin
 a triple announcement ("Loading" + "Content loaded" + "Showing N cards") on cold open:
 
 ```csharp
-// PrayerCardsViewModel.cs (line 45)
+// PrayerCardsViewModel.cs
 private bool _suppressFilterAnnounce;
 
-// PrayerListViewModel.cs (line 49)
+// PrayerListViewModel.cs
 private bool _suppressAnnounce;
 ```
 
@@ -216,7 +216,7 @@ that runs on initial data load.
 
 Use a computed ViewModel property when the accessible description depends on state.
 
-### PrayerTime pause button (`PrayerTimeViewModel.cs` line 155, `PrayerTimePage.xaml` line 25)
+### PrayerTime pause button (`PrayerTimeViewModel.PauseButtonDescription`, `PrayerTimePage.xaml`)
 ```csharp
 public string PauseButtonDescription => IsPaused ? "Resume auto-advance" : "Pause auto-advance";
 ```
@@ -228,13 +228,15 @@ public string PauseButtonDescription => IsPaused ? "Resume auto-advance" : "Paus
 
 ### Home dashboard metrics (`HomeViewModel.cs`, `MainPage.xaml`)
 ```csharp
-public string ActiveCardsAccessible => HasActiveCards ? $"{ActiveCardCount} active cards" : "No active cards";
+public string ActiveCardsAccessible => HasActiveCards
+    ? $"Active cards, {ActiveCardCount}. Tap to view prayer cards."
+    : "No active cards. Tap to create your first card.";
 public string UnansweredAccessible => ...;
 public string LastPrayedAccessible => ...;
 public string OverdueAccessible => ...;
 public string AnsweredOnThisDateAccessible => HasAnsweredOnThisDate
     ? $"{AnsweredOnThisDateHeader}: {string.Join(", ", AnsweredOnThisDate.Select(p => p.Title))}"
-    : "None";
+    : string.Empty;
 ```
 
 Each tile binds its `SemanticProperties.Description` to the matching `*Accessible` property.
@@ -262,19 +264,19 @@ public string AccessibleSummary
 }
 ```
 
-Bound in XAML on the card container:
+Bound in XAML on the row container (`PrayerListPage.xaml` item template):
 ```xml
-<Border SemanticProperties.Description="{Binding AccessibleSummary}"
-        AutomationId="{Binding AutomationId}">
+<Grid SemanticProperties.Description="{Binding AccessibleSummary}"
+      SemanticProperties.Hint="Double tap to view details">
     <!-- Visual sub-elements use IsInAccessibleTree="False" -->
-</Border>
+</Grid>
 ```
 
 ---
 
 ## Multi-Select Mode Announcements
 
-`PrayerCardsViewModel.cs` lines 758–826:
+`PrayerCardsViewModel.cs` multi-select commands:
 
 ```csharp
 // Entering multi-select (toolbar or long-press)
@@ -287,8 +289,8 @@ _accessibilityService.Announce(SelectedCountText);
 // Cancelling selection
 _accessibilityService.Announce("Selection cancelled");
 
-// After move completes
-_accessibilityService.Announce($"Moved {count} card{(count == 1 ? "" : "s")} to {result}");
+// After move completes (archive target announces "Archived N card(s)" instead)
+_accessibilityService.Announce($"Moved {selected.Count} card{(selected.Count == 1 ? "" : "s")} to {result}");
 ```
 
 ---
@@ -299,19 +301,19 @@ All issued via `_accessibilityService` in `PrayerTimeViewModel.cs`:
 
 | Event | Announcement |
 |-------|-------------|
-| Navigate to prayer | `$"Prayer {ProgressDisplay}: {entry.PrayerTitle}"` (line 76) |
-| Session complete | `"Prayer session complete"` (line 349) |
-| Mark answered | `$"{entry.PrayerTitle} marked as answered"` (line 392) |
-| Interval changed | `$"Interval set to {IntervalLabel(SelectedIntervalSeconds)}"` (line 426) |
-| Auto-advance started | `"Auto-advance started"` (line 439) |
-| Resumed | `"Resumed"` (line 465) |
-| Paused | `"Paused"` (line 471) |
+| Navigate to prayer | `$"Prayer {ProgressDisplay}: {entry.PrayerTitle}"` |
+| Session complete | `"Prayer session complete"` |
+| Mark answered | `$"{entry.PrayerTitle} marked as answered"` |
+| Interval changed | `$"Interval set to {IntervalLabel(SelectedIntervalSeconds)}"` |
+| Auto-advance started | `"Auto-advance started"` |
+| Resumed | `"Resumed"` |
+| Paused | `"Paused"` |
 
 ---
 
 ## FAQ Expander
 
-`FaqItemViewModel.cs` line 30 — reads full answer aloud on expand:
+`FaqItemViewModel` constructor — reads full answer aloud on expand:
 
 ```csharp
 ToggleCommand = new RelayCommand(() =>

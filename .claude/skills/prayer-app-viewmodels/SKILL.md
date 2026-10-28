@@ -24,7 +24,8 @@ keywords:
 # PrayerApp ViewModel Patterns
 
 All ViewModels live in `PrayerApp/ViewModels/` and inherit from
-`CommunityToolkit.Mvvm.ComponentModel.ObservableObject`.
+`CommunityToolkit.Mvvm.ComponentModel.ObservableObject`, except `BoxSectionViewModel`
+(an `ObservableCollection`) and the plain classes `HelpViewModel` and `TagChipViewModel`.
 
 ---
 
@@ -49,6 +50,7 @@ All ViewModels live in `PrayerApp/ViewModels/` and inherit from
 | `PrayerTimeViewModel` | `IQueryAttributable` | Prayer carousel with auto-advance timer |
 | `PrayerTimeScopeViewModel` | — | Tag selection modal for scoped prayer sessions |
 | `PrayerTimeBoxScopeViewModel` | — | Box selection modal for box-scoped prayer sessions |
+| `PrayerTimeCardSelectViewModel` | — | "Choose cards" modal; launches Prayer Time with `scope=selection` |
 | `BoxesViewModel` | `ISyncableViewModel` | Box/folder list management |
 | `BoxDetailViewModel` | `IQueryAttributable`, `IEditGuard` | Box editor with `IsBusy` save guard |
 | `BoxItemViewModel` | — | Nested VM inside `BoxesViewModel`; represents one box row |
@@ -58,7 +60,7 @@ All ViewModels live in `PrayerApp/ViewModels/` and inherit from
 | `TagChipViewModel` | — | Tag chip display (selected tags on prayer detail) |
 | `TagPickerViewModel` | — | Modal tag picker with comma auto-save and creation |
 | `TagFilterChipViewModel` | — | Filter chip with selection state for card/prayer lists |
-| `QuickAddViewModel` | — | Quick prayer addition |
+| `ConfirmImportViewModel` | `IDisposable` | Import confirmation and Quick Add manual entry (`InitializeManualEntry`) |
 | `HelpViewModel` | — | Static FAQ content |
 | `FaqItemViewModel` | — | FAQ accordion item |
 
@@ -138,7 +140,7 @@ operations on other pages trigger a re-sync without navigation. Use
 `SafeFireAndForget()` to avoid blocking the message dispatch:
 
 ```csharp
-// From HomeViewModel.cs:225-229
+// From the HomeViewModel constructor (excerpt)
 _messenger.Register<HomeViewModel, PrayerCardChangedMessage>(this,
     (vm, _) => vm.SyncAsync().SafeFireAndForget());
 _messenger.Register<HomeViewModel, PrayerChangedMessage>(this,
@@ -148,13 +150,15 @@ _messenger.Register<HomeViewModel, BulkChangedMessage>(this,
 ```
 
 ```csharp
-// From PrayerCardsViewModel.cs:201-205
+// From the PrayerCardsViewModel constructor (excerpt)
 _messenger.Register<PrayerCardsViewModel, PrayerCardChangedMessage>(this,
-    (vm, _) => vm.SyncAsync().SafeFireAndForget());
-_messenger.Register<PrayerCardsViewModel, TagChangedMessage>(this,
-    (vm, _) => vm.SyncAsync().SafeFireAndForget());
+    (vm, _) => vm.SyncAsync(null, skipExpandedPrayerReload: true).SafeFireAndForget());
+_messenger.Register<PrayerCardsViewModel, PrayerChangedMessage>(this,
+    (vm, msg) => vm.OnPrayerChangedAsync(msg).SafeFireAndForget());
 _messenger.Register<PrayerCardsViewModel, BulkChangedMessage>(this,
     (vm, _) => vm.SyncAsync().SafeFireAndForget());
+_messenger.Register<PrayerCardsViewModel, SessionRelockedMessage>(this,
+    (vm, _) => vm.OnSessionRelocked());
 ```
 
 Weak references auto-clean on GC — no manual unsubscription needed.
@@ -163,8 +167,9 @@ Weak references auto-clean on GC — no manual unsubscription needed.
 
 ## ViewModel Constructor Template
 
-MAUI XAML requires a parameterless constructor for `BindingContext`. Use a
-delegating parameterless constructor that resolves services via
+ViewModels are registered `AddTransient` in `MauiProgram.cs`; pages take their VM
+by constructor injection and set `BindingContext = vm`. Each VM also keeps a
+parameterless (or reduced) constructor that chains to the primary via
 `IPlatformApplication.Current!.Services.GetRequiredService<>()`:
 
 ```csharp
@@ -192,7 +197,7 @@ public NewListViewModel() : this(
 { }
 ```
 
-See `BoxesViewModel.cs:39-63` for the canonical multi-service example.
+See the `BoxesViewModel` constructors for the canonical multi-service example (its secondary constructor takes `IBoxService` and resolves the rest).
 
 ---
 
@@ -203,7 +208,7 @@ Detail-edit VMs (`BoxDetailViewModel`, `PrayerCardViewModel`,
 double-tap duplication and drive a page-level `ActivityIndicator`.
 
 ```csharp
-// From BoxDetailViewModel.cs:49-56 and PrayerCardViewModel.cs:32-44
+// From BoxDetailViewModel.IsBusy
 private bool _isBusy;
 public bool IsBusy
 {
@@ -219,11 +224,11 @@ public bool IsBusy
 SaveCommand = new AsyncRelayCommand(SaveAsync, () => !IsBusy);
 ```
 
-When a VM has two save commands (e.g., `PrayerRequestDetailViewModel`), both notify
+When a VM has two save commands (`PrayerRequestDetailViewModel`, `PrayerCardViewModel`), both notify
 on the same `IsBusy` toggle:
 
 ```csharp
-// From PrayerRequestDetailViewModel.cs:40-44
+// From PrayerRequestDetailViewModel.IsBusy
 if (SetProperty(ref _isBusy, value))
 {
     (SaveCommand as IAsyncRelayCommand)?.NotifyCanExecuteChanged();
@@ -354,7 +359,7 @@ collection; a backing list preserves the full card set.
 
 ## Property Patterns
 
-> **Convention:** This codebase uses explicit `SetProperty(ref _field, value)` for every property. The `[ObservableProperty]` source generator is **not used anywhere** (0 usages across all 16 VMs as of 2026-04-26). Do not introduce it — even though `CommunityToolkit.Mvvm` is referenced, only `ObservableObject` is consumed.
+> **Convention:** This codebase uses explicit `SetProperty(ref _field, value)` for every property. The `[ObservableProperty]` source generator is **not used anywhere** (0 usages, verified 2026-10-28). Do not introduce it — even though `CommunityToolkit.Mvvm` is referenced, only `ObservableObject` is consumed.
 
 ### SetProperty with Dependent Properties
 ```csharp
@@ -395,7 +400,7 @@ public string Title
 
 ## Command Patterns
 
-> **Convention:** Commands use `new (Async)RelayCommand(...)` constructors. The `[RelayCommand]` source generator is **not used anywhere** (0 usages across all 17 VMs as of 2026-04-26). Do not introduce it.
+> **Convention:** Commands use `new (Async)RelayCommand(...)` constructors. The `[RelayCommand]` source generator is **not used anywhere** (0 usages, verified 2026-10-28). Do not introduce it.
 
 ```csharp
 // Async — most common
@@ -459,7 +464,7 @@ private void AnnounceFilterCountDebounced(int count)
 | Mutating a grouped collection during iOS CollectionView layout | Replace the collection reference entirely: `BoxSections = new ObservableCollection<>(...)` |
 | Clear-and-repopulate on sync | Diff in-place (add/remove/update) to preserve item-level state across refreshes |
 | Missing `NotifyCanExecuteChanged` on `IsBusy` set | Call `(SaveCommand as IAsyncRelayCommand)?.NotifyCanExecuteChanged()` in `IsBusy` setter |
-| Constructor injection only (no parameterless ctor) | MAUI XAML requires a parameterless constructor; delegate to the primary via service locator |
+| Constructor injection only (no parameterless ctor) | Keep a parameterless (or reduced) constructor that delegates to the primary via service locator, matching every existing VM |
 | Using `[ObservableProperty]` / `[RelayCommand]` source generators | This codebase uses explicit `SetProperty(ref ...)` and `new (Async)RelayCommand(...)` exclusively (0 source-generator usages across all VMs). Despite the package being referenced, only `ObservableObject` is consumed. Do not introduce generators piecemeal. |
 | Binding a visible element to a **get-only computed** property whose value comes from an async load (e.g. `public string X => $"…{_loadedField}";`) | The get-only expression has no backing field, so nothing fires `PropertyChanged` after the `await` completes — on-device the bound element silently renders **empty** (evaluated before the data arrived; no notification to re-evaluate). Use a **backed** property `get => _x; private set => SetProperty(ref _x, value);` and set it explicitly at the end of the async load. (Empirical — the exact MAUI compiled-binding mechanism was not proven; treat as a safe default.) |
 

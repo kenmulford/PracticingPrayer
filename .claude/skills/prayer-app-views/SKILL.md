@@ -54,7 +54,7 @@ Invoke this skill before:
 | `MainPage` | Grid of metric cards | TapGestureRecognizer commands |
 | `CardsOverflowPopup` | CT.Maui Popup | Explicit Colors.xaml merge, PopupOptions { Shape = null } |
 | `TagPickerPage` | Modal CollectionView | TaskCompletionSource WaitForDismissAsync, code-behind Tapped handler |
-| `QuickAddPage` | Modal form | Full-screen PushModalAsync |
+| `ConfirmImportPage` | Modal form (import and Quick Add) | `PushModalWithNavigationBarAsync` so its Cancel/Save ToolbarItems render |
 
 ---
 
@@ -67,13 +67,15 @@ Invoke this skill before:
 | PrayerCard/ | CardsOverflowPopup | PrayerCardsViewModel | CT.Maui Popup |
 | Prayer/ | PrayerListPage | PrayerListViewModel | Filtered CollectionView |
 | Prayer/ | PrayerDetailPage | PrayerRequestDetailViewModel | Complex form |
+| Prayer/ | PrayersOverflowPopup | PrayerListViewModel | CT.Maui Popup |
 | PrayerTime/ | PrayerTimePage | PrayerTimeViewModel | CarouselView |
 | PrayerTime/ | PrayerTimeScopePage | PrayerTimeScopeViewModel | Modal tag selector |
-| PrayerTime/ | PrayerTimeBoxScopePage | — | Modal collection selector |
+| PrayerTime/ | PrayerTimeBoxScopePage | PrayerTimeBoxScopeViewModel | Modal collection selector |
+| PrayerTime/ | PrayerTimeCardSelectPage | PrayerTimeCardSelectViewModel | Modal card multi-select |
 | Tags/ | TagsPage | TagsViewModel | Flat CollectionView + inline action chips |
 | Tags/ | TagDetailPage | TagDetailViewModel | Form + color swatches |
 | Tags/ | TagPickerPage | TagPickerViewModel | Modal tag picker |
-| Tags/ | ColorPickerPopup | — | Modal color picker |
+| Tags/ | ColorPickerPopup | — | CT.Maui Popup color picker |
 | Boxes/ | BoxesPage | BoxesViewModel | Flat CollectionView + inline action chips |
 | Boxes/ | BoxDetailPage | BoxDetailViewModel | Form |
 | Settings/ | SettingsHubPage | — | Tab navigation |
@@ -85,9 +87,12 @@ Invoke this skill before:
 | Onboarding/ | OnboardingBanner | — | Tutorial banner |
 | Onboarding/ | OnboardingWelcomePopup | — | CT.Maui Popup |
 | Onboarding/ | OnboardingCompletePopup | — | CT.Maui Popup |
+| Confidential/ | PinPromptPopup | — | CT.Maui Popup |
+| Confidential/ | PassphrasePromptPopup | — | CT.Maui Popup |
 | Shared/ | LoadingOverlay | — | Overlay control |
+| Shared/ | StyledPicker | — | Picker control (`ContentView`) |
 | Root | MainPage | HomeViewModel | Metric cards grid |
-| Root | QuickAddPage | QuickAddViewModel | Modal quick-add form |
+| Root | ConfirmImportPage | ConfirmImportViewModel | Modal import / Quick Add form |
 
 ---
 
@@ -233,8 +238,7 @@ per-section empty-state label shown only when a section is expanded and empty.
 ### Flat CollectionView with Inline Action Chips (TagsPage, BoxesPage)
 
 TagsPage and BoxesPage do NOT use `SwipeView`. Actions appear as inline chip Grids
-revealed when a row is selected. The only `SwipeView` reference in Views/ is a
-comment in `PrayerCardsPage.xaml` noting it was replaced.
+revealed when a row is selected. No file under Views/ uses `SwipeView`.
 
 ```xml
 <CollectionView ItemsSource="{Binding Tags}" SelectionMode="None">
@@ -280,21 +284,26 @@ comment in `PrayerCardsPage.xaml` noting it was replaced.
 </Grid>
 ```
 
-### BindableLayout for Horizontal Tag Filter Chips
+### Horizontal Tag Filter Chips (shared `TagFilterChipTemplate`)
+
+PrayerCardsPage and PrayerListPage both render the chip strip as a `CollectionView` using the
+shared `TagFilterChipTemplate` in `Resources/Styles/Styles.xaml`, so the two strips stay identical:
 ```xml
-<HorizontalStackLayout BindableLayout.ItemsSource="{Binding AvailableTags}" Spacing="6">
-    <BindableLayout.ItemTemplate>
-        <DataTemplate x:DataType="viewModels:TagFilterChipViewModel">
-            <Border Padding="10,4" StrokeThickness="1.5">
-                <Border.GestureRecognizers>
-                    <TapGestureRecognizer Command="{Binding ToggleCommand}" />
-                </Border.GestureRecognizers>
-                <Label Text="{Binding Tag.Name}" FontSize="12" />
-            </Border>
-        </DataTemplate>
-    </BindableLayout.ItemTemplate>
-</HorizontalStackLayout>
+<CollectionView ItemTemplate="{StaticResource TagFilterChipTemplate}"
+                ItemsSource="{Binding AvailableTags}"
+                SelectionMode="None" />
+
+<!-- Styles.xaml -->
+<DataTemplate x:Key="TagFilterChipTemplate" x:DataType="viewModels:TagFilterChipViewModel">
+    <Border Padding="10,4" StrokeThickness="1.5">
+        <Border.GestureRecognizers>
+            <TapGestureRecognizer Command="{Binding ToggleCommand}" />
+        </Border.GestureRecognizers>
+        <Label Text="{Binding Tag.Name}" FontSize="{StaticResource FontCaption}" />
+    </Border>
+</DataTemplate>
 ```
+`BindableLayout` is used for short non-scrolling lists (e.g. `SelectedTags` on PrayerDetailPage, the scope pickers).
 
 ### CarouselView (Prayer Time)
 ```xml
@@ -328,20 +337,22 @@ private void ApplyMultiSelectToolbarState(PrayerCardsViewModel vm)
     var item = ToolbarItems.FirstOrDefault();
     if (item is null) return;
     var isDark = Application.Current?.RequestedTheme == AppTheme.Dark;
+    // Semantics first: Android refreshes the a11y description only on a Text/Icon change.
     if (vm.IsMultiSelectMode)
     {
-        item.Text = "Cancel";
-        item.IconImageSource = isDark ? "xmark_solid_full_dark.png" : "xmark_solid_full.png";
         SemanticProperties.SetDescription(item, "Cancel");
         SemanticProperties.SetHint(item, "Exit multi-select mode");
+        item.Text = "Cancel";
+        item.IconImageSource = isDark ? "xmark_solid_full_dark.png" : "xmark_solid_full.png";
     }
     else
     {
+        SemanticProperties.SetDescription(item, "More actions");
+        SemanticProperties.SetHint(item, "Opens a menu with Add Card, Manage Collections, and Select");
         item.Text = "More";
         item.IconImageSource = isDark
             ? "ellipsis_vertical_solid_full_dark.png"
             : "ellipsis_vertical_solid_full.png";
-        SemanticProperties.SetDescription(item, "More actions");
     }
 }
 ```
@@ -350,8 +361,8 @@ private void ApplyMultiSelectToolbarState(PrayerCardsViewModel vm)
 set-once and throws on mutation. Only `Text`, `IconImageSource`, and
 `SemanticProperties` change between modes.
 
-For detail pages that need edit/save toolbar toggle (separate items with `SetBinding`),
-use the standard pattern in `PrayerCardPage` / `PrayerDetailPage`.
+For detail pages with separate Save and "Save +" items bound via `SetBinding` to `SaveCommand` /
+`SaveAndNewCommand`, use the pattern in `PrayerCardPage` / `PrayerDetailPage`.
 
 ---
 
@@ -483,8 +494,8 @@ var options = new PopupOptions { Shape = null };
 await this.ShowPopupAsync(new CardsOverflowPopup(vm), options, CancellationToken.None);
 ```
 
-Apply the same `Colors.xaml` merge to `OnboardingWelcomePopup` and
-`OnboardingCompletePopup`.
+`PrayersOverflowPopup` uses the same merge and `Shape = null`. The onboarding,
+`ColorPickerPopup`, and Confidential prompt popups do not merge `Colors.xaml`.
 
 ---
 
@@ -496,19 +507,25 @@ scrolling via `Dispatcher.DrainLayoutPassAsync()` (`Helpers/DispatcherExtensions
 
 ```csharp
 // PrayerCardsPage.xaml.cs
-private async Task HighlightCardAfterLayoutAsync(PrayerCardsViewModel vm, PrayerCardViewModel card)
+private async Task ScrollToSavedCardAsync(PrayerCardsViewModel vm, PrayerCardViewModel card)
 {
     await Dispatcher.DrainLayoutPassAsync(); // Two dispatcher ticks — drains in-flight layout
-    var section = vm.BoxSections.FirstOrDefault(s => s.Contains(card));
-    if (section != null)
-        cardCollection.ScrollTo(card, section, ScrollToPosition.Center, animate: true);
-    else
-        cardCollection.ScrollTo(card, position: ScrollToPosition.Center, animate: true);
+    try
+    {
+        var section = vm.BoxSections.FirstOrDefault(s => s.Contains(card));
+        if (section != null)
+            cardCollection.ScrollTo(card, section, ScrollToPosition.Center, animate: true);
+        else
+            cardCollection.ScrollTo(card, position: ScrollToPosition.Center, animate: true);
 
-    SemanticScreenReader.Announce($"New card: {card.Title}");
-    await Task.Delay(2500);
-    card.IsHighlighted = false;
+        SemanticScreenReader.Announce($"New card: {card.Title}");
+    }
+    catch (Exception ex)
+    {
+        Diagnostics.ResolveLog()?.Log("PrayerCardsPage.ScrollToSavedCardAsync", ex);
+    }
 }
+// The highlight fade runs separately in FadeHighlightAfterDelayAsync.
 ```
 
 Also use `DrainLayoutPassAsync` before `Entry.Focus()` after a Shell push (BUG-70 family).
@@ -517,10 +534,14 @@ Also use `DrainLayoutPassAsync` before `Entry.Focus()` after a Shell push (BUG-7
 
 ## Modal Navigation
 
-### Full-Screen Modal
+### Page-Sheet Modal
 ```csharp
 await Shell.Current.Navigation.PushModalAsync(
-    _services.GetRequiredService<QuickAddPage>());
+    _services.GetRequiredService<PrayerTimeScopePage>());
+
+// Modal with Cancel/Save ToolbarItems: wrap in a NavigationPage
+await _services.GetRequiredService<INavigationService>()
+    .PushModalWithNavigationBarAsync(confirmImportPage);
 ```
 
 ### CT.Maui Popup
@@ -614,9 +635,13 @@ protected override void OnAppearing()
             <ResourceDictionary Source="Resources/Styles/Colors.xaml" />
             <ResourceDictionary Source="Resources/Styles/Styles.xaml" />
         </ResourceDictionary.MergedDictionaries>
+        <converters:BoolToTextDecorationConverter x:Key="BoolToTextDecoration" />
+        <converters:BoolToMutedColorConverter x:Key="BoolToMutedColor" />
         <converters:InverseBoolConverter x:Key="InverseBool" />
+        <converters:StringToBoolConverter x:Key="StringToBool" />
         <converters:BoolToChevronConverter x:Key="BoolToChevron" />
         <converters:BoolToTriangleConverter x:Key="BoolToTriangle" />
+        <converters:EnumToBoolConverter x:Key="EnumToBool" />
     </ResourceDictionary>
 </Application.Resources>
 ```
@@ -630,7 +655,6 @@ protected override void OnAppearing()
 | Using old `_loaded` flag + `LoadAsync`/`RefreshAsync` branch | Use `await PageSync.OnAppearingAsync(vm)` — single call replaces both |
 | Assuming TagsPage uses SwipeView | TagsPage uses inline action chip Grids inside a plain CollectionView |
 | Setting `Title` on PrayerCardsPage | PrayerCardsPage has no `Title`; it relies on `SafeAreaEdges` instead |
-| Writing `border.Margin` on every Rebind without equality guard | Check `if (border.Margin != target)` first — every unconditional write cascades into another layout pass on Android |
 | Omitting `Colors.xaml` merge in a CT.Maui Popup | Popup runs in a detached visual tree; `AppThemeBinding` silently falls back to light-mode defaults without explicit merge |
 | Omitting `PopupOptions { Shape = null }` | CT.Maui v14 draws a white `RoundRectangle` frame by default; `Shape = null` removes it so the inner themed `Border` controls the surface |
 | Calling `CollectionView.ScrollTo` immediately after `ItemsSource` change on Android | Call `await Dispatcher.DrainLayoutPassAsync()` first to let the adapter commit its snapshot |

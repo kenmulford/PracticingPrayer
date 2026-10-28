@@ -22,10 +22,11 @@
 | Package                  | Version | Notes                                                            |
 | ------------------------ | ------- | ---------------------------------------------------------------- |
 | .NET MAUI                | 10      | `net10.0-android`, `net10.0-ios`                                 |
-| CommunityToolkit.Mvvm    | 8.4.0   | `ObservableObject` only — explicit `SetProperty` + `new (Async)RelayCommand`; no source generators |
+| CommunityToolkit.Mvvm    | 8.4.1   | `ObservableObject` only — explicit `SetProperty` + `new (Async)RelayCommand`; no source generators |
 | CommunityToolkit.Maui    | 14.0.1  | Requires `Microsoft.Maui.Controls >= 10.0.41` — do not downgrade |
-| sqlite-net-pcl           | 1.9.172 | Active Record model pattern                                      |
-| Plugin.LocalNotification | 13.0.0  | Local push notifications                                         |
+| sqlite-net-base          | 1.9.172 | Active Record model pattern; with SQLitePCLRaw.bundle_e_sqlite3 3.0.3 |
+| Plugin.LocalNotification | 14.0.0  | Local push notifications                                         |
+| Oscore.Maui.Biometric    | 2.5.1   | Biometric unlock for Confidential Cards                          |
 | xUnit                    | 2.9.2   | Unit tests                                                       |
 | NSubstitute              | 5.3.0   | Test mocking                                                     |
 
@@ -43,8 +44,9 @@ Views (XAML)
 
 - **Models** carry persistence via a static `IDBService` reference set in `MauiProgram.cs`. Each model has `SaveAsync()`, `DeleteAsync()`, `LoadAsync(id)`, `LoadAllAsync()`, plus type-specific queries.
 - **Services** are registered as singletons. Cache pattern: read → populate `_cache` → return; write → null `_cache` → return.
-- **ViewModels** resolve services via service locator (`IPlatformApplication.Current!.Services.GetRequiredService<>()`), not constructor injection. This is intentional — MAUI XAML requires parameterless constructors.
-- **Navigation**: Shell with 5 tabs. Modals via `Shell.Current.Navigation.PushModalAsync(page)`. Route params via `IQueryAttributable.ApplyQueryAttributes()`.
+- **ViewModels** take services by constructor injection (registered `AddTransient` in `MauiProgram.cs`) and keep a parameterless constructor that chains to it via `IPlatformApplication.Current!.Services.GetRequiredService<>()`, so unit tests inject fakes and XAML can still construct them.
+- **Messaging**: services publish the records in `Messages/EntityChangedMessage.cs` through the injected `IMessenger`; ViewModels re-sync on them.
+- **Navigation**: Shell with 5 tabs (Home, Cards, Prayers, Tags, Settings). ViewModels navigate and show dialogs through `INavigationService` (`ShellNavigationService`), whose `PushModalOnUiThreadAsync` / `PushModalWithNavigationBarAsync` wrap `Shell.Current.Navigation.PushModalAsync`. Route params via `IQueryAttributable.ApplyQueryAttributes()`.
 
 ---
 
@@ -52,11 +54,13 @@ Views (XAML)
 
 | Table               | Key columns                                                                                                     |
 | ------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `PrayerCard`        | Id, Title, CanNotify, PrayerFrequency, IsAnswered, IsFavorite, CreatedAt, UpdatedAt                             |
-| `PrayerRequest`     | Id, PrayerCardId (FK), Title, Details, CanNotify, PrayerFrequency, IsAnswered, AnsweredAt, CreatedAt, UpdatedAt |
-| `PrayerTag`         | Id, Name, Color (hex, nullable)                                                                                 |
+| `PrayerCard`        | Id, Title, CanNotify, PrayerFrequency, IsAnswered, IsFavorite, IsSystem, IsImported, ProtectionMode, BoxId, PreArchiveBoxId, SystemKey, CreatedAt, UpdatedAt |
+| `PrayerRequest`     | Id, PrayerCardId (FK), Title, Details, CanNotify, PrayerFrequency, NotifyHour, NotifyMinute, NotifyDayOfWeek, NotifyDayOfMonth, NotifyDate, IsImported, IsAnswered, AnsweredAt, CreatedAt, UpdatedAt |
+| `PrayerTag`         | Id, Name, Color (hex, nullable), IsSystem, CreatedAt, UpdatedAt                                                 |
 | `PrayerCardTag`     | Id, PrayerCardId (FK), PrayerTagId (FK), PrayerRequestId (FK), CreatedAt                                        |
-| `PrayerInteraction` | Id, PrayerId (FK), InteractionType, InteractionAt                                                               |
+| `PrayerInteraction` | Id, PrayerId (FK), InteractionType, InteractionAt, CreatedAt, UpdatedAt                                         |
+| `CardBox`           | Id, Name, IsSystem, SystemKey, SortOrder, ProtectAllCards, CardProtectionMode, CreatedAt, UpdatedAt             |
+| `UserColor`         | Id, HexValue, IsDefault, CreatedAt                                                                              |
 
 - The `Prayer` model uses `[Table("PrayerRequest")]` — the SQLite table is `PrayerRequest`, not `Prayer`
 - Schema migrations live in `DBService.UpdateSchema()`
@@ -91,7 +95,8 @@ Views (XAML)
 - NSubstitute mocks `IDBService`; static `SetDBService()` called per-test constructor
 - Parallelization disabled (`[assembly: CollectionBehavior(DisableTestParallelization = true)]`) — model static `_dbService` is shared state
 - When adding a new non-MAUI service/model, add a matching `<Compile Include>` in `PrayerApp.Tests.csproj`
-- CI: `.github/workflows/ci.yml` runs on push/PR to `master`/`dev`/`feature/**`
+- CI: `.github/workflows/ci.yml` runs `Unit Tests` and `Android Build` on push to `master`/`dev`/`feature/**`/`fix/**`/`release/**`/`hotfix/**` and on PRs to `master`/`dev`; `.github/workflows/release.yml` ships to Play and TestFlight
+- Dependabot (`.github/dependabot.yml`) opens weekly grouped minor/patch PRs against `dev` for NuGet, Bundler and GitHub Actions
 - Running the Appium UI test suite is documented in [docs/RUNNING_UITESTS.md](docs/RUNNING_UITESTS.md)
 
 ---
@@ -117,8 +122,7 @@ Views (XAML)
 - `docs/plans/` — active screenshot runbooks (completed plans archived to `docs/archive/`)
 - `docs/plans/app-store-screenshots.md` — iOS screenshot runbook (devices, seed data, capture commands)
 - `docs/plans/UX-22-android-screenshots.md` — Android screenshot runbook (emulators, seed data, adb commands)
-- `screenshots/` — app store screenshots (phone + tablet, light + dark)
-- `screenshots/android/prayer_app_seed.db` — pre-built seed DB for screenshot sessions
+- `screenshots/` (gitignored, local only, because captures are build artifacts): app store screenshots and `android/prayer_app_seed.db`
 - `docs/research/` — investigation notes
 - `docs/RUNNING_UITESTS.md` — Appium UI test suite setup and running guide
 - `docs/archive/` — completed plan/spec docs (historical reference)

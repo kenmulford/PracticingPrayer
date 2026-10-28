@@ -1,11 +1,11 @@
 ---
 name: prayer-app-unit-testing
-description: Use when writing, fixing, or extending xUnit tests in PrayerApp.Tests — adding Compile Include entries, wiring IMessenger/WeakReferenceMessenger fixtures, setting up SetDBService for Active Record models, constructing ViewModels or Services under test, running dotnet test with xUnit v3 MTP, or following TDD-first workflow for new behavior.
+description: Use when writing, fixing, or extending xUnit tests in PrayerApp.Tests — adding Compile Include entries, wiring IMessenger/WeakReferenceMessenger fixtures, setting up SetDBService for Active Record models, constructing ViewModels or Services under test, running dotnet test (xUnit 2 on VSTest), or following TDD-first workflow for new behavior.
 ---
 
 # PrayerApp Unit Testing
 
-Test project: `PrayerApp.Tests/` targeting `net10.0` with xUnit 2.9.2 and NSubstitute 5.3.0.
+Test project: `PrayerApp.Tests/` targeting `net10.0` with xUnit 2.9.2 (VSTest runner via `xunit.runner.visualstudio`), NSubstitute 5.3.0, and CommunityToolkit.Mvvm 8.4.0.
 
 **TDD-first workflow:** For any new behavior, invoke `superpowers:test-driven-development` before writing implementation code. Test-after is only acceptable for pure refactors with green coverage.
 
@@ -16,7 +16,7 @@ Test project: `PrayerApp.Tests/` targeting `net10.0` with xUnit 2.9.2 and NSubst
 - Adding or fixing tests for a Service, ViewModel, or Model
 - Wiring up a new test fixture (constructor setup, mocks, messenger)
 - Adding `<Compile Include>` for a new testable class
-- Running `dotnet test` and hitting xUnit v3 MTP CLI quirks
+- Running `dotnet test`, including filtered runs
 - Verifying messenger publish assertions
 
 ---
@@ -26,7 +26,7 @@ Test project: `PrayerApp.Tests/` targeting `net10.0` with xUnit 2.9.2 and NSubst
 | Test class type | Key fixture elements |
 |---|---|
 | Service (e.g. `PrayerServiceTests`) | `IDBService` mock, `Model.SetDBService`, fresh `WeakReferenceMessenger`, captured message list, `new ServiceClass(_db, _messenger)` |
-| ViewModel (e.g. `PrayerCardViewModelTests`) | All service mocks, `Model.SetDBService` × N, `CardBox.SetDBService`, `CreateSut()` factory |
+| ViewModel (e.g. `PrayerCardViewModelTests`) | All service mocks (including `ISettings`, `IConfidentialAccessService`), `Model.SetDBService` × N, `CardBox.SetDBService`, `CreateSut()` factory |
 | Model (Active Record) | `IDBService` mock, `Model.SetDBService(_db)`, direct `model.SaveAsync()` / `LoadAsync()` calls |
 
 ---
@@ -35,7 +35,7 @@ Test project: `PrayerApp.Tests/` targeting `net10.0` with xUnit 2.9.2 and NSubst
 
 ### Why Linked Source Files
 
-The main project targets `net10.0-android;net10.0-ios` — these TFMs cannot run on desktop. The test project targets plain `net10.0` and links source files via `<Compile Include>` instead of a project reference.
+The main project targets `net10.0-android;net10.0-ios` — these TFMs cannot run on desktop. The test project targets plain `net10.0` and links app source files via `<Compile Include>` instead of a project reference to `PrayerApp`. It does take a `<ProjectReference>` to `PrayerApp.Shared`.
 
 ### Adding a New Testable Class
 
@@ -51,19 +51,21 @@ Add bare `<Compile Include>` entries to `PrayerApp.Tests.csproj` — no `Link=` 
 ### What Is Included vs Excluded
 
 **Included** (no MAUI platform dependencies):
-- All Models: `Prayer`, `PrayerCard`, `CardBox`, `PrayerTag`, `PrayerCardTag`, `PrayerInteraction`, `UserColor`
-- Enums: `PrayerFrequency`, `OnboardingStep`
-- Helpers: `TaskExtensions`, `NotificationHelper`, `TagColorPalette`, `BoxStrings`, `SingleFlightGate`, `PerfLog`, `Diagnostics`
+- All Models: `Prayer`, `PrayerCard`, `CardBox`, `PrayerTag`, `PrayerCardTag`, `PrayerInteraction`, `UserColor`, `ParseResult`
+- Enums: `PrayerFrequency`, `OnboardingStep`, `CardProtectionMode`
+- Helpers: `TaskExtensions`, `NotificationHelper`, `TagColorPalette`, `BoxStrings`, `SingleFlightGate`, `PerfLog`, `Diagnostics`, `NativeAttachGuard`, `PopupCloseExtensions`, `PopupResultGate`, `TextNormalization`
+- Behaviors: `KeyboardAvoidanceBehavior`, `KeyboardLiftBehavior`, `ChipStripHeightBehavior`, `AccessibilityScaleBehavior`
 - Messages: `EntityChangedMessage`
-- All Service interfaces and implementations: `CardService`, `PrayerService`, `TagService`, `PrayerInteractionService`, `UserColorService`, `BoxService`, `DeepLinkService`
-- All testable ViewModels (19 total): includes `BoxSectionViewModel`, `BoxesViewModel`, `BoxDetailViewModel`, `PrayerTimeBoxScopeViewModel`, `TagFilterChipViewModel`, `TagChipViewModel`
+- All Service interfaces and the MAUI-free implementations: `CardService`, `PrayerService`, `TagService`, `PrayerInteractionService`, `UserColorService`, `BoxService`, `DeepLinkService`, `NotificationService`, `OnboardingService`, `ConfidentialAccessService`, and the import/share services
+- All testable ViewModels (20 total): includes `BoxSectionViewModel`, `BoxesViewModel`, `BoxDetailViewModel`, `PrayerTimeBoxScopeViewModel`, `TagFilterChipViewModel`, `TagChipViewModel`
 
 **Excluded** (require MAUI runtime):
 - `DBService.cs` — native SQLite runtime
-- `Settings.cs`, `OnboardingService.cs` — MAUI Preferences
+- `Settings.cs` — MAUI Preferences
 - `LocalNotificationCenterWrapper.cs` — Plugin.LocalNotification
 - `OrientationService` — platform-specific
-- All Views (Shell/Application dependencies)
+- All Views (Shell/Application dependencies), except the pure layout files `CardPanelLayout`, `IPageSheetModal`, `PageSheetPresentation`
+- `BackupService.cs` (FileSystem/Share/Shell)
 
 ---
 
@@ -116,7 +118,7 @@ public async Task SavePrayerAsync_New_PublishesCreated()
 
 ## ViewModel Test Template
 
-ViewModels are the most common test target (19 VM files vs 7 service files). Use a `CreateSut()` factory method.
+ViewModels and services are the main test targets (22 ViewModel test files, 23 service test files). Use a `CreateSut()` factory method.
 
 ```csharp
 public class PrayerCardViewModelTests
@@ -127,6 +129,8 @@ public class PrayerCardViewModelTests
     private readonly INavigationService _navigationService = Substitute.For<INavigationService>();
     private readonly IAccessibilityService _accessibilityService = Substitute.For<IAccessibilityService>();
     private readonly IBoxService _boxService = Substitute.For<IBoxService>();
+    private readonly ISettings _settings = Substitute.For<ISettings>();
+    private readonly IConfidentialAccessService _confidentialAccessService = Substitute.For<IConfidentialAccessService>();
     private readonly IDBService _db = Substitute.For<IDBService>();
 
     public PrayerCardViewModelTests()
@@ -139,7 +143,8 @@ public class PrayerCardViewModelTests
 
     private PrayerCardViewModel CreateSut() =>
         new(_cardService, _prayerService, _onboardingService,
-            _navigationService, _accessibilityService, _boxService); // 6 args
+            _navigationService, _accessibilityService, _boxService,
+            _settings, _confidentialAccessService); // 8 args
 
     [Fact]
     public async Task SaveCommand_NewCard_InsertsAndNavigatesBack()
@@ -209,7 +214,7 @@ await _db.DidNotReceive().DeleteAsync(Arg.Any<PrayerCard>());
 
 // AsyncRelayCommand execution
 await ((IAsyncRelayCommand)sut.SaveCommand).ExecuteAsync(null);
-sut.ToggleFavoriteCommand.Execute(null); // synchronous
+sut.ToggleFavoriteCommand.Execute(null); // ICommand.Execute does not await an AsyncRelayCommand
 ```
 
 ---
@@ -243,13 +248,12 @@ public async Task SaveAsync_InvalidatesCache() { }
 
 ## Running Tests
 
-xUnit v3 MTP rejects classic `--nologo`/`--filter` flags (prints help, exits with code 5). Run from the test project directory:
+The project runs xUnit 2 on VSTest, so classic flags work. Run from the repo root:
 
 ```
-cd PrayerApp.Tests && dotnet test
+dotnet test PrayerApp.Tests/PrayerApp.Tests.csproj
+dotnet test PrayerApp.Tests/PrayerApp.Tests.csproj --filter "FullyQualifiedName~PrayerServiceTests"
 ```
-
-Do **not** use `dotnet test PrayerApp.Tests/` with `--filter` or `--nologo`.
 
 ---
 
@@ -265,10 +269,9 @@ Do **not** use `dotnet test PrayerApp.Tests/` with `--filter` or `--nologo`.
 |---|---|
 | `Link="Models\NewModel.cs"` in `<Compile Include>` | Remove `Link=` — bare `Include` only |
 | `new PrayerService(_db)` | Constructor is `(IDBService, IMessenger)` — pass both |
-| `new PrayerCardViewModel(5 args)` | Constructor takes 6 args — add `_boxService` |
+| `new PrayerCardViewModel(6 args)` | Constructor takes 8 args; add `_settings` and `_confidentialAccessService` |
 | Missing `CardBox.SetDBService(_db)` in VM fixture | Add alongside `PrayerCard.SetDBService` and `Prayer.SetDBService` |
 | `WeakReferenceMessenger.Default` in fixture | Use `new WeakReferenceMessenger()` — fresh per fixture to prevent cross-test leakage |
-| `dotnet test PrayerApp.Tests/ --filter "..."` | xUnit v3 MTP ignores classic flags; `cd PrayerApp.Tests && dotnet test` |
 | Asserting messenger via `_service.Received()` | Services don't expose messenger — capture messages in a registered `List<T>` |
 
 ---
@@ -282,4 +285,4 @@ Do **not** use `dotnet test PrayerApp.Tests/` with `--filter` or `--nologo`.
 5. Use `[Fact]` for each test; follow naming convention
 6. For services: test cache invalidation and messenger publishes
 7. For ViewModels: test command execution, navigation, and dirty-state tracking
-8. Run: `cd PrayerApp.Tests && dotnet test`
+8. Run: `dotnet test PrayerApp.Tests/PrayerApp.Tests.csproj`

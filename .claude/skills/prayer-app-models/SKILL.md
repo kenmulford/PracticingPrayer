@@ -9,7 +9,7 @@ description: >
 
 # PrayerApp Data Models
 
-All models live in `PrayerApp/Models/` and use the **Active Record** pattern via sqlite-net-pcl.
+All models live in `PrayerApp/Models/` and use the **Active Record** pattern via sqlite-net (`sqlite-net-base` package).
 
 ---
 
@@ -124,7 +124,7 @@ public class MyModel
 
 ---
 
-## SetDBService Wiring (`MauiProgram.cs:265-272`)
+## SetDBService Wiring (`MauiProgram.CreateMauiApp`)
 
 `SetDBService` is called once at startup in `MauiProgram.cs` after the app is built. Call order:
 
@@ -138,7 +138,7 @@ PrayerInteraction.SetDBService(myDBService);
 CardBox.SetDBService(myDBService);
 ```
 
-`DBService.UpdateSchema()` (schema creation + migrations) runs lazily via `_initTask` assigned in the `DBService` constructor (`DBService.cs:29`). It completes before any query runs, so models can be called immediately after wiring.
+`DBService.UpdateSchema()` (schema creation + migrations) runs lazily via `_initTask` assigned in the `DBService` constructor. It completes before any query runs, so models can be called immediately after wiring.
 
 ---
 
@@ -160,6 +160,7 @@ CardBox.SetDBService(myDBService);
 | NotifyMinute | int | | 0 | 0–59 |
 | NotifyDayOfWeek | int | | -1 | -1=use creation day, 0=Sun..6=Sat |
 | NotifyDayOfMonth | int | | -1 | -1=use creation day, 1–31 |
+| NotifyDate | DateTime? | | null | OneTime/Yearly reminder day (date only); null = legacy CreatedAt path; backfilled by `NotifyDateMigration` |
 | IsImported | bool | | false | F-10: shared/deep-linked content |
 | IsAnswered | bool | | false | |
 | AnsweredAt | DateTime? | | null | |
@@ -184,7 +185,9 @@ CardBox.SetDBService(myDBService);
 | IsFavorite | bool | | false | |
 | IsSystem | bool | | false | Protected from user edit/delete |
 | IsImported | bool | | false | F-10: shared content |
+| ProtectionMode | CardProtectionMode | | `None` | Confidential Cards: `None = 0`, `LockedVisible = 1`, `Hidden = 2` |
 | BoxId | int | | 0 | FK to CardBox; 0 = Unboxed |
+| PreArchiveBoxId | int? | | null | BoxId before archiving, restored on unarchive (BUG-121) |
 | SystemKey | string? | [MaxLength(20)] | null | Identifies system cards |
 | CreatedAt | DateTime | | DateTime.Now | |
 | UpdatedAt | DateTime | | DateTime.Now | |
@@ -206,6 +209,8 @@ CardBox.SetDBService(myDBService);
 | IsSystem | bool | | false | Protected from rename/delete |
 | SystemKey | string? | [MaxLength(20)] | null | |
 | SortOrder | int | | 0 | Controls display order |
+| ProtectAllCards | bool | | false | Cascades `CardProtectionMode` to cards with no explicit mode |
+| CardProtectionMode | CardProtectionMode | | `None` | Mode cascaded when `ProtectAllCards` is true |
 | CreatedAt | DateTime | | DateTime.Now | |
 | UpdatedAt | DateTime | | DateTime.Now | |
 
@@ -339,7 +344,7 @@ CardBox (1) ──── (*) PrayerCard (1) ──── (*) Prayer (1) ──�
 | Using C# 13 `field` keyword for null-safe strings | Use an explicit private backing field: `private string _title = string.Empty;` |
 | Using `_dbService!.InsertAsync(this)` (null-forgiving) | Use the null check + throw pattern — see template above |
 | Adding `UpdatedAt` to a junction table | `PrayerCardTag` has no `UpdatedAt`; don't add one unless a schema migration also adds the column |
-| Calling `SaveAsync` before `SetDBService` | Always wire all models in `MauiProgram.cs:265-272` before any query |
+| Calling `SaveAsync` before `SetDBService` | Always wire all models in the `SetDBService` block of `MauiProgram.CreateMauiApp` before any query |
 
 ---
 
@@ -350,6 +355,6 @@ CardBox (1) ──── (*) PrayerCard (1) ──── (*) Prayer (1) ──�
 3. Add interface methods to `PrayerApp/Services/IDBService.cs` for any custom queries
 4. Implement those methods in `PrayerApp/Services/DBService.cs`
 5. Add `await _db.CreateTableAsync<NewModel>();` in `DBService.UpdateSchema()`
-6. Add `NewModel.SetDBService(myDBService);` in `MauiProgram.cs` (after line 272, continuing the block)
-7. Add `<Compile Include="..\PrayerApp\Models\NewModel.cs" Link="Models\NewModel.cs" />` in `PrayerApp.Tests/PrayerApp.Tests.csproj`
+6. Add `NewModel.SetDBService(myDBService);` in `MauiProgram.cs`, continuing the `SetDBService` block after `CardBox.SetDBService`
+7. Add `<Compile Include="../PrayerApp/Models/NewModel.cs" />` in `PrayerApp.Tests/PrayerApp.Tests.csproj`
 8. If the model has a service, create it (see `prayer-app-services`)

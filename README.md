@@ -14,8 +14,8 @@ A privacy-first prayer journal for iOS and Android. Prayer cards, prayer request
 </p>
 
 <p align="center">
-  <img src="screenshots/android/phone/light/01-home-dashboard.png" alt="Home dashboard, light mode" width="300">
-  <img src="screenshots/android/phone/dark/01-home-dashboard.png" alt="Home dashboard, dark mode" width="300">
+  <img src="https://raw.githubusercontent.com/kenmulford/PracticingPrayer/a0fc2950153688daf63a8bff354196715d8348a2/screenshots/android/phone/light/01-home-dashboard.png" alt="Home dashboard, light mode" width="300">
+  <img src="https://raw.githubusercontent.com/kenmulford/PracticingPrayer/a0fc2950153688daf63a8bff354196715d8348a2/screenshots/android/phone/dark/01-home-dashboard.png" alt="Home dashboard, dark mode" width="300">
 </p>
 
 ## What it is
@@ -84,7 +84,7 @@ PrayerApp/              Main app (MAUI)
 PrayerApp.Tests/        xUnit unit tests (links source files from main project)
 PrayerApp.UITests/      Appium-based UI tests
 docs/                   Plans, research notes, screenshot runbooks
-screenshots/            App store screenshots (phone + tablet, light + dark)
+screenshots/            App store screenshots (gitignored, local only)
 ```
 
 Architecture, conventions, and known gotchas are documented in [ARCHITECTURE.md](ARCHITECTURE.md).

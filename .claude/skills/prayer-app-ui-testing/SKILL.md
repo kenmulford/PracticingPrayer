@@ -2,8 +2,8 @@
 name: prayer-app-ui-testing
 description: >
   Use when writing, debugging, or reviewing Appium UI tests in PrayerApp.UITests/.
-  Covers: infrastructure setup, platform detection, AutomationId locators, every
-  helper in AppExtensions.cs, delay constants, iOS gotchas, TestDataSeed workflow,
+  Covers: infrastructure setup, platform detection, AutomationId locators, the core
+  helpers in AppExtensions.cs, delay constants, iOS gotchas, TestDataSeed workflow,
   test traits, SkippableFact patterns, and operational "never do X" rules that
   prevent cascade failures. Invoke before touching any UITest file.
 ---
@@ -11,7 +11,7 @@ description: >
 # PrayerApp UI Testing
 
 UI test project: `PrayerApp.UITests/` using Appium.WebDriver 8.1.0 with xUnit 2.9.2.
-24 test files; shared Appium collection fixture with a single driver across the session.
+15 test files under `Tests/`; shared Appium collection fixture with a single driver across the session.
 
 ---
 
@@ -35,7 +35,7 @@ Invoke this skill before:
 | `Infrastructure/AppiumCollection.cs` | Collection fixture definition |
 | `Infrastructure/TestDataSeed.cs` | Seed DB builder + adb/simctl push workflow |
 | `Infrastructure/SettingsShim.cs` | Shim for settings access in test context |
-| `Helpers/AppExtensions.cs` | All ~22 element, tap, scroll, navigation, and diagnostic helpers |
+| `Helpers/AppExtensions.cs` | All ~65 element, tap, scroll, navigation, and diagnostic helpers |
 
 ---
 
@@ -43,11 +43,15 @@ Invoke this skill before:
 
 ```csharp
 // TestConfig.cs
-public static readonly bool IsAndroid = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
-public static readonly bool IsIOS    = RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
+private static readonly (bool isAndroid, bool isIOS) Platform = ResolvePlatform(
+    Environment.GetEnvironmentVariable("UITEST_PLATFORM"),
+    RuntimeInformation.IsOSPlatform(OSPlatform.Windows),
+    RuntimeInformation.IsOSPlatform(OSPlatform.OSX));
+public static readonly bool IsAndroid = Platform.isAndroid;
+public static readonly bool IsIOS     = Platform.isIOS;
 ```
 
-Run Android tests on Windows, iOS tests on macOS. Same binary, platform-guarded helpers.
+By default Android runs on Windows and iOS on macOS. Set `UITEST_PLATFORM=android` or `ios` to target the other platform from either host (e.g. the Android suite from macOS). Same binary, platform-guarded helpers.
 
 ---
 
@@ -92,6 +96,8 @@ public class AppiumCollection : ICollectionFixture<AppiumSetup> { }
 | `DelayAppRelaunch` | 5 000 | After full `RecreateDriver` |
 | `DelayCollectionRender` | 1 500 | CollectionView item materialisation |
 | `DelayModalAnimation` | 1 000 | Modal / action-sheet present or dismiss |
+| `DelayShortSettle` | 200 | Short post-action settle that fits no other category |
+| `DelayLongSettle` | 2 000 | Longer settle for heavyweight transitions |
 
 ---
 
@@ -102,10 +108,10 @@ public class AppiumCollection : ICollectionFixture<AppiumSetup> { }
 ```
 Package:     com.multithreadedllc.prayercards
 Automation:  UiAutomator2
-Activity:    crc6425c6d21f3599989c.MainActivity
+Activity:    crc6425c6d21f3599989c.MainActivity  (AndroidComponentNames.MainActivity)
 Device:      env ANDROID_AVD ?? "pixel_9_-_api_36_0"
 autoGrantPermissions: true
-noReset:     true (when APK not provided)
+noReset:     true (when env PRAYER_APK_PATH is not set)
 ```
 
 ### iOS
@@ -144,11 +150,11 @@ MobileBy.AccessibilityId(automationId)
 
 ### Naming Convention
 
-`{Page}_{Type}_{Name}` — e.g. `Home_Btn_QuickAdd`, `Cards_Entry_Search`, `Cards_Section_Header`.
+`{Page}_{Type}_{Name}` — e.g. `Home_Btn_QuickAdd`, `Card_Entry_Title`, `Cards_Section_Header`.
 
 ---
 
-## Quick Reference: All Helpers (AppExtensions.cs)
+## Quick Reference: Core Helpers (AppExtensions.cs)
 
 | Helper | Signature | Notes |
 |--------|-----------|-------|
@@ -176,7 +182,6 @@ MobileBy.AccessibilityId(automationId)
 | `ResetAppUIState` | `(setup)` | Clear search, exit multi-select, back to tab root |
 | `CaptureDiagnostics` | `(reason)` | Screenshot + page source to temp dir; never throws |
 | `EnsureUITestCardExists` | `(setup)` | Navigates to Cards tab; trusts seed DB |
-| `EnsureUITestPrayerExists` | `(setup)` | Navigates to Prayers tab; trusts seed DB |
 | `EnsureUITestTagExists` | `(setup)` | Creates "UITest Tag" if missing |
 | `EnsureUITestCollectionExists` | `(setup)` | Creates "UITest Collection" if missing |
 | `FindCardCell` | `(cardName, timeoutSeconds=10)` | iOS: returns parent XCUIElementTypeCell for reliable swipes |
@@ -209,12 +214,12 @@ Three-stage fallback:
 
 ### `TapIOSActionSheetButton`
 
-Reads `element.Location` and `element.Size` **at call time**, then fires `mobile: tap` with the center coordinates. This avoids stale-coordinate drift that occurs when iPad popover animation is still in progress when WebDriver's `Click()` fires. **Always add `Thread.Sleep(TestConfig.DelayModalAnimation)` before calling** if the action sheet was just presented (see `PrayerTime_TagScoped` — `PrayerTimeTests.cs:280`).
+Reads `element.Location` and `element.Size` **at call time**, then fires `mobile: tap` with the center coordinates. This avoids stale-coordinate drift that occurs when iPad popover animation is still in progress when WebDriver's `Click()` fires. **Always add `Thread.Sleep(TestConfig.DelayModalAnimation)` before calling** if the action sheet was just presented (see `PrayerTimeTests.PrayerTime_TagScoped_ShowsScopePage`).
 
 ### `NavigateToTab` — 5-Stage Escalation
 
 1. Back up to 3 times, dismissing alerts, trying `TryTapTab` after each.
-2. Dismiss known modal buttons (`Welcome_Btn_Skip`, `Scope_Btn_Cancel`, etc.).
+2. Dismiss known modal buttons (`Welcome_Btn_Skip`, `Banner_Btn_Skip`, `Banner_Btn_GotIt`, `Scope_Btn_Cancel`, `QuickAdd_Btn_Cancel`).
 3. Escape Prayer Time page (tab bar is hidden there — taps "I'm done" / "Finish").
 4. Re-activate the app via `ActivateApp`.
 5. Final XPath text fallback.
@@ -235,7 +240,7 @@ When creating cards/prayers in tests, use timestamped titles to avoid SQLite UNI
 var title = $"Race Regression {DateTime.Now:HHmmss}";
 ```
 
-Pattern from `PrayerCardTests.cs:125`. The alert would otherwise cascade into `DismissAlertIfPresent`'s "Discard" path, leaving the form open.
+Pattern from `PrayerCardTests.Cards_CreateCard_PostSaveLifecycle_DoesNotCrash_AndCardIsVisible`. The alert would otherwise cascade into `DismissAlertIfPresent`'s "Discard" path, leaving the form open.
 
 ---
 
@@ -254,8 +259,9 @@ public void PrayerTime_SessionStarts_ShowsCarousel()
 
 // Android-only guard:
 [SkippableFact]
-public void HardwareBack_DirtyDetail_ShowsDiscardDialog()
+public void HardwareBack_CleanSettingsSubPage_PopsToHubNoDiscardDialog()
 {
+    _setup.Driver.ResetAppUIState(_setup);
     if (TestConfig.IsIOS)
         throw new SkipException("Android-only: hardware back button does not exist on iOS");
     // ...
@@ -271,7 +277,7 @@ Skipped tests do not count as failures. Required for `PrayerTimeTests.cs` and `A
 ```csharp
 [Collection("Appium")]
 [Trait("Platform", "CrossPlatform")]
-[Trait("Section", "3-Cards")]
+[Trait("Section", "3-PrayerCards")]
 public class PrayerCardTests
 {
     private readonly AppiumSetup _setup;
@@ -300,8 +306,8 @@ public class PrayerCardTests
 
 | Trait | Values | Purpose |
 |-------|--------|---------|
-| `Platform` | `"CrossPlatform"`, `"Android"`, `"iOS"` | Filter by platform |
-| `Section` | `"1-Onboarding"`, `"2-Home"`, `"3-Cards"`, etc. | UAT section grouping |
+| `Platform` | `"CrossPlatform"`, `"Android"` | Filter by platform (no test carries `"iOS"`) |
+| `Section` | `"2-Home"`, `"3-PrayerCards"`, `"4-Prayers"`, etc. | UAT section grouping |
 
 ### Running Tests
 
@@ -310,7 +316,7 @@ public class PrayerCardTests
 dotnet test PrayerApp.UITests/ --filter "Platform=CrossPlatform|Platform=Android"
 
 # iOS (macOS)
-dotnet test PrayerApp.UITests/ --filter "Platform=CrossPlatform|Platform=iOS"
+dotnet test PrayerApp.UITests/ --filter "Platform=CrossPlatform"
 ```
 
 For long suites (>5 min / >200 lines of output): hand Ken the one-liner and poll the log file rather than running it yourself. The full suite takes ~20 min on a warm simulator.
@@ -350,7 +356,7 @@ Simulator containers are host-filesystem-accessible. `PushSeedToSimulatorAsync` 
 
 `autoDismissAlerts` auto-taps **Cancel** on every alert. The "Unsaved Changes → Discard/Cancel" dialog uses Cancel as the **reject** action — enabling `autoDismissAlerts` taps Cancel, keeps the form dirty, and traps every `NavigateToTab` back-out loop permanently. Tests dismiss alerts explicitly via `DismissAlertIfPresent()`, which tries "Discard" first.
 
-**Source:** `TestConfig.cs:109` comment — this is intentional and must not be reverted.
+**Source:** the comment in `TestConfig.GetIOSOptions`; this is intentional and must not be reverted.
 
 ### NEVER open Appium Inspector during a UITest run
 
@@ -374,7 +380,7 @@ CollectionView reflows after each section-expand, invalidating all previously re
 
 ### Do NOT skip `Thread.Sleep(DelayModalAnimation)` before `TapIOSActionSheetButton`
 
-On iPad, the action sheet / popover animates in. Tapping before animation completes sends coordinates that land on the wrong button. The `PrayerTime_TagScoped` test (`PrayerTimeTests.cs:280`) demonstrates the required pattern: `Thread.Sleep(TestConfig.DelayModalAnimation)` immediately before `TapIOSActionSheetButton(...)`.
+On iPad, the action sheet / popover animates in. Tapping before animation completes sends coordinates that land on the wrong button. The `PrayerTime_TagScoped` test (`PrayerTimeTests.PrayerTime_TagScoped_ShowsScopePage`) demonstrates the required pattern: `Thread.Sleep(TestConfig.DelayModalAnimation)` immediately before `TapIOSActionSheetButton(...)`.
 
 ### NEVER seed the DB with a Release build — `run-as` requires a debuggable APK
 
@@ -382,7 +388,7 @@ The Android seed copies the prepared DB via `adb shell run-as <pkg> cp /data/loc
 
 ### Do NOT locate a bare `Label` by AutomationId — locate text by visible text
 
-On Android, MAUI maps `AutomationId` to `resource-id` only for interactive controls and containers; a bare `<Label>` gets `content-desc` instead. If that Label also sets `SemanticProperties.Description`, the Description **overwrites** `content-desc`, so the locator's `resource-id OR content-desc='<id>'` (`AppExtensions.cs:43-44`) matches neither and the element is "not found." Locate text labels by their visible text — `IsTextContainsDisplayed(…)` / `FindByTextContains(…)` (Android `@text` is always populated) — or move the AutomationId onto a wrapping `Border`.
+On Android, MAUI maps `AutomationId` to `resource-id` only for interactive controls and containers; a bare `<Label>` gets `content-desc` instead. If that Label also sets `SemanticProperties.Description`, the Description **overwrites** `content-desc`, so the locator's `resource-id OR content-desc='<id>'` (`AppExtensions.AutomationIdLocator`) matches neither and the element is "not found." Locate text labels by their visible text — `IsTextContainsDisplayed(…)` / `FindByTextContains(…)` (Android `@text` is always populated) — or move the AutomationId onto a wrapping `Border`.
 
 ---
 

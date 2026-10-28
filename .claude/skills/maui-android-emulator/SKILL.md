@@ -27,7 +27,7 @@ the last section.
 | `<TFM>` | Android target framework | `net10.0-android` |
 | `<APP_ID>` | application id / package | `com.multithreadedllc.prayercards` |
 | `<MAIN_ACTIVITY>` | launch activity | `crc6425c6d21f3599989c.MainActivity` |
-| `<AVD_NAME>` | emulator AVD | `pixel_9_-_api_36_0` (override via `ANDROID_AVD`) |
+| `<AVD_NAME>` | emulator AVD | `pixel_9_-_api_36_0` (override via `ANDROID_AVD`; the Mac's AVD is `pp_api36`) |
 | `<UITESTS>` | UI test project dir | `PrayerApp.UITests/` |
 
 ## When to use
@@ -105,7 +105,7 @@ via `run-as`, the install **must be Debug**.
 # 2. Deploy a debuggable build
 dotnet build <CSPROJ> -t:Install -f <TFM> -c Debug
 # 3. Run the suite (filter to keep runs short)
-dotnet test <UITESTS> --filter "Section=9-Archive"
+dotnet test <UITESTS> --filter "Section=9-Settings"
 ```
 
 For a **full** suite (often >5 min): don't run it inline and watch — hand the
@@ -129,8 +129,8 @@ test → collect the PNGs it produced into an output folder.
 It expects a **capture test** in the suite: a `[Fact]` that resets UI state,
 navigates to each target screen with the project's UI-test helpers, and calls
 the project's screenshot helper (e.g. a `CaptureDiagnostics(reason)` that writes
-a PNG to a temp dir and returns the path). Mirror an existing one (look for a
-`*_Capture_Screenshots` test). A *warm* build+install is ~15–30s; the capture
+a PNG to a temp dir and returns the path). This repo has no capture test at
+present, so write one for the feature. A *warm* build+install is ~15–30s; the capture
 is one Appium session. This is the proven path — validated end-to-end (16s
 build, three states captured) after a full day of hand-rolling failed.
 
@@ -313,12 +313,13 @@ before improvising.
 - App project: `PrayerApp/PrayerApp.csproj` · TFM `net10.0-android` · package
   `com.multithreadedllc.prayercards` · activity
   `crc6425c6d21f3599989c.MainActivity`
-- AVD default `pixel_9_-_api_36_0` (override `ANDROID_AVD`); Appium at
+- AVD default `pixel_9_-_api_36_0` (override `ANDROID_AVD`; the Mac uses
+  `pp_api36`); Appium at
   `http://127.0.0.1:4723` (override `APPIUM_SERVER_URL`)
 - UI tests in `PrayerApp.UITests/` seed the DB via `run-as` (so **build
   Debug**); they attach to the installed app (`noReset: true`). Sections and
   helpers are documented in the project's `prayer-app-ui-testing` skill and
   `docs/RUNNING_UITESTS.md`.
-- `run-uitests.ps1` builds `-c Release` — convenient for a clean APK but a trap
-  for the `run-as` seed path; for seeded test runs prefer `-t:Install -c Debug`.
+- `run-uitests.ps1` (Windows) builds `-c Debug -t:Install` by default, which the
+  `run-as` seed needs; `-Configuration Release` breaks seeding.
 - Android screenshot runbook with seed data: `docs/plans/UX-22-android-screenshots.md`.
