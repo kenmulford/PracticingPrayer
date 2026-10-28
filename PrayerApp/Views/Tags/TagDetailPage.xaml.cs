@@ -105,7 +105,7 @@ namespace PrayerApp.Views.Tags
                 };
             }
 #elif IOS
-            if (grid.Handler?.PlatformView is UIView nativeView)
+            if (grid.Handler?.PlatformView is UIView nativeView && !_nativeGestures.Any(g => ReferenceEquals(g.NativeView, nativeView)))
             {
                 // Use a WeakReference to the grid so the gesture recognizer
                 // closure doesn't prevent GC of the managed MAUI object.

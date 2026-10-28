@@ -22,14 +22,14 @@ public partial class OnboardingWelcomePopup : Popup
 
         BtnGetStarted.Clicked += async (_, _) =>
         {
-            await this.TryCloseAsync();
+            if (!await this.TryCloseAsync()) return;
             _onboardingService.Advance(); // Welcome → CreateCard
             await Shell.Current.GoToAsync("//CardsPage");
         };
 
         SkipButton.Clicked += async (_, _) =>
         {
-            await this.TryCloseAsync();
+            if (!await this.TryCloseAsync()) return;
             _onboardingService.Skip();
         };
     }

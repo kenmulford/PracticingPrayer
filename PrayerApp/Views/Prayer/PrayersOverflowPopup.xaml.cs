@@ -25,14 +25,14 @@ public partial class PrayersOverflowPopup : Popup
     // prayers in view silently no-ops inside StartPrayerTimeAsync's defensive early return.
     private async void OnPrayTapped(object? sender, TappedEventArgs e)
     {
-        await this.TryCloseAsync();
+        if (!await this.TryCloseAsync()) return;
         if (_vm.StartPrayerTimeCommand.CanExecute(null))
             _vm.StartPrayerTimeCommand.Execute(null);
     }
 
     private async void OnAddTapped(object? sender, TappedEventArgs e)
     {
-        await this.TryCloseAsync();
+        if (!await this.TryCloseAsync()) return;
         _vm.NewCommand.Execute(null);
     }
 
@@ -41,7 +41,7 @@ public partial class PrayersOverflowPopup : Popup
     // should not compete with the popup for the presentation stack.
     private async void OnShowConfidentialTapped(object? sender, TappedEventArgs e)
     {
-        await this.TryCloseAsync();
+        if (!await this.TryCloseAsync()) return;
         _vm.ShowConfidentialCommand.Execute(null);
     }
 }

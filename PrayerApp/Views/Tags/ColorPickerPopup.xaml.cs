@@ -6,6 +6,7 @@ namespace PrayerApp.Views.Tags;
 
 public partial class ColorPickerPopup : Popup
 {
+    private readonly PopupResultGate _resultGate = new();
     private static readonly Regex HexPattern = new(@"^#[0-9A-Fa-f]{6}$");
 
     // HSV state (H: 0-360, S: 0-1, V: 0-1)
@@ -105,15 +106,25 @@ public partial class ColorPickerPopup : Popup
 
     private async void OnCancel(object? sender, EventArgs e)
     {
+        if (!_resultGate.TryBegin()) return;
         SelectedHex = null;
-        await this.TryCloseAsync();
+        if (!await this.TryCloseAsync())
+        {
+            SelectedHex = null;
+            _resultGate.Reset();
+        }
     }
 
     private async void OnAccept(object? sender, EventArgs e)
     {
+        if (!_resultGate.TryBegin()) return;
         var color = ColorFromHsv(_hue, _saturation, _value);
         SelectedHex = ToHexString(color);
-        await this.TryCloseAsync();
+        if (!await this.TryCloseAsync())
+        {
+            SelectedHex = null;
+            _resultGate.Reset();
+        }
     }
 
     // ── Update helpers ──────────────────────────────────────────

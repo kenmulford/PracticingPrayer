@@ -19,6 +19,7 @@ namespace PrayerApp.Views.Confidential;
 /// </summary>
 public partial class PassphrasePromptPopup : Popup
 {
+    private readonly PopupResultGate _resultGate = new();
     private readonly bool _isImporting;
 
     /// <summary>The entered passphrase, or null if the user canceled.</summary>
@@ -90,13 +91,23 @@ public partial class PassphrasePromptPopup : Popup
 
     private async void OnCancel(object? sender, EventArgs e)
     {
+        if (!_resultGate.TryBegin()) return;
         EnteredPassphrase = null;
-        await this.TryCloseAsync();
+        if (!await this.TryCloseAsync())
+        {
+            EnteredPassphrase = null;
+            _resultGate.Reset();
+        }
     }
 
     private async void OnConfirm(object? sender, EventArgs e)
     {
+        if (!_resultGate.TryBegin()) return;
         EnteredPassphrase = PassphraseEntry.Text;
-        await this.TryCloseAsync();
+        if (!await this.TryCloseAsync())
+        {
+            EnteredPassphrase = null;
+            _resultGate.Reset();
+        }
     }
 }
