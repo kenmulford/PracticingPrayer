@@ -72,7 +72,8 @@ export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$JAVA_HOME/bin:
 | Android Appium port | `4723` (default) |
 | iOS Appium port | `4725` (2nd server, for parallel) |
 
-`run-uitests.ps1` is Windows-only and `pwsh` isn't installed here — **drive the steps
+`run-uitests.ps1` hardcodes Windows paths (`$env:LOCALAPPDATA\Android\Sdk`, `emulator.exe`, `adb.exe`), so it fails on
+this Mac even though `pwsh` is installed at `/opt/homebrew/bin/pwsh`. **Drive the steps
 manually / via the bundled `.sh`, never that script.**
 
 ---

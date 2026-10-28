@@ -14,7 +14,7 @@ Files, types, functions, tests, branches.
 
 ## File & folder layout
 Where things go, and the shape of a feature.
-> `PrayerApp/` holds `Views/`, `ViewModels/`, `Services/`, `Models/`, `Behaviors/`, `Converters/`, `Helpers/`, `Messages/`, `Resources/Styles/`, `Platforms/`. Views are grouped by feature (`Views/Prayer`, `Views/PrayerCard`, `Views/PrayerTime`, `Views/Tags`, `Views/Settings`, `Views/Onboarding`, `Views/Backup`). Unit tests in `PrayerApp.Tests/` (source linked via `<Compile Include>`); Appium E2E in `PrayerApp.UITests/`.
+> `PrayerApp/` holds `Views/`, `ViewModels/`, `Services/`, `Models/`, `Behaviors/`, `Converters/`, `Helpers/`, `Messages/`, `Resources/Styles/`, `Platforms/`. Views are grouped by feature (`Views/Prayer`, `Views/PrayerCard`, `Views/PrayerTime`, `Views/Tags`, `Views/Boxes`, `Views/Confidential`, `Views/Settings`, `Views/Onboarding`, `Views/Backup`, plus shared controls in `Views/Shared`). Unit tests in `PrayerApp.Tests/` (source linked via `<Compile Include>`); Appium E2E in `PrayerApp.UITests/`.
 
 ## Test patterns
 Where tests live, how they're named, fixtures/factories, and what a good test looks like.
@@ -28,7 +28,7 @@ The reference implementations to copy when building something similar. Point at 
 | A new page + ViewModel | `PrayerApp/Views/Prayer/PrayerListPage.xaml` (+ `.xaml.cs` + ViewModel) | PageSync OnAppearing load; ISyncableViewModel; compiled bindings (`x:DataType`) |
 | A grouped / card CollectionView | `PrayerApp/Views/PrayerCard/PrayerCardsPage.xaml` | CollectionView grouping; `PrayerCardBorder`; empty / loading states |
 | A service (cache + message bus) | `PrayerApp/Services/` (singleton services) | `_cache` nulled on write; WeakReferenceMessenger publish cascade |
-| A settings / form page | `PrayerApp/Views/Settings.xaml` | label-above-field, full-width forms |
+| A settings / form page | `PrayerApp/Views/Settings/AppSettingsPage.xaml` | label-above-field, full-width forms |
 
 ## Commits & PRs
 Message format and PR expectations.
@@ -36,4 +36,4 @@ Message format and PR expectations.
 
 ## Versioning
 Does the project follow semantic versioning? If so, **where the version lives** (e.g. `pyproject.toml`, `package.json`, `*.csproj`, a `VERSION` file) and the **bump cadence** (per feature / milestone). When semver is on, `milestone-driver` applies the bump per PR and `milestone-feeder` names milestones as versions so the driver can derive the target.
-> SemVer. The display version lives in `Directory.Build.props` (`ApplicationDisplayVersion`) and is bumped manually at release milestones; the build number auto-stamps from `git rev-list --count HEAD` (a shallow clone fails loudly) into the binary (`ApplicationVersion`) and is **not** part of the tag. Release record is canonical in GitHub: tag the **plain marketing version** (e.g. `1.5.1`) on `master`, publish a GitHub Release, and close the milestone. Note: milestone-driver's auto-bump targets `.claude-plugin/plugin.json`, which this app does not use — version bumps here are manual.
+> SemVer. The display version lives in `Directory.Build.props` (`ApplicationDisplayVersion`) and is bumped manually at release milestones; the build number auto-stamps from `git rev-list --count HEAD` (a shallow clone fails loudly) into the binary (`ApplicationVersion`) and is **not** part of the tag. Release record is canonical in GitHub: tag the marketing version with a `v` prefix (e.g. `v1.7.2`; tags before `v1.7.1` are unprefixed) on `master`, publish a GitHub Release, and close the milestone. Note: milestone-driver's auto-bump targets `.claude-plugin/plugin.json`, which this app does not use — version bumps here are manual.

@@ -34,15 +34,14 @@ Theme files: `PrayerApp/Resources/Styles/Colors.xaml` and `Styles.xaml`
 |---|---|---|---|
 | `PageLight` / `PageDark` | `#FAF8F3` | `#0d0e0c` | Page background |
 | `CardLight` / `CardDark` | `#FFFFFF` | `#181a16` | Card bg; also set by `PrayerCardBorder` |
-| `CardExpandedLight` / `CardExpandedDark` | `#FFFAF0` | `#20221D` | "Lifted paper" tint for expanded cards |
+| `CardExpandedLight` / `CardExpandedDark` | `#FFFAF0` | `#2A2820` | "Lifted paper" tint for expanded cards |
 | `Primary` / `PrimaryDark` | `#6B7D5A` | `#A8B896` | Brand color |
 | `WarmGold` / `WarmGoldDark` | `#C4A052` | `#d4b062` | Answered, Prayer Time CTAs |
 | `LoadingScrimLight` / `LoadingScrimDark` | `#66000000` | `#A6000000` | Translucent backdrop behind activity indicators |
 | `TagText` | `White` | `White` | All tag chip foreground — same in both modes |
-| `PrayerCardBorder` | Border style | Sets `BackgroundColor` (CardLight/CardDark), `Stroke` (Primary/CardBorderDark), 8px corners, 1.5px stroke |
+| `PrayerCardBorder` | Border style | Sets `BackgroundColor` (CardLight/CardDark), 8px corners, no stroke in `Normal`; `CardStates` VSM: `Highlighted` = WarmGold/WarmGoldDark 2.5px, `MultiSelected` = Primary/PrimaryDark 2.5px |
 | `DividerLine` | BoxView style | 1px rule; `Opacity` is `{AppThemeBinding Light=0.4, Dark=0.85}` — NOT static |
 | `SaveActivityIndicator` | Named style | Centered ActivityIndicator; Primary (light) / PrimaryBtnDark (dark) |
-| `PickerField` | Border style | Outlined dropdown; Gray300/CardBorderDark stroke, 8px corners |
 | `PickerIndicator` | Label style | Decorative ▼ arrow; `BasedOn="LabelBase"` |
 
 ---
@@ -71,7 +70,7 @@ Theme files: `PrayerApp/Resources/Styles/Colors.xaml` and `Styles.xaml`
 | `CardLight` | `#FFFFFF` | Card background light |
 | `CardDark` | `#181a16` | Card background dark |
 | `CardExpandedLight` | `#FFFAF0` | Expanded card "lifted paper" tint (light) |
-| `CardExpandedDark` | `#20221D` | Expanded card tint (dark) |
+| `CardExpandedDark` | `#2A2820` | Expanded card tint (dark) |
 | `SurfaceDark` | `#1c1e19` | Elevated surface dark |
 | `TabBarDark` | `#0a0b09` | Tab bar dark |
 | `CardBorderDark` | `#2a2e26` | Card border dark |
@@ -105,21 +104,21 @@ Theme files: `PrayerApp/Resources/Styles/Colors.xaml` and `Styles.xaml`
 ### Chip Colors (Light/Dark pairs)
 | Purpose | Light | Dark |
 |---|---|---|
-| `ChipBg` | `#F0F0F0` | `#2A2E26` |
-| `ChipFavoritedBg` | `#F5EDD4` | `#3A3420` |
-| `ChipDangerBg` | `#FDE8E8` | `#3A1B1B` |
+| `ChipBgLight` / `ChipBgDark` | `#F0F0F0` | `#2A2E26` |
+| `ChipFavoritedBgLight` / `ChipFavoritedBgDark` | `#F5EDD4` | `#3A3420` |
+| `ChipDangerBgLight` / `ChipDangerBgDark` | `#FDE8E8` | `#3A1B1B` |
 
 ### Tag Color Palette (8 hues — all use `TagText` = White)
 | Name | Light Hex | Dark Hex |
 |---|---|---|
-| `TagRed` | `#B84040` | `#D46060` |
-| `TagOrange` | `#B35A20` | `#CC7040` |
-| `TagBrown` | `#7A4020` | `#A65C34` |
-| `TagTeal` | `#1E7870` | `#3AA898` |
-| `TagBlue` | `#2E5A9A` | `#507ACC` |
-| `TagPurple` | `#663C8C` | `#9460C0` |
-| `TagPink` | `#8C3860` | `#B85A8C` |
-| `TagGray` | `#505050` | `#848484` |
+| `TagRed` / `TagRedDark` | `#B84040` | `#D46060` |
+| `TagOrange` / `TagOrangeDark` | `#B35A20` | `#CC7040` |
+| `TagBrown` / `TagBrownDark` | `#7A4020` | `#A65C34` |
+| `TagTeal` / `TagTealDark` | `#1E7870` | `#3AA898` |
+| `TagBlue` / `TagBlueDark` | `#2E5A9A` | `#507ACC` |
+| `TagPurple` / `TagPurpleDark` | `#663C8C` | `#9460C0` |
+| `TagPink` / `TagPinkDark` | `#8C3860` | `#B85A8C` |
+| `TagGray` / `TagGrayDark` | `#505050` | `#848484` |
 
 Tag foreground: always `{StaticResource TagText}` (White in both modes).
 
@@ -159,12 +158,12 @@ Tag foreground: always `{StaticResource TagText}` (White in both modes).
 
 ### Typography
 
-`Headline` and `SubHeadline` do **NOT** use `BasedOn="LabelBase"` — they are standalone styles. Only `MutedText`, `SuccessBadge`, `FormLabel`, `CardTitle`, and `PickerIndicator` use `BasedOn="LabelBase"`.
+`Headline` and `SubHeadline` do **NOT** use `BasedOn="LabelBase"` — they are standalone styles. Only `MutedText`, `SuccessBadge`, `FormLabel`, `CardTitle`, `PickerIndicator`, `PickerSectionHeader`, and `CardsSectionHeader` use `BasedOn="LabelBase"`.
 
 | Style | Size | Weight | BasedOn | Notes |
 |---|---|---|---|---|
-| `Headline` | 32px | — | *(none)* | Centered, SemanticLevel1 |
-| `SubHeadline` | 24px | — | *(none)* | Centered |
+| `Headline` | 32px (`FontHero`) | — | *(none)* | Centered, SemanticLevel1 |
+| `SubHeadline` | 24px (`FontDisplay`) | — | *(none)* | Centered |
 | `SectionHeading` | 18px | Bold | *(none)* | SemanticLevel2 |
 | `SectionDescription` | 13px | — | *(none)* | Gray secondary |
 | `MutedText` | — | — | `LabelBase` | Gray500 / TextMutedDark |
@@ -178,6 +177,8 @@ Tag foreground: always `{StaticResource TagText}` (White in both modes).
 |---|---|---|
 | `DangerButton` | Delete/destructive | Red background |
 | `GhostButton` | Toolbar actions | Transparent background |
+| `CloseButton` | Dismiss/close | Transparent, Gray400/TextMutedDark text, 4px padding |
+| `AddPrayerAffordanceButton` | Add-request affordance | Transparent, Primary/PrimaryDark bold 17px text |
 | `SmallActionButton` | In-card actions | 13px, compact padding |
 | `AnsweredButton` | Mark Answered CTA | `BasedOn="SmallActionButton"`, WarmGold bg |
 | `CircleNavButton` | Prayer Time nav | 60×60, 30px radius |
@@ -185,10 +186,9 @@ Tag foreground: always `{StaticResource TagText}` (White in both modes).
 ### Layout Styles
 | Style | TargetType | Usage |
 |---|---|---|
-| `PrayerCardBorder` | `Border` | Card wrapper — sets `BackgroundColor` (CardLight/CardDark), Primary/CardBorderDark stroke, 8px corners, 1.5px |
+| `PrayerCardBorder` | `Border` | Card wrapper — sets `BackgroundColor` (CardLight/CardDark), 8px corners, no stroke in `Normal`; `Highlighted` / `MultiSelected` visual states add a 2.5px stroke |
 | `ActionChip` | `Border` | Rounded action button — 14px corners, 12,8 padding, ChipBg colors |
 | `DividerLine` | `BoxView` | 1px rule — `Opacity` via `AppThemeBinding` (Light=0.4, Dark=0.85) |
-| `PickerField` | `Border` | Outlined dropdown border — Gray300/CardBorderDark stroke, 8px corners |
 | `SaveActivityIndicator` | `ActivityIndicator` | Centered; Primary (light) / PrimaryBtnDark (dark) |
 
 ### Shell & Navigation (implicit styles)
@@ -226,7 +226,7 @@ Tag foreground: always `{StaticResource TagText}` (White in both modes).
 
 ## Value Converters
 
-All six are registered in `App.xaml` (lines 13–18):
+All seven are registered in `App.xaml` resources:
 
 | Converter class | x:Key | Input → Output |
 |---|---|---|
@@ -236,6 +236,7 @@ All six are registered in `App.xaml` (lines 13–18):
 | `StringToBoolConverter` | `StringToBool` | non-empty string → true |
 | `BoolToChevronConverter` | `BoolToChevron` | true → "▼", false → "›" |
 | `BoolToTriangleConverter` | `BoolToTriangle` | true → "▲", false → "▼" |
+| `EnumToBoolConverter` | `EnumToBool` | enum value == `ConverterParameter` name → true; drives RadioButton groups |
 
 ---
 
@@ -257,6 +258,7 @@ Default: `OpenSansRegular`. Override with `FontFamily="OpenSansSemibold"` where 
 `PrayerApp/Platforms/Android/Resources/values/colors.xml`:
 - `colorPrimary`: `#6B7D5A` · `colorPrimaryDark`: `#3F4A34` · `colorAccent`: `#C4A052`
 - `colorPageLight`: `#FAF8F3` · `colorPageDark`: `#0d0e0c`
+- `colorShellAppBar`: `@color/colorPrimary`; `values-night/colors.xml` overrides it to `#212121`
 
 ---
 
@@ -264,9 +266,9 @@ Default: `OpenSansRegular`. Override with `FontFamily="OpenSansSemibold"` where 
 
 | Mistake | Correct approach |
 |---|---|
-| Assuming `Headline` / `SubHeadline` inherit `LabelBase` | They are standalone styles — `BasedOn` is absent. Only `MutedText`, `SuccessBadge`, `FormLabel`, `CardTitle`, `PickerIndicator` use `LabelBase`. |
+| Assuming `Headline` / `SubHeadline` inherit `LabelBase` | They are standalone styles — `BasedOn` is absent. Only `MutedText`, `SuccessBadge`, `FormLabel`, `CardTitle`, `PickerIndicator`, `PickerSectionHeader`, `CardsSectionHeader` use `LabelBase`. |
 | Using static `Opacity="0.4"` on `DividerLine` | `DividerLine` already sets `Opacity` via `AppThemeBinding` (0.4 light, 0.85 dark). Don't override. |
-| Assuming `AppThemeBinding` is for colors only | It works on any scalar: `Opacity`, font sizes, strings. See `DividerLine` `Styles.xaml:599`. |
+| Assuming `AppThemeBinding` is for colors only | It works on any scalar: `Opacity`, font sizes, strings. See the `DividerLine` style in `Styles.xaml`. |
 | `AppThemeBinding` inside a keyed Style inside a `BindableLayout` DataTemplate | Doesn't reliably propagate to all children. Use inline color bindings for `BoxView`/dividers inside `BindableLayout` DataTemplates — the one exception to "no inline colors." |
 | Hardcoding hex in XAML or C# | Always use `StaticResource` tokens from Colors.xaml. |
 | Referencing a style key before verifying it exists | Always confirm the key is in Styles.xaml or Colors.xaml before using `StaticResource`. |

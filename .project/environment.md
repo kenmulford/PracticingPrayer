@@ -15,7 +15,7 @@ Which environments exist (production, staging, test, local) and how they differ.
 
 ## Data stores
 Databases and other persistent stores: the engine(s), and the **topology** — separate prod / staging / test databases, or a shared one. **Test-data isolation:** how tests get a clean, isolated database (a dedicated test DB, a per-worker DB suffix, transactional rollback, truncate-on-start). This is the single biggest drift source if left unstated.
-> One local SQLite database (`prayer_app.db`) on-device; no remote or shared DB. Tables: PrayerCard, PrayerRequest (the `Prayer` model maps `[Table("PrayerRequest")]`), PrayerTag, PrayerCardTag, PrayerInteraction; migrations in `DBService.UpdateSchema()`. Test-data isolation: NSubstitute mocks `IDBService`, a static `SetDBService()` runs in each test constructor, and parallelization is disabled (`[assembly: CollectionBehavior(DisableTestParallelization = true)]`) because the model static `_dbService` is shared state.
+> One local SQLite database (`prayer_app.db`) on-device; no remote or shared DB. Tables: PrayerCard, PrayerRequest (the `Prayer` model maps `[Table("PrayerRequest")]`), PrayerTag, PrayerCardTag, PrayerInteraction, CardBox, UserColor; migrations in `DBService.UpdateSchema()`. Test-data isolation: NSubstitute mocks `IDBService`, a static `SetDBService()` runs in each test constructor, and parallelization is disabled (`[assembly: CollectionBehavior(DisableTestParallelization = true)]`) because the model static `_dbService` is shared state.
 
 ## Caching
 Whether caching exists and, if so, the layer and technology (in-memory, Redis, CDN), what is cached, and the invalidation policy. **"None" is a valid, drift-preventing answer** — record it explicitly.
@@ -23,7 +23,7 @@ Whether caching exists and, if so, the layer and technology (in-memory, Redis, C
 
 ## Async & messaging
 Background jobs, queues, streams, schedulers — or "none."
-> In-process only: a WeakReferenceMessenger (Community Toolkit) message bus for reactive cross-ViewModel sync (e.g. `PrayerChangedMessage`, `BulkChangedMessage`); `IDispatcherTimer` for UI-thread timers (never `System.Timers.Timer`); local reminders via Plugin.LocalNotification. No queues, streams, or server jobs.
+> In-process only: a WeakReferenceMessenger (Community Toolkit) message bus for reactive cross-ViewModel sync (the records in `Messages/EntityChangedMessage.cs`, e.g. `PrayerChangedMessage`, `BulkChangedMessage`, `SessionRelockedMessage`); `IDispatcherTimer` for UI-thread timers (never `System.Timers.Timer`); local reminders via Plugin.LocalNotification behind `ILocalNotificationCenter` (`LocalNotificationCenterWrapper`). No queues, streams, or server jobs.
 
 ## External services & integrations
 Third-party services the app depends on: auth / identity, payments, email / SMS, object storage, analytics, other APIs.

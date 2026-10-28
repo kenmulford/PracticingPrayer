@@ -35,11 +35,13 @@ PrayerApp uses .NET MAUI Shell with 5 tabs, push navigation for detail pages, an
 | `Routes.BackupPage` | `"BackupPage"` | Push |
 | `Routes.AboutPage` | `"AboutPage"` | Push |
 | `Routes.HelpPage` | `"HelpPage"` | Push |
+| `Routes.ConfirmImportPage` | `"ConfirmImportPage"` | Push (also pushed modally via DI) |
 | `Routes.ScopeAll` | `"all"` | Query param value |
 | `Routes.ScopeTags` | `"tags"` | Query param value |
 | `Routes.ScopeBox` | `"box"` | Query param value |
+| `Routes.ScopeSelection` | `"selection"` | Query param value |
 
-**Modals (no route constant — resolved via DI):** `QuickAddPage`, `TagPickerPage`, `PrayerTimeScopePage`, `PrayerTimeBoxScopePage`, `RestoreProgressPage`
+**Modals (no route constant):** `ConfirmImportPage` (Quick Add, via `PushModalWithNavigationBarAsync`), `PrayerTimeCardSelectPage`, `PrayerTimeScopePage`, `PrayerTimeBoxScopePage` (resolved via DI); `TagPickerPage` and `RestoreProgressPage` (constructed with `new`)
 
 ---
 
@@ -84,6 +86,7 @@ Routing.RegisterRoute(nameof(AppSettingsPage),   typeof(AppSettingsPage));
 Routing.RegisterRoute(nameof(BackupPage),        typeof(BackupPage));
 Routing.RegisterRoute(nameof(AboutPage),         typeof(AboutPage));
 Routing.RegisterRoute(nameof(HelpPage),          typeof(HelpPage));
+Routing.RegisterRoute(nameof(ConfirmImportPage), typeof(ConfirmImportPage));
 ```
 
 ---
@@ -121,7 +124,7 @@ await _navigationService.GoToAsync($"..?prayerSaved={id}&parentCardId={cardId}&o
 ```csharp
 // Push — from code-behind, resolved via DI
 await Shell.Current.Navigation.PushModalAsync(
-    _services.GetRequiredService<QuickAddPage>());
+    _services.GetRequiredService<PrayerTimeScopePage>());
 
 // Pop — from ViewModel via INavigationService
 await _navigationService.PopModalAsync();
@@ -173,7 +176,7 @@ void IQueryAttributable.ApplyQueryAttributes(IDictionary<string, object> query)
 }
 ```
 
-**Common parameter names:** `id`, `new`, `parentCardId`, `saved`, `deleted`, `prayerSaved`, `oldCardId`, `scope`
+**Common parameter names:** `id`, `new`, `parentCardId`, `saved`, `deleted`, `prayerSaved`, `prayerDeleted`, `oldCardId`, `importedToExisting`, `scope`, `tagIds`, `boxId`. The return-path keys are constants in `Routes.QueryKeys`.
 
 ---
 
@@ -224,14 +227,14 @@ protected override async void OnAppearing()
 }
 ```
 
-For live cross-tab refresh without waiting for `OnAppearing`, ViewModel constructors subscribe to `WeakReferenceMessenger` broadcasts from the service layer (wired in `MauiProgram.cs`):
+For live cross-tab refresh without waiting for `OnAppearing`, ViewModel constructors subscribe through the injected `IMessenger` (registered in `MauiProgram.cs` as `WeakReferenceMessenger.Default`) to broadcasts from the service layer:
 
 ```csharp
-WeakReferenceMessenger.Default.Register<PrayerCardChangedMessage>(this, (_, msg) =>
-    SyncAsync().SafeFireAndForget());
+_messenger.Register<PrayerListViewModel, PrayerCardChangedMessage>(this, (vm, _) =>
+    vm.SyncAsync().SafeFireAndForget());
 ```
 
-Message types (all in `Messages/EntityChangedMessage.cs`): `PrayerCardChangedMessage`, `PrayerChangedMessage`, `TagChangedMessage`, `CardBoxChangedMessage`, `BulkChangedMessage` (used after bulk ops like restore or import — triggers full re-sync, not granular).
+Message types (all in `Messages/EntityChangedMessage.cs`): `PrayerCardChangedMessage`, `PrayerChangedMessage`, `TagChangedMessage`, `CardBoxChangedMessage`, `BulkChangedMessage` (used after bulk ops like restore or import — triggers full re-sync, not granular), `SessionRelockedMessage` (confidential session relocked).
 
 ---
 
@@ -259,12 +262,18 @@ public interface IDeepLinkService
 public interface INavigationService
 {
     Task GoToAsync(string route);
+    Task PushModalAsync(Page page);
     Task PopModalAsync();
+    Task PushModalOnUiThreadAsync(Page page);         // off-UI-thread callers (deep links); awaits Shell ready
+    Task PushModalWithNavigationBarAsync(Page page);  // wraps in NavigationPage so ToolbarItems render
     Task<bool> DisplayConfirmAsync(string title, string message, string accept, string cancel);
+    Task DisplayAlertAsync(string title, string message, string ok);
+    Task<string?> DisplayActionSheetAsync(string title, string cancel, string? destruction, params string[] buttons);
+    Task WhenShellReadyAsync();
 }
 ```
 
-`ShellNavigationService` wraps `Shell.Current.GoToAsync()`. ViewModels resolve it via service locator (`IPlatformApplication.Current!.Services.GetRequiredService<INavigationService>()`).
+`ShellNavigationService` wraps `Shell.Current`. ViewModels take `INavigationService` in their DI constructor; the parameterless constructor chains to it via `IPlatformApplication.Current!.Services.GetRequiredService<INavigationService>()`.
 
 ---
 

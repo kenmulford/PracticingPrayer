@@ -24,12 +24,12 @@ All services live in `PrayerApp/Services/`, registered as singletons in `MauiPro
 
 | Service | Constructor deps | Return-type quirks |
 |---------|------------------|--------------------|
-| `CardService` | `IMessenger` only (no IDBService) | `SaveCardAsync` → `Task<PrayerCard>` |
-| `PrayerService` | `IDBService`, `IMessenger` | `SavePrayerAsync` → `Task<Prayer>`; in-flight coalescer on `GetAllPrayersAsync` |
+| `CardService` | `IMessenger` only (no IDBService) | `SaveCardAsync(card, publishMessage = true)` → `Task<PrayerCard>` |
+| `PrayerService` | `IDBService`, `IMessenger` | `SavePrayerAsync(prayer, publishMessage = true)` → `Task<Prayer>`; in-flight coalescer on `GetAllPrayersAsync` |
 | `TagService` | `IDBService`, `IMessenger` | `GetRequestIdsByTagIdsAsync` → `Task<IReadOnlyList<int>>` (not `HashSet`) |
-| `BoxService` | `IDBService`, `IPrayerService`, `ICardService`, `IMessenger` | — |
-| `BackupService` | `IDBService`, `ICardService`, `IPrayerService`, `ITagService`, `INotificationService`, `IMessenger` | — |
-| `DeepLinkService` | `ICardService`, `IPrayerService`, `INavigationService`, `IShareService`, `IMessenger` | — |
+| `BoxService` | `IDBService`, `IPrayerService`, `ICardService`, `IMessenger` | `SaveBoxAsync` → `Task<CardBox>` |
+| `BackupService` | `IDBService`, `ICardService`, `IPrayerService`, `ITagService`, `IBoxService`, `INotificationService`, `IPassphrasePrompt`, `IConfidentialAccessService`, `IMessenger` | `ExportAsync`/`ImportAsync` → `Task<bool>` |
+| `DeepLinkService` | `INavigationService`, `IShareService`, `IImportPayloadService`, `Func<Page>` (ConfirmImportPage factory) | Registered via factory lambda |
 | `PrayerInteractionService` | *(no args)* | — |
 | `IShareService` / `IOrientationService` / `IColorPickerService` | Platform-specific impls | See §Platform Services |
 
@@ -118,13 +118,14 @@ Services use `CommunityToolkit.Mvvm.Messaging.IMessenger` (registered as `WeakRe
 | `PrayerCardChangedMessage(CardId, Kind)` | `ICardService` | Save, Delete, or AssignBox |
 | `CardBoxChangedMessage(BoxId, Kind)` | `IBoxService` | Save or Delete of the box itself |
 | `TagChangedMessage(TagId, Kind)` | `ITagService` | Save or Delete of the tag itself |
-| `BulkChangedMessage()` | `IBoxService`, `IBackupService`, `IDeepLinkService`, `ITagService` | Any operation mutating many entities at once |
+| `BulkChangedMessage()` | `IBoxService`, `IBackupService`, `ITagService`, `ConfirmImportViewModel` | Any operation mutating many entities at once |
+| `SessionRelockedMessage()` | `App.xaml.cs` | After `IConfidentialAccessService.RelockSession` on `Window.Deactivated` |
 
 **`BulkChangedMessage` rule:** Send when a single logical operation mutates multiple entity types (backup restore, deep-link import, box cascade delete, tag color reassign). Subscribers respond with a full re-sync. **Never** fire granular per-entity messages alongside `BulkChangedMessage` — that causes N+1 resyncs.
 
 ### `publishMessage: false` cascade pattern
 
-`DeletePrayerAsync` and `DeleteCardAsync` accept an optional `bool publishMessage = true`. Set it to `false` when calling from a cascade (e.g. `BoxService.DeleteBoxAsync`) so individual per-entity messages don't fan out alongside the single `BulkChangedMessage` that the cascade already sends:
+`SavePrayerAsync`, `DeletePrayerAsync`, `SaveCardAsync`, and `DeleteCardAsync` accept an optional `bool publishMessage = true`. Set it to `false` when calling from a cascade (e.g. `BoxService.DeleteBoxAsync`) so individual per-entity messages don't fan out alongside the single `BulkChangedMessage` that the cascade already sends:
 
 ```csharp
 // BoxService.DeleteBoxAsync — cascade path
@@ -137,7 +138,7 @@ _messenger.Send(new BulkChangedMessage());
 
 ---
 
-## DI Registration (`MauiProgram.cs`, ~lines 148-194)
+## DI Registration (`MauiProgram.CreateMauiApp`)
 
 ```csharp
 // Cross-cutting messenger — published by services, subscribed by ViewModels
@@ -149,6 +150,7 @@ builder.Services.AddSingleton<ITagService, TagService>();
 builder.Services.AddSingleton<IPrayerService, PrayerService>();
 builder.Services.AddSingleton<IPrayerInteractionService, PrayerInteractionService>();
 builder.Services.AddSingleton<IBoxService, BoxService>();
+builder.Services.AddSingleton<IPrayerSelectionService, PrayerSelectionService>();
 builder.Services.AddSingleton<ILocalNotificationCenter, LocalNotificationCenterWrapper>();
 builder.Services.AddSingleton<INotificationService>(sp =>
     new NotificationService(
@@ -162,15 +164,31 @@ builder.Services.AddSingleton<ISettings, SettingsService>();
 builder.Services.AddSingleton<INavigationService, ShellNavigationService>();
 builder.Services.AddSingleton<IAccessibilityService, MauiAccessibilityService>();
 builder.Services.AddSingleton<IShareService, ShareService>();
-builder.Services.AddSingleton<IDeepLinkService, DeepLinkService>();
+builder.Services.AddSingleton<IBiometricAuthenticator, OscoreBiometricAuthenticator>();
+builder.Services.AddSingleton<ISecureStore, MauiSecureStore>();
+builder.Services.AddSingleton<IPinPrompt, MauiPinPrompt>();
+builder.Services.AddSingleton<IConfidentialAccessService, ConfidentialAccessService>();
+builder.Services.AddSingleton<IPassphrasePrompt, MauiPassphrasePrompt>();
+builder.Services.AddSingleton<IDeepLinkService>(sp => new DeepLinkService(
+    sp.GetRequiredService<INavigationService>(),
+    sp.GetRequiredService<IShareService>(),
+    sp.GetRequiredService<IImportPayloadService>(),
+    () => sp.GetRequiredService<PrayerApp.Views.ConfirmImportPage>()));
+builder.Services.AddSingleton(sp => new ShareHandoffService(/* ISettings, IClipboardLinkDetector, INavigationService, IDeepLinkService, IOnboardingService, clipboard reader */));
+builder.Services.AddSingleton<IImportPayloadService, ImportPayloadService>();
+builder.Services.AddSingleton<ITextSelectionParser, TextSelectionParser>();
 
 // Platform-specific — registered conditionally per platform
 #if ANDROID
 builder.Services.AddSingleton<IOrientationService, PrayerApp.Platforms.Android.OrientationService>();
+builder.Services.AddSingleton<IClipboardLinkDetector, PrayerApp.Platforms.Android.ClipboardLinkDetector>();
 builder.Services.AddSingleton<IColorPickerService, PrayerApp.Platforms.Android.ColorPickerService>();
 #elif IOS
 builder.Services.AddSingleton<IOrientationService, PrayerApp.Platforms.iOS.OrientationService>();
+builder.Services.AddSingleton<IClipboardLinkDetector, PrayerApp.Platforms.iOS.ClipboardLinkDetector>();
 builder.Services.AddSingleton<IColorPickerService, PrayerApp.Platforms.iOS.ColorPickerService>();
+builder.Services.AddSingleton<IAppGroupContainerProvider, PrayerApp.Platforms.iOS.NsFileManagerAppGroupContainerProvider>();
+builder.Services.AddSingleton(sp => new AppGroupImportOrchestrator(/* IAppGroupContainerProvider, IImportPayloadService, INavigationService, ConfirmImportPage factory */));
 #endif
 ```
 
@@ -181,15 +199,18 @@ builder.Services.AddSingleton<IColorPickerService, PrayerApp.Platforms.iOS.Color
 ```
 BoxService      ──→ IDBService, IPrayerService, ICardService, IMessenger
 BackupService   ──→ IDBService, ICardService, IPrayerService, ITagService,
-                    INotificationService, IMessenger
-DeepLinkService ──→ ICardService, IPrayerService, INavigationService,
-                    IShareService, IMessenger
+                    IBoxService, INotificationService, IPassphrasePrompt,
+                    IConfidentialAccessService, IMessenger
+DeepLinkService ──→ INavigationService, IShareService, IImportPayloadService,
+                    Func<Page> (ConfirmImportPage factory)
 CardService     ──→ IMessenger only  (no IDBService — reads via PrayerCard model)
 PrayerService   ──→ IDBService, IMessenger
 TagService      ──→ IDBService, IMessenger
 PrayerInteractionService ──→ (no injected deps)
 NotificationService ──→ ILocalNotificationCenter, Settings.AllowNotifications (func)
-All others      ──→ IDBService only (or none)
+OnboardingService ──→ ISettings
+ConfidentialAccessService ──→ IBiometricAuthenticator, ISecureStore, IPinPrompt
+UserColorService ──→ IDBService
 ```
 
 ---
@@ -206,7 +227,8 @@ Task<IReadOnlyList<Prayer>> GetOverduePrayersAsync(int dayThreshold = 30);
 Task<IReadOnlyList<Prayer>> GetAnsweredOnThisDateAsync();   // Same month+day, prior years
 Task<int> GetActivePrayerCountByCardAsync(int cardId);      // Routes through _allCache
 Task<DateTime?> GetLastInteractionDateAsync();
-Task<Prayer> SavePrayerAsync(Prayer prayer);                // Returns saved entity
+Task<int> GetInteractionCountByPrayerAsync(int prayerId);
+Task<Prayer> SavePrayerAsync(Prayer prayer, bool publishMessage = true);  // Returns saved entity
 Task DeletePrayerAsync(Prayer prayer, bool publishMessage = true);
 void InvalidateCache();
 ```
@@ -226,7 +248,7 @@ await prayer.DeleteAsync();
 Task<IReadOnlyList<PrayerCard>> GetCardsAsync();
 Task<PrayerCard> GetOrCreateQuickAddCardAsync();
 Task<PrayerCard> GetOrCreateSharedCardAsync();
-Task<PrayerCard> SaveCardAsync(PrayerCard card);            // Returns saved entity
+Task<PrayerCard> SaveCardAsync(PrayerCard card, bool publishMessage = true);  // Returns saved entity
 Task DeleteCardAsync(PrayerCard card, bool publishMessage = true);
 Task AssignBoxAsync(PrayerCard card, int boxId);            // boxId=0 = Unboxed
 void InvalidateCache();
@@ -241,9 +263,10 @@ void InvalidateCache();
 ```csharp
 Task<IReadOnlyList<CardBox>> GetBoxesAsync();              // Sorted: SortOrder → Name
 Task<CardBox?> GetSystemBoxAsync(string systemKey);
-Task SaveBoxAsync(CardBox box);                            // Guards system boxes from rename
-Task SeedSystemBoxesAsync();
+Task<CardBox> SaveBoxAsync(CardBox box);                   // Guards system boxes from rename
 Task DeleteBoxAsync(int boxId, bool deleteCards);          // Cascade or unassign
+Task SeedSystemBoxesAsync();
+Task<bool> HasConfidentialCardsAsync();
 void InvalidateCache();
 ```
 
@@ -286,7 +309,7 @@ Task LogInteractionAsync(int prayerId);  // Writes PrayerInteraction(Interaction
 
 ```csharp
 Task<IReadOnlyList<UserColor>> GetColorsAsync();           // Ordered by CreatedAt
-Task SaveColorAsync(string hexValue);                      // Uppercase + dedup
+Task<UserColor> SaveColorAsync(string hexValue);           // Uppercase + dedup
 Task DeleteColorAsync(int id);                             // Guards default colors
 Task SeedDefaultsAsync();
 string GetFirstDefaultHex();                               // Returns "#B84040"
@@ -299,23 +322,25 @@ string GetFirstDefaultHex();                               // Returns "#B84040"
 ```csharp
 Task<bool> RequestPermissionAsync();
 Task<bool> AreNotificationsEnabledAsync();
-Task ScheduleAsync(Prayer prayer);
-Task CancelAsync(int notificationId, PrayerFrequency frequency);
 Task ClearAllAsync();
-Task ReconcileNotificationsAsync(IReadOnlyList<Prayer> activePrayers);
+Task ScheduleAsync(Prayer prayer);
+Task CancelAsync(int notificationId, PrayerFrequency frequency = PrayerFrequency.OneTime);
+Task RenewMonthlyNotificationsAsync(IEnumerable<Prayer> activePrayers);
+Task ReconcileNotificationsAsync(IEnumerable<Prayer> activePrayers);
 ```
 
 ### IOnboardingService
 
-- 7-step tutorial sequence persisted to MAUI Preferences
+- Tutorial sequence `OnboardingStep.Welcome` through `PrayerTimeHighlight`, persisted via `ISettings.OnboardingStep` / `OnboardingComplete`
+- Properties: `CurrentStep`, `IsActive`, `IsDeepLinkSession`, `WelcomeShownThisSession`
 - Events: `StepChanged`
-- Methods: `GetCurrentStep()`, `AdvanceStep()`, `CompleteOnboarding()`, `ResetOnboarding()`
+- Methods: `Advance()`, `Skip()`, `Reset()`, `MarkWelcomeShown()`, `MarkDeepLinkSession()`
 
 ### IBackupService
 
 ```csharp
-Task ExportAsync();   // Close DB → ZIP → share via OS share sheet
-Task ImportAsync();   // Import from ZIP → replace DB → BulkChangedMessage
+Task<bool> ExportAsync();   // Close DB → ZIP → share via OS share sheet
+Task<bool> ImportAsync();   // Import from ZIP → replace DB → BulkChangedMessage
 ```
 
 ---
@@ -331,7 +356,7 @@ Task ShareTextAsync(string title, string text);
 Task ShareFileAsync(string title, string filePath, string mimeType);
 ```
 
-Wraps the OS-native share sheet. Used by `BackupService` (file export) and `DeepLinkService` (text share).
+Wraps the OS-native share sheet. Used by `DeepLinkService` (text share and `.prayercard` file share). `BackupService` calls MAUI `Share.RequestAsync` directly.
 
 ### IOrientationService (`PrayerApp/Services/IOrientationService.cs`)
 
@@ -358,7 +383,7 @@ iOS: native `UIColorPickerViewController`. Android: hex-entry popup.
 
 | Service | Guard | Behavior |
 |---------|-------|----------|
-| `CardService` | System cards | Cannot delete cards where `IsSystem == true` |
+| `PrayerCardViewModel` | System cards | `DeleteAsync`, `ArchiveAsync`, `ShareAsync` return early when `IsSystem == true` (`CardService` does not guard) |
 | `BoxService` | System boxes | Cannot rename/delete boxes where `IsSystem == true` |
 | `TagService` | System tags | Cannot delete tags where `IsSystem == true` |
 | `UserColorService` | Default colors | Cannot delete colors where `IsDefault == true` |

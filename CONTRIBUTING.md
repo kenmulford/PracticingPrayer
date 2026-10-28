@@ -30,7 +30,7 @@ This project follows a Gitflow-style model. **`master` and `dev` are protected**
 | `release/*` | `dev` | `master`, then `dev` | Release stabilization — maintainer only |
 | `hotfix/*` | `master` | `master`, then `dev` | Urgent production fixes — maintainer only |
 
-- `dev` is the integration branch; `master` reflects released (app-store) builds and is tagged per release. Release tags are the plain marketing version, e.g. `1.5.1` (set by `ApplicationDisplayVersion` in `Directory.Build.props`). The build number is auto-stamped into the binary from the commit count (`ApplicationVersion`) and is **not** part of the tag.
+- `dev` is the integration branch; `master` reflects released (app-store) builds and is tagged per release. Release tags are the marketing version with a `v` prefix, e.g. `v1.7.2` (the version is set by `ApplicationDisplayVersion` in `Directory.Build.props`). The build number is auto-stamped into the binary from the commit count (`ApplicationVersion`) and is **not** part of the tag.
 - Contributors work on `feature/*` or `fix/*` off `dev`. `release/*` and `hotfix/*` are maintainer-driven, and merge **twice** — into `master` (tagged) and back into `dev` so the fix carries forward.
 - **When to cut a `release/*`:** only when `dev` needs to keep taking new work while a build is frozen for stabilization or App Store review. For a straightforward release with nothing queued behind it, `dev → master` directly is equivalent.
 
