@@ -1,3 +1,4 @@
+using System.Text.Json;
 using PrayerApp.Services.Confidential;
 using Xunit;
 
@@ -10,6 +11,8 @@ namespace PrayerApp.Tests.Services;
 /// </summary>
 public class PinHasherTests
 {
+    private const string FixturePath = "contracts/pin/pin-record.json";
+
     [Fact]
     public void Verify_CorrectPin_ReturnsTrue()
     {
@@ -52,5 +55,31 @@ public class PinHasherTests
     public void Verify_MalformedRecord_ReturnsFalseRatherThanThrowing()
     {
         Assert.False(PinHasher.Verify("123456", "not-a-valid-record"));
+    }
+
+    [Fact]
+    public void Verify_ContractFixtureMauiRecord_ReturnsTrue()
+    {
+        var (pin, record, _) = ReadFixture();
+
+        Assert.True(PinHasher.Verify(pin, record));
+    }
+
+    [Fact]
+    public void Verify_ContractFixtureSwiftRecord_ReturnsTrue()
+    {
+        var (pin, _, swiftRecord) = ReadFixture();
+
+        Assert.True(PinHasher.Verify(pin, swiftRecord));
+    }
+
+    private static (string Pin, string Record, string SwiftRecord) ReadFixture()
+    {
+        using var doc = JsonDocument.Parse(File.ReadAllText(FixturePath));
+        var root = doc.RootElement;
+        return (
+            root.GetProperty("pin").GetString()!,
+            root.GetProperty("record").GetString()!,
+            root.GetProperty("swiftRecord").GetString()!);
     }
 }
