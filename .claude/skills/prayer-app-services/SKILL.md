@@ -339,9 +339,10 @@ Wraps the OS-native share sheet. Used by `BackupService` (file export) and `Deep
 void LockLandscape();
 void LockPortrait();
 void Unlock();
+void ApplyDefault();   // idiom policy: tablets rotate, phones portrait
 ```
 
-Used by Prayer Time to enforce landscape orientation.
+`ApplyDefault()` follows `OrientationPolicy.AllowsRotation(DeviceIdiom)` (`PrayerApp/Services/OrientationPolicy.cs`, unit-tested): `Tablet` unlocks, every other idiom locks portrait. MainPage.OnAppearing and PrayerTimePage.OnDisappearing call it; PrayerTimePage.OnAppearing calls `LockLandscape()`. Never lock portrait for every idiom: Play flags a manifest `screenOrientation`, and Android 16 ignores it on screens 600dp and wider anyway (#261). Android applies the policy in `MainActivity.OnCreate` before `base.OnCreate`; iOS sets it in the `OrientationService` initializer and asks UIKit to re-read allowed orientations on change.
 
 ### IColorPickerService (`PrayerApp/Services/IColorPickerService.cs`)
 

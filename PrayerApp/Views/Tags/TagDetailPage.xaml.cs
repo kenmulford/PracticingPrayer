@@ -1,3 +1,4 @@
+using PrayerApp.Helpers;
 using PrayerApp.ViewModels;
 #if ANDROID
 using Android.Views;
@@ -16,6 +17,9 @@ namespace PrayerApp.Views.Tags
         // When Shell pops this page, iOS deallocates native views while the GC
         // may collect the managed objects — that race causes SIGABRT. (BUG-1)
         private readonly List<(UIView NativeView, UIGestureRecognizer Recognizer)> _nativeGestures = new();
+#elif ANDROID
+        // Loaded re-fires on every re-attach; attach the Touch handler once per native view.
+        private readonly NativeAttachGuard _swatchGestureGuard = new();
 #endif
 
         public TagDetailPage(TagDetailViewModel vm)
@@ -64,7 +68,11 @@ namespace PrayerApp.Views.Tags
             if (grid.Handler is not null)
                 AttachNativeLongPress(grid);
             else
+            {
+                // -= first: a second Loaded before the handler exists must not double-subscribe.
+                grid.HandlerChanged -= OnSwatchHandlerChanged;
                 grid.HandlerChanged += OnSwatchHandlerChanged;
+            }
         }
 
         private void OnSwatchHandlerChanged(object? sender, EventArgs e)
@@ -79,7 +87,8 @@ namespace PrayerApp.Views.Tags
         private void AttachNativeLongPress(Grid grid)
         {
 #if ANDROID
-            if (grid.Handler?.PlatformView is Android.Views.View nativeView)
+            if (grid.Handler?.PlatformView is Android.Views.View nativeView
+                && _swatchGestureGuard.TryMark(nativeView))
             {
                 // Handle BOTH tap and long-press natively on Android.
                 // MAUI's TapGestureRecognizer and the native GestureDetector

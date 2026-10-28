@@ -10,7 +10,7 @@
 
 | Tool | Version | Install |
 |------|---------|---------|
-| .NET SDK | 10.0.4xx + workload set 10.0.401.1 (both pinned in `global.json`) | [dotnet.microsoft.com](https://dotnet.microsoft.com/download) |
+| .NET SDK | 10.0.4xx + workload set 10.0.402 (both pinned in `global.json`) | [dotnet.microsoft.com](https://dotnet.microsoft.com/download) |
 | Node.js | 18+ | [nodejs.org](https://nodejs.org) (needed for Appium) |
 | Appium | 2.x | `npm install -g appium` |
 

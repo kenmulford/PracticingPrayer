@@ -6,7 +6,7 @@
              x:Class="PrayerApp.Views.Boxes.BoxDetailPage"
              x:DataType="viewModels:BoxDetailViewModel"
              Title="Collection"
-             SafeAreaEdges="Container">
+             SafeAreaEdges="{OnPlatform Android='Container, Container, Container, All', Default=Container}">
 
     <ContentPage.ToolbarItems>
         <ToolbarItem Text="Save"

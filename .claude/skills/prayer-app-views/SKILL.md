@@ -47,7 +47,7 @@ Invoke this skill before:
 
 | Page | Layout type | Key patterns |
 |------|-------------|--------------|
-| `PrayerCardsPage` | Grouped CollectionView | PageSync, inline expanded subtree (`IsVisible="{Binding IsExpanded}"`, shape (i) #42), Margin via `IsExpanded` DataTrigger, Android CardGestureListener, single overflow ToolbarItem, GroupFooterTemplate HeightRequest="0", SafeAreaEdges="Container" |
+| `PrayerCardsPage` | Grouped CollectionView | PageSync, inline expanded subtree (`IsVisible="{Binding IsExpanded}"`, shape (i) #42), Margin via `IsExpanded` DataTrigger, Android CardGestureListener, single overflow ToolbarItem, GroupFooterTemplate HeightRequest="0", keyboard-aware SafeAreaEdges (see below) |
 | `TagsPage` | Flat CollectionView + inline action chips | PageSync, inline action Grid (no SwipeView), SafeAreaEdges="Container" |
 | `BoxesPage` | Flat CollectionView + inline action chips | PageSync, SafeAreaEdges="Container" |
 | `PrayerTimePage` | CarouselView | Two-way Position binding |
@@ -104,7 +104,7 @@ Invoke this skill before:
              SafeAreaEdges="Container">
 
     <!-- x:DataType enables compiled bindings — REQUIRED on every page -->
-    <!-- SafeAreaEdges="Container" is used on PrayerCardsPage, TagsPage, BoxesPage -->
+    <!-- SafeAreaEdges="Container" is used on TagsPage, BoxesPage. Pages with an Entry use the Android keyboard-aware value (see SafeAreaEdges section) -->
 
     <ScrollView>
         <VerticalStackLayout Padding="20" Spacing="16">
@@ -228,7 +228,7 @@ per-section empty-state label shown only when a section is expanded and empty.
 </CollectionView>
 ```
 
-**Note:** PrayerCardsPage has no `Title` attribute and uses `SafeAreaEdges="Container"` (not a named Title bar).
+**Note:** PrayerCardsPage has no `Title` attribute and uses `SafeAreaEdges="{OnPlatform Android='Container, Container, Container, All', Default=Container}"` (not a named Title bar).
 
 ### Flat CollectionView with Inline Action Chips (TagsPage, BoxesPage)
 
@@ -391,6 +391,22 @@ typical libraries, and cold-launch is unchanged.
 
 ---
 
+## SafeAreaEdges and the Android keyboard (#357)
+
+MAUI 10 `ContentPage` defaults to `SafeAreaEdges="None"` (edge-to-edge), and Android 15+ enforces edge-to-edge, so every page declares a value on its root.
+
+| Page kind | Value | Why |
+|---|---|---|
+| Page with an `Entry`/`Editor`/`SearchBar` | `{OnPlatform Android='Container, Container, Container, All', Default=Container}` | Bottom `All` pads by the keyboard on Android; iOS keeps `Container` (E2E guards it) |
+| List page without input | `Container` | Clears status and navigation bars |
+| PrayerTimePage | `Container` | Covers the landscape display cutout |
+
+- Keyboard padding works only because `App.xaml` sets `android:Application.WindowSoftInputModeAdjust="Resize"`. MAUI overwrites the manifest's `AdjustResize` with this property (default `Pan`), and under `Pan` its safe-area code skips keyboard padding. Do not remove it.
+- Set the value on the page, not a `ScrollView` (no effect there) or an inner layout.
+- `PrayerApp.Tests/Views/SafeAreaEdgesContractTests.cs` locks each page's value and the App.xaml attribute; add a row when a page gains input.
+
+---
+
 ## Android Native Gesture Detector (BUG-60)
 
 On Android, MAUI `TapGestureRecognizer` and native `GestureDetector` conflict on the
@@ -405,15 +421,21 @@ private void OnCardHeaderLoaded(object? sender, EventArgs e)
     if (grid.Handler is not null)
         AttachNativeCardGestures(grid);
     else
+    {
+        grid.HandlerChanged -= OnCardHeaderHandlerChanged; // -= first: Loaded can re-fire
         grid.HandlerChanged += OnCardHeaderHandlerChanged;
+    }
 #endif
 }
 
 #if ANDROID
+private readonly NativeAttachGuard _cardGestureGuard = new();
+
 private void AttachNativeCardGestures(Grid grid)
 {
     if (grid.Handler?.PlatformView is not Android.Views.View nativeView) return;
     if (BindingContext is not PrayerCardsViewModel vm) return;
+    if (!_cardGestureGuard.TryMark(nativeView)) return; // one Touch handler per native view
     grid.GestureRecognizers.Clear(); // Remove conflicting MAUI recognizer
     var listener = new CardGestureListener(grid, vm);
     var detector = new GestureDetector(nativeView.Context, listener);
@@ -424,6 +446,8 @@ private void AttachNativeCardGestures(Grid grid)
 
 The `CardGestureListener` (`SimpleOnGestureListener` subclass) handles
 `OnSingleTapUp` (tap to expand/toggle selection) and `OnLongPress` (enter multi-select).
+
+`Loaded` re-fires on every re-attach (resume, scroll recycle), so both guards are required: without them each re-attach stacks another `Touch` handler and one tap fires N times (#360: N PIN popups on a Locked card). TagDetailPage's swatch uses the same `NativeAttachGuard` (`PrayerApp/Helpers/NativeAttachGuard.cs`).
 
 ---
 
@@ -605,7 +629,7 @@ protected override void OnAppearing()
 |---------|-----------------|
 | Using old `_loaded` flag + `LoadAsync`/`RefreshAsync` branch | Use `await PageSync.OnAppearingAsync(vm)` — single call replaces both |
 | Assuming TagsPage uses SwipeView | TagsPage uses inline action chip Grids inside a plain CollectionView |
-| Setting `Title` on PrayerCardsPage | PrayerCardsPage has no `Title`; uses `SafeAreaEdges="Container"` instead |
+| Setting `Title` on PrayerCardsPage | PrayerCardsPage has no `Title`; it relies on `SafeAreaEdges` instead |
 | Writing `border.Margin` on every Rebind without equality guard | Check `if (border.Margin != target)` first — every unconditional write cascades into another layout pass on Android |
 | Omitting `Colors.xaml` merge in a CT.Maui Popup | Popup runs in a detached visual tree; `AppThemeBinding` silently falls back to light-mode defaults without explicit merge |
 | Omitting `PopupOptions { Shape = null }` | CT.Maui v14 draws a white `RoundRectangle` frame by default; `Shape = null` removes it so the inner themed `Border` controls the surface |

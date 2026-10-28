@@ -104,7 +104,7 @@ public partial class MainPage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-        _orientationService?.LockPortrait();
+        _orientationService?.ApplyDefault();
         await PageSync.OnAppearingAsync(_homeViewModel);
 
         // Show welcome popup on first visit — skip if user entered via share link

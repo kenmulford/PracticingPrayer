@@ -181,11 +181,13 @@ public class AppiumSetup : IAsyncLifetime
             Driver = androidDriver;
             Driver.Manage().Timeouts().ImplicitWait = TestConfig.DefaultTimeout;
             ApplyAndroidTreeReadSettings(androidDriver);
+            Driver.Orientation = ScreenOrientation.Portrait;
             return;
         }
 
         Driver = new IOSDriver(TestConfig.AppiumServerUri, options, TestConfig.IOSSessionTimeout);
         Driver.Manage().Timeouts().ImplicitWait = TestConfig.DefaultTimeout;
+        Driver.Orientation = ScreenOrientation.Portrait;
     }
 
     /// <summary>

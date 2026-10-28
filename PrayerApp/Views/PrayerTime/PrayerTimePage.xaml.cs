@@ -31,7 +31,7 @@ public partial class PrayerTimePage : ContentPage
     protected override void OnDisappearing()
     {
         base.OnDisappearing();
-        _orientationService.LockPortrait();
+        _orientationService.ApplyDefault();
 
         // Unsubscribe window lifecycle events
         if (Window is not null)

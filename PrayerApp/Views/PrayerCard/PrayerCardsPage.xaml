@@ -9,7 +9,7 @@
              xmlns:ios="clr-namespace:Microsoft.Maui.Controls.PlatformConfiguration.iOSSpecific;assembly=Microsoft.Maui.Controls"
              x:Class="PrayerApp.Views.PrayerCard.PrayerCardsPage"
              x:DataType="viewModels:PrayerCardsViewModel"
-             SafeAreaEdges="Container">
+             SafeAreaEdges="{OnPlatform Android='Container, Container, Container, All', Default=Container}">
     <ContentPage.ToolbarItems>
         <!-- Single overflow button opens CardsOverflowPopup (Add Card, Manage Collections,
              Select Cards). Replaces the prior 3-Primary / iOS-Secondary split: the iOS
