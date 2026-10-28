@@ -155,7 +155,7 @@ public class BoxTests
         // BoxDetailPage focuses the name entry on appear, so Android's first back press only closes the keyboard.
         if (TestConfig.IsAndroid && driver.IsKeyboardShown())
         {
-            driver.HideKeyboard();
+            try { driver.HideKeyboard(); } catch { /* keyboard closed between the check and the call */ }
             Thread.Sleep(TestConfig.DelayAfterDismiss);
         }
 

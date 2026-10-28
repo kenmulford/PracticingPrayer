@@ -43,23 +43,11 @@ public partial class PinPromptPopup : Popup
 
     private async void OnCancel(object? sender, EventArgs e)
     {
-        if (!_resultGate.TryBegin()) return;
-        EnteredPin = null;
-        if (!await this.TryCloseAsync())
-        {
-            EnteredPin = null;
-            _resultGate.Reset();
-        }
+        await _resultGate.CompleteAsync(() => this.TryCloseAsync(), () => EnteredPin = null);
     }
 
     private async void OnConfirm(object? sender, EventArgs e)
     {
-        if (!_resultGate.TryBegin()) return;
-        EnteredPin = PinEntry.Text;
-        if (!await this.TryCloseAsync())
-        {
-            EnteredPin = null;
-            _resultGate.Reset();
-        }
+        await _resultGate.CompleteAsync(() => this.TryCloseAsync(), () => EnteredPin = PinEntry.Text, () => EnteredPin = null);
     }
 }

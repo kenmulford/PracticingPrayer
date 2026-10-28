@@ -8,7 +8,7 @@ using PrayerApp.Services;
 namespace PrayerApp
 {
     // Manifest value applies before MAUI creates the window; at runtime App.xaml Application.WindowSoftInputModeAdjust is the source of truth.
-    [Activity(Theme ="@style/Maui.SplashTheme", MainLauncher = true, LaunchMode = LaunchMode.SingleTop,
+    [Activity(Theme = "@style/Maui.SplashTheme", MainLauncher = true, LaunchMode = LaunchMode.SingleTop,
         WindowSoftInputMode = SoftInput.AdjustResize,
         ConfigurationChanges = ConfigChanges.ScreenSize | ConfigChanges.Orientation | ConfigChanges.UiMode | ConfigChanges.ScreenLayout | ConfigChanges.SmallestScreenSize | ConfigChanges.Density)]
     // Deep link handler: https://practicingprayerapp.com/share/*

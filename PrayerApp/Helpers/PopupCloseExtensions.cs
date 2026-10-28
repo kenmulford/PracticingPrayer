@@ -10,7 +10,7 @@ public static class PopupCloseExtensions
     public static Task<bool> TryCloseAsync(this Popup popup, CancellationToken token = default) =>
         TryCloseAsync(() => popup.CloseAsync(token), popup.GetType().Name);
 
-    public static async Task<bool> TryCloseAsync(Func<Task> close, string source = "Popup")
+    internal static async Task<bool> TryCloseAsync(Func<Task> close, string source = "Popup")
     {
         try
         {

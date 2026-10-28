@@ -106,25 +106,15 @@ public partial class ColorPickerPopup : Popup
 
     private async void OnCancel(object? sender, EventArgs e)
     {
-        if (!_resultGate.TryBegin()) return;
-        SelectedHex = null;
-        if (!await this.TryCloseAsync())
-        {
-            SelectedHex = null;
-            _resultGate.Reset();
-        }
+        await _resultGate.CompleteAsync(() => this.TryCloseAsync(), () => SelectedHex = null);
     }
 
     private async void OnAccept(object? sender, EventArgs e)
     {
-        if (!_resultGate.TryBegin()) return;
-        var color = ColorFromHsv(_hue, _saturation, _value);
-        SelectedHex = ToHexString(color);
-        if (!await this.TryCloseAsync())
-        {
-            SelectedHex = null;
-            _resultGate.Reset();
-        }
+        await _resultGate.CompleteAsync(
+            () => this.TryCloseAsync(),
+            () => SelectedHex = ToHexString(ColorFromHsv(_hue, _saturation, _value)),
+            () => SelectedHex = null);
     }
 
     // ── Update helpers ──────────────────────────────────────────

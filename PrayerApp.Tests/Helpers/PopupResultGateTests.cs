@@ -28,4 +28,28 @@ public class PopupResultGateTests
 
         Assert.True(gate.TryBegin());
     }
+
+    [Fact]
+    public async Task CompleteAsync_CloseSucceeds_KeepsResultAndBlocksSecondCall()
+    {
+        var gate = new PopupResultGate();
+        string? result = null;
+
+        await gate.CompleteAsync(() => Task.FromResult(true), () => result = "first", () => result = null);
+        await gate.CompleteAsync(() => Task.FromResult(true), () => result = "second", () => result = null);
+
+        Assert.Equal("first", result);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_CloseRefused_ClearsResultAndRearmsGate()
+    {
+        var gate = new PopupResultGate();
+        string? result = null;
+
+        await gate.CompleteAsync(() => Task.FromResult(false), () => result = "first", () => result = null);
+
+        Assert.Null(result);
+        Assert.True(gate.TryBegin());
+    }
 }

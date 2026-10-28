@@ -19,11 +19,14 @@ public class KeyboardLiftBehavior : BaseBehavior<Popup>
 #if IOS
     // Observers are tied to Loaded/Unloaded because a popup that closes without
     // detaching its behaviors would otherwise leak them and lift later popups (#363).
-    private static int _liveObservers;
     private Thickness _baselineMargin;
+    private bool _hasBaseline;
     private NSObject? _willShowToken;
     private NSObject? _willChangeFrameToken;
     private NSObject? _willHideToken;
+#if DEBUG
+    private static int _liveObservers;
+#endif
 #endif
 
     public static Thickness Lift(Thickness baseline, double keyboardHeight) =>
@@ -50,7 +53,7 @@ public class KeyboardLiftBehavior : BaseBehavior<Popup>
         bindable.Loaded -= OnLoaded;
         bindable.Unloaded -= OnUnloaded;
         DisposeObservers();
-        bindable.Margin = _baselineMargin;
+        if (_hasBaseline) bindable.Margin = _baselineMargin;
 #endif
         base.OnDetachingFrom(bindable);
     }
@@ -61,6 +64,7 @@ public class KeyboardLiftBehavior : BaseBehavior<Popup>
         if (View is null) return;
         DisposeObservers();
         _baselineMargin = View.Margin;
+        _hasBaseline = true;
         _willShowToken = UIKeyboard.Notifications.ObserveWillShow(OnKeyboardFrame);
         _willChangeFrameToken = UIKeyboard.Notifications.ObserveWillChangeFrame(OnKeyboardFrame);
         _willHideToken = UIKeyboard.Notifications.ObserveWillHide(OnKeyboardWillHide);
@@ -72,7 +76,7 @@ public class KeyboardLiftBehavior : BaseBehavior<Popup>
     private void OnUnloaded(object? sender, EventArgs e)
     {
         DisposeObservers();
-        if (View is null) return;
+        if (View is null || !_hasBaseline) return;
         View.Margin = _baselineMargin;
     }
 

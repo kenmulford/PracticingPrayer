@@ -91,23 +91,11 @@ public partial class PassphrasePromptPopup : Popup
 
     private async void OnCancel(object? sender, EventArgs e)
     {
-        if (!_resultGate.TryBegin()) return;
-        EnteredPassphrase = null;
-        if (!await this.TryCloseAsync())
-        {
-            EnteredPassphrase = null;
-            _resultGate.Reset();
-        }
+        await _resultGate.CompleteAsync(() => this.TryCloseAsync(), () => EnteredPassphrase = null);
     }
 
     private async void OnConfirm(object? sender, EventArgs e)
     {
-        if (!_resultGate.TryBegin()) return;
-        EnteredPassphrase = PassphraseEntry.Text;
-        if (!await this.TryCloseAsync())
-        {
-            EnteredPassphrase = null;
-            _resultGate.Reset();
-        }
+        await _resultGate.CompleteAsync(() => this.TryCloseAsync(), () => EnteredPassphrase = PassphraseEntry.Text, () => EnteredPassphrase = null);
     }
 }
