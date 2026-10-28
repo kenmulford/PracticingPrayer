@@ -1,3 +1,4 @@
+using CommunityToolkit.Maui.Views;
 using Microsoft.Maui.Controls;
 using PrayerApp.Behaviors;
 
@@ -23,10 +24,34 @@ public class KeyboardLiftBehaviorTests
     }
 
     [Fact]
-    public void CanAttachToBorder()
+    public void Overlap_DockedKeyboard_ReturnsOverlap()
     {
-        var border = new Border();
-        var ex = Record.Exception(() => border.Behaviors.Add(new KeyboardLiftBehavior()));
+        Assert.Equal(334, KeyboardLiftBehavior.Overlap(1024, 690, 1024));
+    }
+
+    [Fact]
+    public void Overlap_OffscreenEndFrame_ReturnsZero()
+    {
+        Assert.Equal(0, KeyboardLiftBehavior.Overlap(1024, 1024, 1358));
+    }
+
+    [Fact]
+    public void Overlap_WindowShorterThanScreen_ClampsToWindow()
+    {
+        Assert.Equal(210, KeyboardLiftBehavior.Overlap(900, 690, 1024));
+    }
+
+    [Fact]
+    public void Overlap_FloatingKeyboard_ReturnsKeyboardHeight()
+    {
+        Assert.Equal(200, KeyboardLiftBehavior.Overlap(1024, 400, 600));
+    }
+
+    [Fact]
+    public void CanAttachToPopup()
+    {
+        var popup = new Popup();
+        var ex = Record.Exception(() => popup.Behaviors.Add(new KeyboardLiftBehavior()));
         Assert.Null(ex);
     }
 }

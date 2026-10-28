@@ -5,14 +5,15 @@
                xmlns:behaviors="clr-namespace:PrayerApp.Behaviors"
                x:Class="PrayerApp.Views.Confidential.PinPromptPopup">
 
+    <toolkit:Popup.Behaviors>
+        <behaviors:KeyboardLiftBehavior />
+    </toolkit:Popup.Behaviors>
+
     <Border StrokeShape="RoundRectangle 12"
             BackgroundColor="{AppThemeBinding Light={StaticResource CardLight}, Dark={StaticResource CardDark}}"
             Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource CardBorderDark}}"
             WidthRequest="300"
             Padding="16">
-        <Border.Behaviors>
-            <behaviors:KeyboardLiftBehavior />
-        </Border.Behaviors>
         <VerticalStackLayout Spacing="12">
 
             <Label x:Name="TitleLabel"
