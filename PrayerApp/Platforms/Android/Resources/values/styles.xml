@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Match the window background to PageLight so no white flash appears before
-         MAUI applies its theme. DayNight.NoActionBar matches MAUI's default parent. -->
-    <style name="Maui.SplashTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
+         MAUI applies its theme. The parent is MAUI's own splash parent, and maui_splash
+         makes MAUI swap to Maui.MainTheme.NoActionBar after launch so Material dialogs
+         resolve colorSurface. -->
+    <style name="Maui.SplashTheme" parent="Maui.MainTheme.NoActionBar">
+        <item name="maui_splash">true</item>
         <item name="android:windowBackground">@color/colorPageLight</item>
     </style>
 </resources>

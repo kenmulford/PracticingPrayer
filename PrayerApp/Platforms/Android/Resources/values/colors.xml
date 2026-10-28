@@ -8,4 +8,6 @@
 	<color name="colorAccent">#C4A052</color>
 	<color name="colorPageLight">#FAF8F3</color>
 	<color name="colorPageDark">#0d0e0c</color>
+	<!-- Shell app bar behind the transparent status bar; values-night overrides it. -->
+	<color name="colorShellAppBar">@color/colorPrimary</color>
 </resources>
