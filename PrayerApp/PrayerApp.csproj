@@ -53,6 +53,12 @@
 	  <AndroidSigningKeyPass>$(ANDROID_SIGNING_KEY_PASS)</AndroidSigningKeyPass>
 	</PropertyGroup>
 
+	<!-- Release only: R8 shrinks and optimizes the bundle for the Play DEX score; Debug stays on D8 (XA0119). -->
+	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android' AND '$(Configuration)' == 'Release'">
+	  <AndroidLinkTool>r8</AndroidLinkTool>
+	  <AndroidR8ObfuscationMode>private-members</AndroidR8ObfuscationMode>
+	</PropertyGroup>
+
 	<PropertyGroup Condition="'$(TargetFramework)'=='net10.0-ios'">
 	  <ProvisioningType>manual</ProvisioningType>
 	  <EnableSGenConc>False</EnableSGenConc>

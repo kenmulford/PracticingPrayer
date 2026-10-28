@@ -2,6 +2,20 @@
 
 Release notes for Practicing Prayer, newest first.
 
+## v1.7.2 - Android R8 code shrinking
+
+**Theme:** Android Release builds now shrink and optimize their Java code with R8, raising Google Play's DEX optimization score.
+
+| Issue | PR | What |
+|---|---|---|
+| #343 Android: enable R8 for Release builds | | Release sets `AndroidLinkTool` to `r8` and `AndroidR8ObfuscationMode` to `private-members`, so the bundle ships R8 mapping and build-metadata files. Debug stays on D8 |
+
+### Consumer notes (upgrading from 1.7.1)
+
+- Building any head requires workload set 10.0.402: run `dotnet workload restore` from the repo root.
+- Android only. iOS code is unchanged.
+- **No schema changes** to the app database.
+
 ## v1.7.1 - Android dark-mode dialog crashes
 
 **Theme:** On Android, the collection picker and the default reminder time picker no longer crash in dark mode.
