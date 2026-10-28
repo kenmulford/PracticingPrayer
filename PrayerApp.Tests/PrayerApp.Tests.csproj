@@ -52,6 +52,7 @@
   <ItemGroup>
     <!-- Behaviors -->
     <Compile Include="../PrayerApp/Behaviors/KeyboardAvoidanceBehavior.cs" />
+    <Compile Include="../PrayerApp/Behaviors/KeyboardLiftBehavior.cs" />
     <Compile Include="../PrayerApp/Behaviors/ChipStripHeightBehavior.cs" />
     <Compile Include="../PrayerApp/Behaviors/AccessibilityScaleBehavior.cs" />
 
