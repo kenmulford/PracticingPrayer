@@ -187,11 +187,19 @@ public partial class PrayerCardsPage : ContentPage
         if (grid.Handler is not null)
             AttachNativeCardGestures(grid);
         else
+        {
+            // -= first: a second Loaded before the handler exists must not double-subscribe.
+            grid.HandlerChanged -= OnCardHeaderHandlerChanged;
             grid.HandlerChanged += OnCardHeaderHandlerChanged;
+        }
 #endif
     }
 
 #if ANDROID
+    // Loaded re-fires on every re-attach; a second Touch handler on the same native view
+    // would double-fire taps (stacked PIN popups on a Locked card).
+    private readonly NativeAttachGuard _cardGestureGuard = new();
+
     private void OnCardHeaderHandlerChanged(object? sender, EventArgs e)
     {
         if (sender is Grid grid && grid.Handler is not null)
@@ -205,6 +213,7 @@ public partial class PrayerCardsPage : ContentPage
     {
         if (grid.Handler?.PlatformView is not Android.Views.View nativeView) return;
         if (BindingContext is not PrayerCardsViewModel vm) return;
+        if (!_cardGestureGuard.TryMark(nativeView)) return;
 
         // Remove MAUI's TapGestureRecognizer — it conflicts with native GestureDetector.
         // Both tap and long-press are handled natively via CardGestureListener.

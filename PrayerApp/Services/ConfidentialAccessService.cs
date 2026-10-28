@@ -18,6 +18,7 @@ public class ConfidentialAccessService : IConfidentialAccessService
     private readonly ISecureStore _secureStore;
     private readonly IPinPrompt _pinPrompt;
     private readonly PinAttemptTracker _attempts = new();
+    private Task<bool>? _authInFlight;
 
     public bool IsSessionUnlocked { get; private set; }
 
@@ -31,7 +32,28 @@ public class ConfidentialAccessService : IConfidentialAccessService
         _pinPrompt = pinPrompt;
     }
 
-    public async Task<bool> AuthenticateAsync(string reason)
+    public Task<bool> AuthenticateAsync(string reason)
+    {
+        // Concurrent callers share one prompt; relies on the UI dispatcher being single-threaded.
+        if (_authInFlight is { IsCompleted: false } inFlight)
+            return inFlight;
+
+        return _authInFlight = RunAuthenticationAsync(reason);
+    }
+
+    private async Task<bool> RunAuthenticationAsync(string reason)
+    {
+        try
+        {
+            return await AuthenticateCoreAsync(reason);
+        }
+        finally
+        {
+            _authInFlight = null;
+        }
+    }
+
+    private async Task<bool> AuthenticateCoreAsync(string reason)
     {
         if (await _biometric.AuthenticateAsync(reason))
         {

@@ -916,6 +916,11 @@ public static class AppExtensions
         // below run against the live session, not the just-quit `driver` param (#164).
         driver = setup.Driver;
 
+        // Prayer Time forces landscape and tablets rotate freely (#261); pin portrait so
+        // a prior test's rotation never leaks in. Guarded to skip a rotation round-trip.
+        if (driver.Orientation != ScreenOrientation.Portrait)
+            driver.Orientation = ScreenOrientation.Portrait;
+
         // Cards list scroll position is preserved across tab navigation. A
         // prior test (e.g. Slice 6g auto-reveal-after-save in
         // EmptyCardExpand) can leave the list mid-scrolled, putting the next

@@ -53,6 +53,15 @@
 	  <AndroidSigningKeyPass>$(ANDROID_SIGNING_KEY_PASS)</AndroidSigningKeyPass>
 	</PropertyGroup>
 
+	<!-- Release only: R8 shrinks and optimizes the bundle for the Play DEX score; Debug stays on D8 (XA0119). -->
+	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android' AND '$(Configuration)' == 'Release'">
+	  <AndroidLinkTool>r8</AndroidLinkTool>
+	  <AndroidR8ObfuscationMode>private-members</AndroidR8ObfuscationMode>
+	</PropertyGroup>
+	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android' AND '$(Configuration)' == 'Release'">
+	  <ProguardConfiguration Include="Platforms\Android\proguard.cfg" />
+	</ItemGroup>
+
 	<PropertyGroup Condition="'$(TargetFramework)'=='net10.0-ios'">
 	  <ProvisioningType>manual</ProvisioningType>
 	  <EnableSGenConc>False</EnableSGenConc>
@@ -197,6 +206,21 @@
 		     in MauiProgram.cs. -->
 		<PackageReference Include="sqlite-net-base" Version="1.9.172" />
 		<PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
+	</ItemGroup>
+
+	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+		<!-- Issue #358: overrides MAUI's transitive 1.12.0.5 so Material never calls the deprecated Window.setStatusBarColor/setNavigationBarColor on Android 15+ (Play warning). -->
+		<PackageReference Include="Xamarin.Google.Android.Material" Version="1.14.0.6" />
+		<!-- Ktx/LiveData wrappers pinned to the binding revision matching the AndroidX base the Material bump resolves (clears NU1608). -->
+		<PackageReference Include="Xamarin.AndroidX.Activity.Ktx" Version="1.13.0.1" />
+		<PackageReference Include="Xamarin.AndroidX.Collection.Ktx" Version="1.6.0.1" />
+		<PackageReference Include="Xamarin.AndroidX.Fragment.Ktx" Version="1.8.9.3" />
+		<PackageReference Include="Xamarin.AndroidX.Lifecycle.LiveData" Version="2.11.0.1" />
+		<PackageReference Include="Xamarin.AndroidX.Lifecycle.LiveData.Core.Ktx" Version="2.11.0.1" />
+		<PackageReference Include="Xamarin.AndroidX.Lifecycle.Runtime.Ktx" Version="2.11.0.1" />
+		<PackageReference Include="Xamarin.AndroidX.Lifecycle.Runtime.Ktx.Android" Version="2.11.0.1" />
+		<PackageReference Include="Xamarin.AndroidX.Lifecycle.ViewModel.Ktx" Version="2.11.0.1" />
+		<PackageReference Include="Xamarin.AndroidX.SavedState.SavedState.Ktx" Version="1.5.0.1" />
 	</ItemGroup>
 
 	<!-- Linker preservation rules — prevents iOS AOT "SQLite-net out of date" crash -->

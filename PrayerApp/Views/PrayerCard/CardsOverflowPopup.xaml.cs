@@ -1,4 +1,5 @@
 using CommunityToolkit.Maui.Views;
+using PrayerApp.Helpers;
 using PrayerApp.ViewModels;
 
 namespace PrayerApp.Views.PrayerCard;
@@ -18,19 +19,19 @@ public partial class CardsOverflowPopup : Popup
     // can fail if the modal popup is still owning the presentation stack.
     private async void OnAddCardTapped(object? sender, TappedEventArgs e)
     {
-        await CloseAsync(CancellationToken.None);
+        if (!await this.TryCloseAsync()) return;
         _vm.NewCommand.Execute(null);
     }
 
     private async void OnCollectionsTapped(object? sender, TappedEventArgs e)
     {
-        await CloseAsync(CancellationToken.None);
+        if (!await this.TryCloseAsync()) return;
         _vm.OpenCollectionsCommand.Execute(null);
     }
 
     private async void OnSelectTapped(object? sender, TappedEventArgs e)
     {
-        await CloseAsync(CancellationToken.None);
+        if (!await this.TryCloseAsync()) return;
         _vm.EnterMultiSelectCommand.Execute(null);
     }
 
@@ -39,7 +40,7 @@ public partial class CardsOverflowPopup : Popup
     // should not compete with the popup for the presentation stack.
     private async void OnShowConfidentialTapped(object? sender, TappedEventArgs e)
     {
-        await CloseAsync(CancellationToken.None);
+        if (!await this.TryCloseAsync()) return;
         _vm.ShowConfidentialCommand.Execute(null);
     }
 }

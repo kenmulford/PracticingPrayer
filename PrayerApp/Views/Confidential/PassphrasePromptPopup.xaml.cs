@@ -1,4 +1,5 @@
 using CommunityToolkit.Maui.Views;
+using PrayerApp.Helpers;
 using PrayerApp.Services.Confidential;
 
 namespace PrayerApp.Views.Confidential;
@@ -18,6 +19,7 @@ namespace PrayerApp.Views.Confidential;
 /// </summary>
 public partial class PassphrasePromptPopup : Popup
 {
+    private readonly PopupResultGate _resultGate = new();
     private readonly bool _isImporting;
 
     /// <summary>The entered passphrase, or null if the user canceled.</summary>
@@ -89,13 +91,11 @@ public partial class PassphrasePromptPopup : Popup
 
     private async void OnCancel(object? sender, EventArgs e)
     {
-        EnteredPassphrase = null;
-        await CloseAsync(CancellationToken.None);
+        await _resultGate.CompleteAsync(() => this.TryCloseAsync(), () => EnteredPassphrase = null);
     }
 
     private async void OnConfirm(object? sender, EventArgs e)
     {
-        EnteredPassphrase = PassphraseEntry.Text;
-        await CloseAsync(CancellationToken.None);
+        await _resultGate.CompleteAsync(() => this.TryCloseAsync(), () => EnteredPassphrase = PassphraseEntry.Text, () => EnteredPassphrase = null);
     }
 }

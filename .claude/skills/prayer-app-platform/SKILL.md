@@ -24,15 +24,17 @@ Platform code lives under `PrayerApp/Platforms/Android/` and `PrayerApp/Platform
 
 | File | Purpose |
 |------|---------|
-| `Platforms/Android/MainActivity.cs` | Activity attributes, two `IntentFilter`s (deep link + file import) |
+| `Platforms/Android/MainActivity.cs` | Activity attributes, two `IntentFilter`s (deep link + file import). No `ScreenOrientation` attribute: `OnCreate` applies the idiom orientation policy before `base.OnCreate` (#261) |
 | `Platforms/Android/CustomShellRenderer.cs` | `OnTabReselected` → pop-to-root workaround (dotnet/maui#15301) |
-| `Platforms/Android/OrientationService.cs` | Lock/unlock portrait/landscape via `Platform.CurrentActivity` |
+| `Platforms/Android/OrientationService.cs` | Lock/unlock and `ApplyDefault()` (tablets rotate, phones portrait) via `Platform.CurrentActivity` |
 | `Platforms/Android/ColorPickerService.cs` | `IColorPickerService` — shows `ColorPickerPopup` via CT.Maui |
 | `Platforms/Android/Handlers/TextInputTimePickerHandler.cs` | Forces Material TimePicker to keyboard/text input mode |
+| `Platforms/Android/proguard.cfg` | R8 keep rules for public fields .NET bindings read over JNI. Release builds use R8 (`AndroidLinkTool=r8` in the csproj Release group); Debug stays on D8 because R8 in Debug fails with XA0119 (#343) |
+| `scripts/check-r8-jni-members.cs` | Release-lane gate (fastlane `android release`): fails when a `[Register]`-bound member is missing from the AAB's DEX. Run it after any proguard, binding-package or R8 change |
 | `Platforms/Android/AndroidManifest.xml` | Permissions (notifications, network, boot, alarms, vibrate) |
 | `Platforms/Android/Resources/values/colors.xml` | Material color tokens mapped from MAUI theme |
 | `Platforms/iOS/AppDelegate.cs` | Orientation delegate (`GetSupportedInterfaceOrientations`) |
-| `Platforms/iOS/OrientationService.cs` | `UIWindowSceneGeometryPreferencesIOS` orientation update |
+| `Platforms/iOS/OrientationService.cs` | Idiom-aware `AllowedOrientations` default (iPad all but upside-down, iPhone portrait); `SetNeedsUpdateOfSupportedInterfaceOrientations` then `UIWindowSceneGeometryPreferencesIOS` update |
 | `Platforms/iOS/ColorPickerService.cs` | `IColorPickerService` — wraps `NativeColorPicker` |
 | `Platforms/iOS/Handlers/EnglishLocaleTimePickerHandler.cs` | Forces `UIDatePicker` locale to `en_US` |
 | `Platforms/iOS/Helpers/SwipeBackHelper.cs` | Disable/enable iOS swipe-back gesture on edit pages |

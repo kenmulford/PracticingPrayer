@@ -6,7 +6,8 @@
              xmlns:shared="clr-namespace:PrayerApp.Views.Shared"
              x:Class="PrayerApp.Views.ConfirmImportPage"
              x:DataType="viewModels:ConfirmImportViewModel"
-             Title="Confirm Import">
+             Title="Confirm Import"
+             SafeAreaEdges="{OnPlatform Android='Container, Container, Container, All', Default=None}">
     <ContentPage.ToolbarItems>
         <ToolbarItem Text="Cancel"
                      AutomationId="ConfirmImport_Btn_Cancel"

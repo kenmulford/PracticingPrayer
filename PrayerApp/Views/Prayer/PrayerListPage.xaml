@@ -8,7 +8,7 @@
              x:Class="PrayerApp.Views.Prayer.PrayerListPage"
              x:DataType="viewModels:PrayerListViewModel"
              Title="Prayers"
-             SafeAreaEdges="Container">
+             SafeAreaEdges="{OnPlatform Android='Container, Container, Container, All', Default=Container}">
     <ContentPage.ToolbarItems>
         <!-- Single overflow button opens PrayersOverflowPopup (Pray, Add, Show Confidential).
              Mirrors PrayerCardsPage's "More" overflow (issue #298). -->

@@ -1,3 +1,4 @@
+using Microsoft.Maui.Devices;
 using PrayerApp.Services;
 using UIKit;
 
@@ -6,7 +7,9 @@ namespace PrayerApp.Platforms.iOS;
 public class OrientationService : IOrientationService
 {
     public static UIInterfaceOrientationMask AllowedOrientations { get; private set; }
-        = UIInterfaceOrientationMask.Portrait;
+        = OrientationPolicy.AllowsRotation(DeviceInfo.Current.Idiom)
+            ? UIInterfaceOrientationMask.AllButUpsideDown
+            : UIInterfaceOrientationMask.Portrait;
 
     public void LockLandscape()
     {
@@ -26,13 +29,25 @@ public class OrientationService : IOrientationService
         RequestUpdate(UIInterfaceOrientationMask.AllButUpsideDown);
     }
 
+    public void ApplyDefault()
+    {
+        if (OrientationPolicy.AllowsRotation(DeviceInfo.Current.Idiom))
+            Unlock();
+        else
+            LockPortrait();
+    }
+
     private static void RequestUpdate(UIInterfaceOrientationMask mask)
     {
         var geometryPreferences = new UIWindowSceneGeometryPreferencesIOS(mask);
         foreach (var scene in UIApplication.SharedApplication.ConnectedScenes)
         {
-            if (scene is UIWindowScene windowScene)
-                windowScene.RequestGeometryUpdate(geometryPreferences, _ => { });
+            if (scene is not UIWindowScene windowScene) continue;
+            // UIKit re-reads supportedInterfaceOrientations only after this call (iOS 16+); without it
+            // Unlock() leaves a forced-landscape iPad sideways because its mask still contains landscape.
+            foreach (var window in windowScene.Windows)
+                window.RootViewController?.SetNeedsUpdateOfSupportedInterfaceOrientations();
+            windowScene.RequestGeometryUpdate(geometryPreferences, _ => { });
         }
     }
 }

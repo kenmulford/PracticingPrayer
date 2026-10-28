@@ -4,7 +4,8 @@
              x:Class="PrayerApp.Views.Backup.RestoreProgressPage"
              NavigationPage.HasNavigationBar="False"
              Shell.NavBarIsVisible="False"
-             BackgroundColor="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource OffBlack}}">
+             BackgroundColor="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource OffBlack}}"
+             SafeAreaEdges="{OnPlatform Android=Container, Default=None}">
     <VerticalStackLayout
         VerticalOptions="Center"
         HorizontalOptions="Center"

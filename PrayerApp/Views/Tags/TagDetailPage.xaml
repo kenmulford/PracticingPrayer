@@ -5,7 +5,7 @@
              x:Class="PrayerApp.Views.Tags.TagDetailPage"
              x:DataType="viewModels:TagDetailViewModel"
              Title="Tag"
-             SafeAreaEdges="Container">
+             SafeAreaEdges="{OnPlatform Android='Container, Container, Container, All', Default=Container}">
 
     <ContentPage.ToolbarItems>
         <ToolbarItem Text="Save"

@@ -2,6 +2,29 @@
 
 Release notes for Practicing Prayer, newest first.
 
+## v1.7.2 - Android Play Console fixes and iPad rotation
+
+**Theme:** Android builds now shrink and optimize their code with R8. On Android 15 and later, Material Components no longer reach the deprecated bar-color APIs Play Console flags. Pages keep content clear of the system bars, keyboard, and display cutouts. Tablets request rotation and phones stay portrait.
+
+| Issue | PR | What |
+|---|---|---|
+| #343 Android: enable R8 for Release builds | #366 | Release sets `AndroidLinkTool` to `r8` and `AndroidR8ObfuscationMode` to `private-members`, so the bundle ships R8 mapping and build-metadata files. Debug stays on D8. `Platforms/Android/proguard.cfg` stops R8 from optimizing away public fields .NET bindings read over JNI, and `scripts/check-r8-jni-members.cs` fails the release lane when a bound member is missing from the bundle's DEX |
+| #358 Android: bump Material Components to 1.14 to drop deprecated setStatusBarColor calls | #366 | A direct Android-only reference pins `Xamarin.Google.Android.Material` 1.14.0.6 over MAUI's transitive 1.12.0.5, so `Window.setStatusBarColor` / `setNavigationBarColor` run only below API 35. The Kotlin wrapper packages (`Activity.Ktx` 1.13.0.1, `Collection.Ktx` 1.6.0.1, `Fragment.Ktx` 1.8.9.3, `Lifecycle.*` 2.11.0.1, `SavedState.SavedState.Ktx` 1.5.0.1) are pinned to the binding release of the AndroidX libraries they wrap, so restore has no NU1608 |
+| #357 Android: handle edge-to-edge insets on Android 15+ (nav bar, keyboard, cutouts) | #366 | Eight pages set `SafeAreaEdges` with bottom `All` on Android so content clears the navigation bar and the keyboard: PrayerCardPage, PrayerDetailPage, BoxDetailPage, TagDetailPage, AppSettingsPage, ConfirmImportPage, PrayerListPage, and PrayerCardsPage. ConfirmImportPage and RestoreProgressPage gain Android-only values (`Container` on RestoreProgressPage); their iOS value stays `None`. The other pages keep their iOS value. Display cutouts are covered by PrayerTimePage's existing `Container`. The app sets Android's soft input mode to Resize (MAUI defaults it to Pan, which skips keyboard padding), so the keyboard shrinks these pages instead of covering them |
+| #261 Idiom-aware orientation: tablets rotate, phones stay portrait | #366 | MainActivity no longer declares android:screenOrientation, which clears Play's Android 16 large-screen finding. At launch and when leaving Prayer Time, the policy requests rotation on tablets (Android smallest width 600dp or more, and iPad) and portrait on phones. Prayer Time still opens in landscape, and leaving it asks UIKit to re-read the allowed orientations so an iPad can rotate back. Tablet landscape uses the phone layouts. On iPad, the PIN and passphrase prompts move above the keyboard so their buttons stay reachable in landscape |
+| #360 Android: card tap handler stacks per resume, so a Locked card opens several PIN popups | #366 | The native card and tag-swatch touch handlers attach once per native view (`NativeAttachGuard`), the HandlerChanged subscription is idempotent, concurrent `AuthenticateAsync` callers share one in-flight prompt, and every popup closes through `TryCloseAsync`, which logs the toolkit's `InvalidOperationException` instead of crashing the process |
+| #361 Android: one-time and monthly reminders never post when exact alarms are not granted | #368 | Android reminders schedule with a 1-hour `AllowedDelay`. Without `SCHEDULE_EXACT_ALARM` (denied by default on Android 14+) the alarm fires about 2 minutes late, and the plugin's 1-minute default dropped it |
+| #363 iPad: PIN and passphrase popups clip or over-grow while lifted above the keyboard | #368 | `KeyboardLiftBehavior` attaches to the Popup and sets the toolkit's `Popup.Margin`, so the panel moves. The lift is the keyboard's overlap with the window. Its keyboard observers live from `Loaded` to `Unloaded`, so closed popups no longer lift later ones |
+| #364 Popup close results and gesture guards | #368 | A refused popup close skips its follow-up action and clears the popup's result. `PopupResultGate` ignores a second result tap while the close is in flight. The iOS tag-swatch long-press attaches once per native view |
+| #365 E2E: Box detail back press only closes the keyboard on Android | #368 | `Boxes_ProtectAllCards_RadiosSelectAndPersist` closes the Android keyboard before the back press |
+| #367 E2E: Cards_DecorativeElements_MarkedNotImportant depends on a collection being expanded | #368 | The accessibility check accepts the collection triangle expanded (▼) or collapsed (▷), so it no longer depends on collection state left by earlier tests |
+
+### Consumer notes (upgrading from 1.7.1)
+
+- Building any head requires workload set 10.0.402: run `dotnet workload restore` from the repo root.
+- The orientation policy requests rotation on iPad outside Prayer Time and portrait on iPhone.
+- **No schema changes** to the app database.
+
 ## v1.7.1 - Android dark-mode dialog crashes
 
 **Theme:** On Android, the collection picker and the default reminder time picker no longer crash in dark mode.

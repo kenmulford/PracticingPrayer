@@ -54,9 +54,12 @@ public class AccessibilityTests
         // (no content-desc, not clickable, not focusable as an a11y node)
         // This is a heuristic: if the triangle has no content-desc and isn't
         // marked as accessible, TalkBack will skip it.
-        Assert.Contains("\u25BC", source); // triangle exists in DOM (expected)
-        // Verify it does NOT appear as a content-desc (which would make it announced)
+        // BoolToTriangleConverter emits \u25BC (expanded) or \u25B7 (collapsed); either state may be on screen.
+        Assert.True(source.Contains("\u25BC") || source.Contains("\u25B7"),
+            "Expected a section triangle (\u25BC expanded or \u25B7 collapsed) in the page source");
+        // Neither glyph may be a content-desc, or TalkBack would announce it.
         Assert.DoesNotContain("content-desc=\"\u25BC\"", source);
+        Assert.DoesNotContain("content-desc=\"\u25B7\"", source);
     }
 
     /// <summary>15.9: Settings row meets the 44dp touch-target minimum (PS-06 / TouchTargetMinimum
