@@ -29,7 +29,20 @@ public class SafeAreaEdgesContractTests
         Assert.Equal(expected, LoadPageSafeAreaEdges(relativeXamlPath));
     }
 
-    private static string? LoadPageSafeAreaEdges(string relativeXamlPath)
+    [Fact]
+    public void App_SetsAndroidSoftInputModeToResize()
+    {
+        // MAUI replaces the manifest's AdjustResize with this Application property (default Pan),
+        // and its safe-area code skips keyboard padding under Pan.
+        XNamespace androidSpecific = "clr-namespace:Microsoft.Maui.Controls.PlatformConfiguration.AndroidSpecific;assembly=Microsoft.Maui.Controls";
+        var root = LoadRoot("PrayerApp/App.xaml");
+        Assert.Equal("Resize", root?.Attribute(androidSpecific + "Application.WindowSoftInputModeAdjust")?.Value);
+    }
+
+    private static string? LoadPageSafeAreaEdges(string relativeXamlPath) =>
+        LoadRoot(relativeXamlPath)?.Attribute("SafeAreaEdges")?.Value;
+
+    private static XElement? LoadRoot(string relativeXamlPath)
     {
         // The test assembly runs from bin/<Config>/net10.0/, so a few parents reach the repo root.
         var current = new DirectoryInfo(AppContext.BaseDirectory);
@@ -37,7 +50,7 @@ public class SafeAreaEdgesContractTests
         {
             var candidate = Path.Combine(current.FullName, relativeXamlPath);
             if (File.Exists(candidate))
-                return XDocument.Load(candidate).Root?.Attribute("SafeAreaEdges")?.Value;
+                return XDocument.Load(candidate).Root;
             current = current.Parent;
         }
         throw new FileNotFoundException($"Could not locate {relativeXamlPath} above {AppContext.BaseDirectory}");
