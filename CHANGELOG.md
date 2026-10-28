@@ -2,13 +2,14 @@
 
 Release notes for Practicing Prayer, newest first.
 
-## v1.7.2 - Android R8 code shrinking
+## v1.7.2 - Android Play Console fixes
 
-**Theme:** Android Release builds now shrink and optimize their Java code with R8, raising Google Play's DEX optimization score.
+**Theme:** Android builds now shrink and optimize their code with R8, and on Android 15 and later Material Components no longer reach the deprecated bar-color APIs Play Console flags.
 
 | Issue | PR | What |
 |---|---|---|
 | #343 Android: enable R8 for Release builds | | Release sets `AndroidLinkTool` to `r8` and `AndroidR8ObfuscationMode` to `private-members`, so the bundle ships R8 mapping and build-metadata files. Debug stays on D8 |
+| #358 Android: bump Material Components to 1.14 to drop deprecated setStatusBarColor calls | | A direct Android-only reference pins `Xamarin.Google.Android.Material` 1.14.0.6 over MAUI's transitive 1.12.0.5, so `Window.setStatusBarColor` / `setNavigationBarColor` run only below API 35. The Kotlin wrapper packages (`Activity.Ktx` 1.13.0.1, `Collection.Ktx` 1.6.0.1, `Fragment.Ktx` 1.8.9.3, `Lifecycle.*` 2.11.0.1, `SavedState.SavedState.Ktx` 1.5.0.1) are pinned to the binding release of the AndroidX libraries they wrap, so restore has no NU1608 |
 
 ### Consumer notes (upgrading from 1.7.1)
 
