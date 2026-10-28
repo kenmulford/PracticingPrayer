@@ -22,6 +22,11 @@ platform :android do
     aab = Dir["#{ROOT}/PrayerApp/bin/Release/net10.0-android/publish/*-Signed.aab"].first
     UI.user_error!("no signed AAB produced") unless aab
 
+    # Fails the lane when R8 stripped a member the .NET bindings read over JNI.
+    sh("dotnet", "run", "#{ROOT}/scripts/check-r8-jni-members.cs", "--",
+       "#{ROOT}/PrayerApp/obj/Release/net10.0-android/android-arm64/linked",
+       aab)
+
     upload_to_play_store(
       package_name: PACKAGE,
       aab: aab,
