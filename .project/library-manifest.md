@@ -9,7 +9,7 @@ headings stable — they are citation anchors.
 
 ## Runtime & frameworks
 The platform/runtime and primary frameworks, with versions. (Mirror these into milestone-driver `nonNegotiables` where they're hard constraints.)
-> .NET MAUI 10 (TFMs `net10.0-android`, `net10.0-ios`); built against the iOS 27 SDK / Android API 36; minimum supported iOS 16.0 / Android API 24. Hard constraint (milestone-driver `nonNegotiables`): MAUI .NET 10 + Community Toolkit.
+> .NET MAUI 10 (TFMs `net10.0-android`, `net10.0-ios`); built against the iOS 27 SDK / Android API 36; minimum supported iOS 16.0 / Android API 24. Hard constraint (milestone-driver `nonNegotiables`): MAUI .NET 10 + Community Toolkit for the Android app only; the iOS app is native Swift under `ios/`.
 
 ## Approved libraries (by purpose)
 One approved choice per purpose, so a redundant alternative is easy to spot.
@@ -25,6 +25,7 @@ One approved choice per purpose, so a redundant alternative is easy to spot.
 | HTTP factory | Microsoft.Extensions.Http 10.0.5 | Only for strategic privacy-safe online tools; offline by default |
 | Logging | Microsoft.Extensions.Logging.Debug 10.0.5 | Debug-output logger only |
 | Unit testing | xUnit 2.9.2 (VSTest runner) + NSubstitute 5.3.0 | Parallelization disabled (shared static `_dbService`) |
+| Local database (native iOS, PrayerKit) | GRDB.swift 7.11.1 | Opens the existing SQLite file unchanged from Swift, with records and migrations; MIT license, open source; the approved database library (sqlite-net) is .NET only and cannot be called from Swift; approved in the 2.0.0 plan, epic #441, Persistence decision (GRDB over the existing SQLite file), 2026-10-28. |
 
 ## Adding a dependency (the gate)
 A new dependency is a PAUSE, not an autonomous call. Record what it buys, its license / OSS status, and why nothing approved suffices; a human approves before it's added.

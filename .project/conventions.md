@@ -15,6 +15,7 @@ Files, types, functions, tests, branches.
 ## File & folder layout
 Where things go, and the shape of a feature.
 > `PrayerApp/` holds `Views/`, `ViewModels/`, `Services/`, `Models/`, `Behaviors/`, `Converters/`, `Helpers/`, `Messages/`, `Resources/Styles/`, `Platforms/`. Views are grouped by feature (`Views/Prayer`, `Views/PrayerCard`, `Views/PrayerTime`, `Views/Tags`, `Views/Boxes`, `Views/Confidential`, `Views/Settings`, `Views/Onboarding`, `Views/Backup`, plus shared controls in `Views/Shared`). Unit tests in `PrayerApp.Tests/` (source linked via `<Compile Include>`); Appium E2E in `PrayerApp.UITests/`.
+> Native iOS tree: `ios/PrayerApp/` (app target, SwiftUI views grouped by feature: `Home`, `Prayers`, `Cards`, `Collections`, `Tags`, `PrayerTime`, `Reminders`, `Onboarding`, `Confidential`, `Backup`, `Sharing`, `Settings`), `ios/PrayerKit/` (local SwiftPM package, no SwiftUI; `Sources/PrayerKit/<domain>/`, `Tests/PrayerKitTests/`), `ios/PrayerAppTests/`, `ios/PrayerAppUITests/` (XCUITest), `ios/Configuration/` (`.xcconfig`, Info.plist), `ios/PrayerApp.xcodeproj`; domain folder names match on both sides of the package boundary and an empty domain folder holds a `.gitkeep`, never a stub; `contracts/` at the repo root holds wire-format fixtures shared by the .NET and Swift suites (`contracts/app-group/pending-import.golden.json`).
 
 ## Test patterns
 Where tests live, how they're named, fixtures/factories, and what a good test looks like.

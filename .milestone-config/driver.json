@@ -2,12 +2,12 @@
   "integrationBranch": "ios-2.0-refactor",
   "protectedBranch": "master",
   "parallel": true,
-  "sourceGlobs": ["PrayerApp/**", "PrayerApp.Tests/**", "PrayerApp.UITests/**"],
-  "uiSurfaceGlobs": ["PrayerApp/**/*.xaml"],
-  "unitTestCmd": "dotnet test PrayerApp.Tests/PrayerApp.Tests.csproj",
+  "sourceGlobs": ["PrayerApp/**", "PrayerApp.Tests/**", "PrayerApp.UITests/**", "ios/**"],
+  "uiSurfaceGlobs": ["PrayerApp/**/*.xaml", "ios/PrayerApp/**/*.swift"],
+  "unitTestCmd": "bash scripts/unit-tests.sh",
   "e2eTestCmd": "pwsh ./run-uitests.ps1",
   "implementerAgent": "milestone-driver:implementer",
-  "domainSkills": ["maui-skills:*", "maui-current-apis", "prayer-app-skills:*"],
-  "nonNegotiables": ["MAUI .NET 10 + Community Toolkit"],
+  "domainSkills": ["maui-skills:*", "maui-current-apis", "prayer-app-skills:*", "swiftui-specialist", "swiftui-whats-new-27", "modernize-tests", "audit-xcode-security-settings", "uikit-app-modernization"],
+  "nonNegotiables": ["MAUI .NET 10 + Community Toolkit for the Android app only; the iOS app is native Swift under ios/."],
   "e2eEnv": { "endpoint": "127.0.0.1:4723", "device": "Android emulator (AVD)" }
 }

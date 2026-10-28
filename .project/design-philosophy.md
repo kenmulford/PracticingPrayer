@@ -16,6 +16,7 @@ What kind of system is this, and what does it fundamentally optimize for?
 ## Layering & boundaries
 The layers and the allowed dependency directions — what may depend on what, and what must never.
 > Views (XAML) → ViewModels (CommunityToolkit.Mvvm) → Services (singletons, cached) → Models (Active Record, SQLite) → IDBService/DBService. Strict downward dependency; a layer never reaches around its neighbor. ViewModels take services by constructor injection (registered `AddTransient` in `MauiProgram.cs`) and keep a parameterless constructor that chains to it via `IPlatformApplication.Current!.Services.GetRequiredService<>()`, so tests inject fakes and XAML can still construct them. Models carry persistence via a static `IDBService` set in `MauiProgram.cs`.
+> The native iOS app under `ios/` has one dependency direction, the `PrayerApp` app target to `PrayerKit`; the app target takes no package dependency but `PrayerKit`, and `PrayerKit` never imports SwiftUI, so domain logic runs under `swift test` with no view code.
 
 ## What we optimize for
 Ranked priorities, and the explicit non-goals that follow from them.
