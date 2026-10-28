@@ -240,6 +240,47 @@ public class ConfidentialAccessServiceTests
         Assert.False(sut.IsSessionUnlocked);
     }
 
+    // ── single-flight authentication ────────────────────────────────
+
+    [Fact]
+    public async Task AuthenticateAsync_ConcurrentCalls_PromptOnceAndShareResult()
+    {
+        _biometric.NextResult = false;
+        _secureStore.Seed("confidential_access_pin", PinHasher.Hash("654321"));
+        var gate = new TaskCompletionSource<string?>();
+        _pinPrompt.EnterPinGate = gate;
+        var sut = CreateSut();
+
+        var first = sut.AuthenticateAsync(Reason);
+        var second = sut.AuthenticateAsync(Reason);
+        gate.SetResult("654321");
+
+        Assert.True(await first);
+        Assert.True(await second);
+        Assert.Equal(1, _pinPrompt.EnterPinPromptCount);
+    }
+
+    [Fact]
+    public async Task AuthenticateAsync_AfterFirstCompletes_NewCallPromptsAgain()
+    {
+        _biometric.NextResult = false;
+        _secureStore.Seed("confidential_access_pin", PinHasher.Hash("654321"));
+        var gate = new TaskCompletionSource<string?>();
+        _pinPrompt.EnterPinGate = gate;
+        var sut = CreateSut();
+
+        var first = sut.AuthenticateAsync(Reason);
+        gate.SetResult("654321");
+        await first;
+
+        _pinPrompt.EnterPinGate = new TaskCompletionSource<string?>();
+        var second = sut.AuthenticateAsync(Reason);
+        _pinPrompt.EnterPinGate.SetResult("654321");
+        await second;
+
+        Assert.Equal(2, _pinPrompt.EnterPinPromptCount);
+    }
+
     // ── fakes ────────────────────────────────────────────────────────
 
     private sealed class FakeBiometricAuthenticator : IBiometricAuthenticator
@@ -276,6 +317,13 @@ public class ConfidentialAccessServiceTests
             return Task.FromResult(SetPinToReturn);
         }
 
-        public Task<string?> PromptEnterPinAsync() => Task.FromResult(EnterPinToReturn);
+        public TaskCompletionSource<string?>? EnterPinGate { get; set; }
+        public int EnterPinPromptCount { get; private set; }
+
+        public Task<string?> PromptEnterPinAsync()
+        {
+            EnterPinPromptCount++;
+            return EnterPinGate?.Task ?? Task.FromResult(EnterPinToReturn);
+        }
     }
 }

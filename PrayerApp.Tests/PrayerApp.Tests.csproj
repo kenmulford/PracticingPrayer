@@ -74,6 +74,7 @@
     <Compile Include="../PrayerApp/Helpers/Diagnostics.cs" />
     <Compile Include="../PrayerApp/Helpers/PerfLog.cs" />
     <Compile Include="../PrayerApp/Helpers/SingleFlightGate.cs" />
+    <Compile Include="../PrayerApp/Helpers/NativeAttachGuard.cs" />
     <Compile Include="../PrayerApp/Helpers/TaskExtensions.cs" />
     <Compile Include="../PrayerApp/Helpers/NotificationHelper.cs" />
     <Compile Include="../PrayerApp/Helpers/TagColorPalette.cs" />

@@ -1,5 +1,6 @@
 // PrayerApp/Views/Onboarding/OnboardingWelcomePopup.xaml.cs
 using CommunityToolkit.Maui.Views;
+using PrayerApp.Helpers;
 using PrayerApp.Services;
 
 namespace PrayerApp.Views.Onboarding;
@@ -21,14 +22,14 @@ public partial class OnboardingWelcomePopup : Popup
 
         BtnGetStarted.Clicked += async (_, _) =>
         {
-            await CloseAsync(CancellationToken.None);
+            await this.TryCloseAsync();
             _onboardingService.Advance(); // Welcome → CreateCard
             await Shell.Current.GoToAsync("//CardsPage");
         };
 
         SkipButton.Clicked += async (_, _) =>
         {
-            await CloseAsync(CancellationToken.None);
+            await this.TryCloseAsync();
             _onboardingService.Skip();
         };
     }

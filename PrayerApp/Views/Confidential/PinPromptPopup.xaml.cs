@@ -1,4 +1,5 @@
 using CommunityToolkit.Maui.Views;
+using PrayerApp.Helpers;
 
 namespace PrayerApp.Views.Confidential;
 
@@ -41,12 +42,12 @@ public partial class PinPromptPopup : Popup
     private async void OnCancel(object? sender, EventArgs e)
     {
         EnteredPin = null;
-        await CloseAsync(CancellationToken.None);
+        await this.TryCloseAsync();
     }
 
     private async void OnConfirm(object? sender, EventArgs e)
     {
         EnteredPin = PinEntry.Text;
-        await CloseAsync(CancellationToken.None);
+        await this.TryCloseAsync();
     }
 }

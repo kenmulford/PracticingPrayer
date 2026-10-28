@@ -1,4 +1,5 @@
 using CommunityToolkit.Maui.Views;
+using PrayerApp.Helpers;
 using PrayerApp.ViewModels;
 
 namespace PrayerApp.Views.Prayer;
@@ -24,14 +25,14 @@ public partial class PrayersOverflowPopup : Popup
     // prayers in view silently no-ops inside StartPrayerTimeAsync's defensive early return.
     private async void OnPrayTapped(object? sender, TappedEventArgs e)
     {
-        await CloseAsync(CancellationToken.None);
+        await this.TryCloseAsync();
         if (_vm.StartPrayerTimeCommand.CanExecute(null))
             _vm.StartPrayerTimeCommand.Execute(null);
     }
 
     private async void OnAddTapped(object? sender, TappedEventArgs e)
     {
-        await CloseAsync(CancellationToken.None);
+        await this.TryCloseAsync();
         _vm.NewCommand.Execute(null);
     }
 
@@ -40,7 +41,7 @@ public partial class PrayersOverflowPopup : Popup
     // should not compete with the popup for the presentation stack.
     private async void OnShowConfidentialTapped(object? sender, TappedEventArgs e)
     {
-        await CloseAsync(CancellationToken.None);
+        await this.TryCloseAsync();
         _vm.ShowConfidentialCommand.Execute(null);
     }
 }

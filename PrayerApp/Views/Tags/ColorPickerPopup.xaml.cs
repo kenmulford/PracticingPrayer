@@ -1,4 +1,5 @@
 using CommunityToolkit.Maui.Views;
+using PrayerApp.Helpers;
 using System.Text.RegularExpressions;
 
 namespace PrayerApp.Views.Tags;
@@ -105,14 +106,14 @@ public partial class ColorPickerPopup : Popup
     private async void OnCancel(object? sender, EventArgs e)
     {
         SelectedHex = null;
-        await CloseAsync(CancellationToken.None);
+        await this.TryCloseAsync();
     }
 
     private async void OnAccept(object? sender, EventArgs e)
     {
         var color = ColorFromHsv(_hue, _saturation, _value);
         SelectedHex = ToHexString(color);
-        await CloseAsync(CancellationToken.None);
+        await this.TryCloseAsync();
     }
 
     // ── Update helpers ──────────────────────────────────────────
