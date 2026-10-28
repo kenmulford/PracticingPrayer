@@ -40,7 +40,7 @@ This project follows a Gitflow-style model. **`master` and `dev` are protected**
 2. Branch from `dev` — name it `feature/<short-desc>` or `fix/<short-desc>`.
 3. Make your changes; keep commits focused and reviewable. One concern per branch.
 4. Run the test suite locally — see [Build and run](README.md#build-and-run) and the test layout below.
-5. Open the PR against `dev`. Link the issue with `Closes #<n>` if one exists. The `Unit Tests` check must pass before merge.
+5. Open the PR against `dev`. Link the issue with `Closes #<n>` if one exists. The `Unit Tests` check must pass before merge. The `Swift Tests` check runs `swift test --package-path ios/PrayerKit` on PRs that touch `ios/` or `contracts/`, and it is not a required check.
 
 PRs are squash-merged into `dev`, so your in-branch commit history is for review readability — the final history is one squashed commit per PR.
 

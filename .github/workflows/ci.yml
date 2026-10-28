@@ -14,27 +14,52 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0   # Directory.Build.props stamps ApplicationVersion from `git rev-list --count HEAD`
+
+      - name: Detect changed trees
+        id: changes
+        run: |
+          dotnet=true
+          swift=true
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            files=$(git diff --name-only "origin/$GITHUB_BASE_REF...HEAD")
+            if [ -n "$files" ]; then
+              swift=false
+              dotnet=false
+              if echo "$files" | grep -qE '^(ios|contracts)/'; then swift=true; fi
+              if echo "$files" | grep -qvE '^ios/'; then dotnet=true; fi
+            fi
+          fi
+          echo "dotnet=$dotnet" >> "$GITHUB_OUTPUT"
+          echo "swift=$swift" >> "$GITHUB_OUTPUT"
+          echo "dotnet=$dotnet swift=$swift"
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v6
+        if: steps.changes.outputs.dotnet == 'true'
         with:
           global-json-file: global.json
 
       - name: Install .NET workload set
         run: dotnet workload restore PrayerApp.Tests/PrayerApp.Tests.csproj
+        if: steps.changes.outputs.dotnet == 'true'
 
       - name: Restore dependencies
         run: dotnet restore PrayerApp.Tests/PrayerApp.Tests.csproj
+        if: steps.changes.outputs.dotnet == 'true'
 
       - name: Build test project
         run: dotnet build PrayerApp.Tests/PrayerApp.Tests.csproj --no-restore --configuration Release
+        if: steps.changes.outputs.dotnet == 'true'
 
       - name: Run tests
         run: dotnet test PrayerApp.Tests/PrayerApp.Tests.csproj --no-build --configuration Release --logger "trx;LogFileName=test-results.trx" --collect:"XPlat Code Coverage"
+        if: steps.changes.outputs.dotnet == 'true'
 
       - name: Upload test results
         uses: actions/upload-artifact@v7
-        if: always()
+        if: always() && steps.changes.outputs.dotnet == 'true'
         with:
           name: test-results
           path: PrayerApp.Tests/TestResults/
@@ -60,3 +85,38 @@ jobs:
       # iOS workload leaking into the Android restore) on every push/PR, not just at release.
       - name: Build Android head
         run: dotnet build PrayerApp/PrayerApp.csproj -f net10.0-android -c Release
+
+  swift-test:
+    name: Swift Tests
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0   # the changed-trees filter diffs against the PR base
+
+      - name: Detect changed trees
+        id: changes
+        run: |
+          dotnet=true
+          swift=true
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            files=$(git diff --name-only "origin/$GITHUB_BASE_REF...HEAD")
+            if [ -n "$files" ]; then
+              swift=false
+              dotnet=false
+              if echo "$files" | grep -qE '^(ios|contracts)/'; then swift=true; fi
+              if echo "$files" | grep -qvE '^ios/'; then dotnet=true; fi
+            fi
+          fi
+          echo "dotnet=$dotnet" >> "$GITHUB_OUTPUT"
+          echo "swift=$swift" >> "$GITHUB_OUTPUT"
+          echo "dotnet=$dotnet swift=$swift"
+
+      - name: Select Xcode
+        if: steps.changes.outputs.swift == 'true'
+        run: sudo xcode-select -s /Applications/Xcode_26.6.app
+
+      - name: Run Swift tests
+        if: steps.changes.outputs.swift == 'true'
+        run: swift test --package-path ios/PrayerKit
