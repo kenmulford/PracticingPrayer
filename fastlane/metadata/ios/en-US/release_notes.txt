@@ -1,1 +1,1 @@
-iPad now rotates to landscape. iPhone stays in portrait, and Prayer Time still opens in landscape on both.
+iPad now rotates to landscape. iPhone stays in portrait, and Prayer Time still opens in landscape on both. On iPad, PIN and passphrase prompts stay above the keyboard.
