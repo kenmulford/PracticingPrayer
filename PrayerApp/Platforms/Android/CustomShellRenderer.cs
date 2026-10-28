@@ -1,6 +1,8 @@
 using Android.Content;
+using Google.Android.Material.AppBar;
 using Microsoft.Maui.Controls.Handlers.Compatibility;
 using Microsoft.Maui.Controls.Platform.Compatibility;
+using AToolbar = AndroidX.AppCompat.Widget.Toolbar;
 
 namespace PrayerApp.Platforms.Android;
 
@@ -14,6 +16,9 @@ namespace PrayerApp.Platforms.Android;
 ///
 /// Android-only. iOS Shell uses a different renderer stack (UITabBarController);
 /// the equivalent there is out of scope for this change.
+///
+/// It also paints the Shell AppBarLayout (visible behind the transparent status
+/// bar) from <c>colorShellAppBar</c>.
 /// </summary>
 public class CustomShellRenderer : ShellRenderer
 {
@@ -21,6 +26,22 @@ public class CustomShellRenderer : ShellRenderer
 
     protected override IShellItemRenderer CreateShellItemRenderer(ShellItem shellItem)
         => new PopToRootShellItemRenderer(this);
+
+    protected override IShellToolbarAppearanceTracker CreateToolbarAppearanceTracker()
+        => new AppBarColorToolbarAppearanceTracker(this);
+
+    private sealed class AppBarColorToolbarAppearanceTracker : ShellToolbarAppearanceTracker
+    {
+        public AppBarColorToolbarAppearanceTracker(IShellContext shellContext) : base(shellContext) { }
+
+        protected override void SetColors(AToolbar toolbar, IShellToolbarTracker toolbarTracker, Color foreground, Color background, Color title)
+        {
+            base.SetColors(toolbar, toolbarTracker, foreground, background, title);
+
+            if (toolbar.Parent is AppBarLayout appBar)
+                appBar.SetBackgroundResource(Resource.Color.colorShellAppBar);
+        }
+    }
 
     private sealed class PopToRootShellItemRenderer : ShellItemRenderer
     {
