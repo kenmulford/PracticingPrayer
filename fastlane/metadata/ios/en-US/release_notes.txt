@@ -1,6 +1,1 @@
-Shared prayers now survive an install, and importing skips what you already have.
-
-• Got a shared prayer link before you had the app? Install, open Practicing Prayer, and tap Import to bring it in.
-• Importing into an existing card skips requests already on it. Tap "+ Add" to bring one back.
-• While your protected prayers are locked, the import card picker hides or masks them.
-• Plus bug fixes and reliability improvements.
+No iOS changes in this build. 1.7.1 fixes two Android crashes in dark mode.

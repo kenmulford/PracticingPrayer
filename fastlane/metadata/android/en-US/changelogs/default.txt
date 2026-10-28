@@ -1,1 +1,1 @@
-Got a shared prayer link before you had the app? Install, open Practicing Prayer, and tap Import to bring it in. Importing into an existing card now skips requests already on it, and the card picker masks protected cards while they're locked. Now requires Android 7.0 or later. Plus bug fixes and reliability improvements.
+Fixes a crash when choosing a collection for a card, or setting the default reminder time, while your phone is in dark mode.
