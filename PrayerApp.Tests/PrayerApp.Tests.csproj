@@ -12,11 +12,9 @@
     <ProjectReference Include="..\PrayerApp.Shared\PrayerApp.Shared.csproj" />
   </ItemGroup>
 
-  <!-- Slice 4 M3 contract test fixture. CopyToOutputDirectory ensures the
-       golden JSON is alongside the test DLL at run time so File.ReadAllText
-       can resolve a relative path. -->
+  <!-- Every file under the repo-root contracts/ lands at <output>/contracts/<subfolder>/<file>. -->
   <ItemGroup>
-    <None Update="AppIntent\Fixtures\swift-pending-import.golden.json">
+    <None Include="..\contracts\**" Link="contracts\%(RecursiveDir)%(Filename)%(Extension)">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

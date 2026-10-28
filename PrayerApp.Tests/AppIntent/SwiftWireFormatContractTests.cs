@@ -23,11 +23,11 @@ namespace PrayerApp.Tests.AppIntent;
 ///          --device &lt;UDID&gt;
 ///   3. Replace the "ts" value with "2026-05-03T12:00:00.000Z" so the fixture
 ///      is reproducible.
-///   4. Commit to AppIntent/Fixtures/. Re-run these tests.
+///   4. Commit to contracts/app-group/. Re-run these tests.
 /// </summary>
 public class SwiftWireFormatContractTests
 {
-    private const string FixturePath = "AppIntent/Fixtures/swift-pending-import.golden.json";
+    private const string FixturePath = "contracts/app-group/pending-import.golden.json";
 
     [Fact]
     public void Golden_Fixture_Deserializes_Through_Host_JsonContext()
