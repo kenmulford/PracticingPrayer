@@ -7,7 +7,7 @@
              x:Class="PrayerApp.Views.PrayerCard.PrayerCardPage"
              x:DataType="viewModels:PrayerCardViewModel"
              Title="Prayer Card"
-             SafeAreaEdges="{OnPlatform iOS='Container, Container, Container, All', Default=Container}">
+             SafeAreaEdges="Container, Container, Container, All">
 
     <Grid RowDefinitions="*,Auto">
 

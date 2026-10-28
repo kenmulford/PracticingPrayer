@@ -4,12 +4,13 @@ Release notes for Practicing Prayer, newest first.
 
 ## v1.7.2 - Android Play Console fixes
 
-**Theme:** Android builds now shrink and optimize their code with R8, and on Android 15 and later Material Components no longer reach the deprecated bar-color APIs Play Console flags.
+**Theme:** Android builds now shrink and optimize their code with R8. On Android 15 and later, Material Components no longer reach the deprecated bar-color APIs Play Console flags. Pages keep content clear of the system bars, keyboard, and display cutouts.
 
 | Issue | PR | What |
 |---|---|---|
 | #343 Android: enable R8 for Release builds | | Release sets `AndroidLinkTool` to `r8` and `AndroidR8ObfuscationMode` to `private-members`, so the bundle ships R8 mapping and build-metadata files. Debug stays on D8. `Platforms/Android/proguard.cfg` stops R8 from optimizing away public fields .NET bindings read over JNI, and `scripts/check-r8-jni-members.cs` fails the release lane when a bound member is missing from the bundle's DEX |
 | #358 Android: bump Material Components to 1.14 to drop deprecated setStatusBarColor calls | | A direct Android-only reference pins `Xamarin.Google.Android.Material` 1.14.0.6 over MAUI's transitive 1.12.0.5, so `Window.setStatusBarColor` / `setNavigationBarColor` run only below API 35. The Kotlin wrapper packages (`Activity.Ktx` 1.13.0.1, `Collection.Ktx` 1.6.0.1, `Fragment.Ktx` 1.8.9.3, `Lifecycle.*` 2.11.0.1, `SavedState.SavedState.Ktx` 1.5.0.1) are pinned to the binding release of the AndroidX libraries they wrap, so restore has no NU1608 |
+| #357 Android: handle edge-to-edge insets on Android 15+ (nav bar, keyboard, cutouts) | | Eight pages set `SafeAreaEdges` with bottom `All` on Android so content clears the navigation bar and the keyboard: PrayerCardPage, PrayerDetailPage, BoxDetailPage, TagDetailPage, AppSettingsPage, ConfirmImportPage, PrayerListPage, and PrayerCardsPage. ConfirmImportPage and RestoreProgressPage gain Android-only values (`Container` on RestoreProgressPage); their iOS value stays `None`. The other pages keep their iOS value. Display cutouts are covered by PrayerTimePage's existing `Container` |
 
 ### Consumer notes (upgrading from 1.7.1)
 
