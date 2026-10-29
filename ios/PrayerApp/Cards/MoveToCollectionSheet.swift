@@ -3,7 +3,7 @@ import SwiftUI
 
 struct MoveToCollectionSheet: View {
     let collections: [CardBoxRecord]
-    let currentBoxId: Int64
+    let currentBoxId: Int64?
     let select: (Int64) -> Void
 
     @Environment(\.dismiss) private var dismiss

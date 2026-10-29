@@ -4,6 +4,9 @@
     "%@ · %lld" : {
 
     },
+    "%lld Selected" : {
+
+    },
     "%lld active prayers" : {
       "localizations" : {
         "en" : {
@@ -108,11 +111,61 @@
     "Archive" : {
 
     },
+    "Archive %lld cards? You can find them in your Archived Cards collection." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Archive %lld card? You can find it in your Archived Cards collection."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Archive %lld cards? You can find them in your Archived Cards collection."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Archive Card" : {
 
     },
     "Archive Card?" : {
 
+    },
+    "Archive Cards" : {
+
+    },
+    "Archive Cards?" : {
+
+    },
+    "Archived %lld cards" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Archived %lld card"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Archived %lld cards"
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "Are you sure you want to Archive this card? You can find it in your Archived Cards collection." : {
 
@@ -153,10 +206,10 @@
     "Card" : {
 
     },
-    "Card saved" : {
+    "Card Title" : {
 
     },
-    "Card Title" : {
+    "Card saved" : {
 
     },
     "Cards" : {
@@ -192,10 +245,13 @@
     "Couldn't Update Card" : {
 
     },
-    "Couldn't create the tag." : {
+    "Couldn't Update Cards" : {
 
     },
     "Couldn't Update Prayer" : {
+
+    },
+    "Couldn't create the tag." : {
 
     },
     "Create %@" : {
@@ -213,10 +269,35 @@
     "Delete" : {
 
     },
+    "Delete %lld Cards?" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Delete %lld Card?"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Delete %lld Cards?"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Delete All Cards & Requests" : {
 
     },
     "Delete Card" : {
+
+    },
+    "Delete Cards" : {
 
     },
     "Delete Collection" : {
@@ -231,6 +312,28 @@
     "Delete “%@”?" : {
 
     },
+    "Deleted %lld cards" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Deleted %lld card"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Deleted %lld cards"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Details" : {
 
     },
@@ -241,6 +344,9 @@
 
     },
     "Discard Changes" : {
+
+    },
+    "Done" : {
 
     },
     "Duplicate Collection Name" : {
@@ -336,6 +442,38 @@
     "Move To…" : {
 
     },
+    "Moved %lld cards to %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%#@cards@ to %@"
+          },
+          "substitutions" : {
+            "cards" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "Moved %arg card"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "Moved %arg cards"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Name" : {
 
     },
@@ -378,6 +516,9 @@
     "None" : {
 
     },
+    "None Selected" : {
+
+    },
     "Not Yet" : {
 
     },
@@ -387,10 +528,10 @@
     "Notifications are turned off in Settings." : {
 
     },
-    "Off" : {
+    "OK" : {
 
     },
-    "OK" : {
+    "Off" : {
 
     },
     "Open Settings" : {
@@ -493,13 +634,19 @@
     "Search or Create Tags" : {
 
     },
-    "Select a Prayer" : {
-
-    },
     "Select Card" : {
 
     },
+    "Select Cards" : {
+
+    },
+    "Select a Prayer" : {
+
+    },
     "Select a Prayer Card" : {
+
+    },
+    "Selection cancelled" : {
 
     },
     "Send Diagnostic Info" : {
@@ -523,10 +670,10 @@
     "Tap the Prayer Cards tab, then tap \"Add Card\" in the top right. Give your card a name \u2014 a person, topic, or place \u2014 then tap Save, or Save + to save it and start another card in the same collection." : {
 
     },
-    "The card shows as “Protected” until you unlock with Face ID or your passcode." : {
+    "The card is hidden from every list until you choose Show Confidential." : {
 
     },
-    "The card is hidden from every list until you choose Show Confidential." : {
+    "The card shows as “Protected” until you unlock with Face ID or your passcode." : {
 
     },
     "The star marks a card as a favorite. Swipe a card to the right in the Cards list, or touch and hold the card and choose Favorite. Favorited cards sort to the top of their collection so they're always easy to find." : {
@@ -537,6 +684,28 @@
     },
     "This also deletes its 1 prayer request." : {
 
+    },
+    "This also deletes their %lld active prayer requests." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "This also deletes its %lld active prayer request."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "This also deletes their %lld active prayer requests."
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "This card has no prayer requests." : {
 

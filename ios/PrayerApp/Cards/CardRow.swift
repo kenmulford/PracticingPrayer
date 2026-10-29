@@ -3,6 +3,7 @@ import SwiftUI
 
 struct CardRow: View {
     let item: CardListItem
+    var isSelected = false
 
     private var count: Int { item.activePrayerCount ?? 0 }
 
@@ -28,6 +29,7 @@ struct CardRow: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private var accessibilityText: String {
