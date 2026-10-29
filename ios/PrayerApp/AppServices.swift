@@ -8,6 +8,7 @@ final class AppServices {
 
     private(set) var phase: Phase = .opening
     let preferences: AppPreferences
+    var prayerSession: PrayerSession?
 
     @ObservationIgnored private var openedDatabase: PrayerDatabase?
     @ObservationIgnored private let databasePath: String

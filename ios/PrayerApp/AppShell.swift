@@ -1,3 +1,4 @@
+import PrayerKit
 import SwiftUI
 
 struct AppShell: View {
@@ -25,10 +26,19 @@ struct AppShell: View {
                     .prominentLabel()
                 }
             case .open:
-                tabs
+                tabs.fullScreenCover(item: Bindable(services).prayerSession) { PrayerSessionView(session: $0) }
             }
         }
-        .task { await services.open() }
+        .task {
+            await services.open()
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains(PrayerSession.debugArgument), services.phase == .open {
+                let items = (try? PrayerStore(database: services.database)
+                    .prayers(segment: .active, isSessionUnlocked: false)) ?? []
+                services.prayerSession = PrayerSession(items: Array(items.prefix(3)), database: services.database)
+            }
+            #endif
+        }
     }
 
     private var tabs: some View {

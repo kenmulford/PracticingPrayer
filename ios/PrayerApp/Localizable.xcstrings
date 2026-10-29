@@ -1,6 +1,9 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%@ marked as answered" : {
+
+    },
     "%@ · %lld" : {
 
     },
@@ -50,6 +53,9 @@
           }
         }
       }
+    },
+    "%lld of %lld" : {
+
     },
     "%lld prayers saved" : {
 
@@ -231,6 +237,9 @@
 
     },
     "Clear Filter" : {
+
+    },
+    "Close" : {
 
     },
     "Collection" : {
@@ -516,6 +525,9 @@
     "New reminders start at this time." : {
 
     },
+    "Next" : {
+
+    },
     "No Active Cards" : {
 
     },
@@ -619,6 +631,9 @@
     "Prayer %lld" : {
 
     },
+    "Prayer %lld of %lld. %@" : {
+
+    },
     "Prayer Cards" : {
 
     },
@@ -643,10 +658,16 @@
     "Prayer saved" : {
 
     },
+    "Prayer session complete" : {
+
+    },
     "Prayers" : {
 
     },
     "Prayers not prayed within this many days appear in your overdue list on the home page." : {
+
+    },
+    "Previous" : {
 
     },
     "Privacy Policy" : {
@@ -828,6 +849,9 @@
 
     },
     "Yes. Open the prayer, tap Edit, then use the \"Belongs to Card\" picker to choose a different card. Tap Save when done." : {
+
+    },
+    "You've prayed through all your requests!" : {
 
     },
     "Red" : {
