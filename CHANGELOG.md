@@ -2,6 +2,30 @@
 
 Release notes for Practicing Prayer, newest first.
 
+## 2.0.0 Prayer Time, reminders, and onboarding
+
+**Theme:** Prayer Time sessions, per-prayer reminders, and first-launch onboarding on the native screens. Lands on `ios-2.0-refactor`, not a release.
+
+### ✨ Features / enhancements
+
+| Issue | PR | What |
+|---|---|---|
+| #416 Prayer Time session pager | #445 | Page through prayers, marking each prayed or answered |
+| #417 Reminder section in the Prayer Editor and Reminder row in Prayer Detail | #445 | Set a reminder on any prayer |
+| #418 Auto-advance and the landscape setting in Prayer Time | #445 | A timed auto-advance with pause, and iPhone landscape during a session |
+| #419 Launch Prayer Time from Home with the scope sheets | #445 | All Requests, Choose Cards, By Tags and By Collection |
+| #420 Offer Prayer Time over Recently Notified when a notification is tapped | #445 | Tapping a reminder offers a session over recently notified prayers |
+| #421 Start Prayer Time from Card Detail, the Prayers toolbar, and context menus | #445 | Pray from any card, list or row |
+| #422 Onboarding with the welcome sheet and ordered tips | #445 | A Welcome sheet, three guided tips, and Take the Tour Again |
+
+### 🐛 Fixes found at milestone end
+
+- Deleting a prayer, card or collection left its reminder scheduled, and Tag Prayers answer toggles did not update reminders.
+
+### ⚖️ Post-run audit trail
+
+- The UI suite was not run at milestone end; it runs once at the end of the 2.0.0 epic.
+
 ## 2.0.0 Core UI
 
 **Theme:** the native SwiftUI screens on top of `PrayerKit`: the five-tab shell, Home, cards, prayers, tags, collections and settings. Lands on `ios-2.0-refactor`, not a release.
