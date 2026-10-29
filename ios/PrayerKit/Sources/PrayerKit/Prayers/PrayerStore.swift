@@ -80,12 +80,15 @@ public struct PrayerStore: Sendable {
 
     public func delete(id: Int64) throws {
         try database.dbQueue.write { db in
-            try db.execute(sql: "DELETE FROM PrayerInteraction WHERE PrayerId = ?", arguments: [id])
-            try db.execute(sql: "DELETE FROM PrayerCardTag WHERE PrayerRequestId = ?", arguments: [id])
-            guard try PrayerRequestRecord.deleteOne(db, key: id) else {
-                throw PrayerStoreError.prayerNotFound(id)
-            }
+            guard try Self.deleteRows(prayerId: id, db) else { throw PrayerStoreError.prayerNotFound(id) }
         }
+    }
+
+    // GRDB access is not reentrant, so a card delete runs this inside its own write.
+    static func deleteRows(prayerId: Int64, _ db: Database) throws -> Bool {
+        try db.execute(sql: "DELETE FROM PrayerInteraction WHERE PrayerId = ?", arguments: [prayerId])
+        try db.execute(sql: "DELETE FROM PrayerCardTag WHERE PrayerRequestId = ?", arguments: [prayerId])
+        return try PrayerRequestRecord.deleteOne(db, key: prayerId)
     }
 
     public func markAnswered(id: Int64, on answeredDate: Date? = nil, now: Date) throws {
