@@ -218,7 +218,16 @@
     "Auto-mode automatically advances to the next prayer after a set interval (30s, 60s, or 120s). Tap the timer display to cycle through intervals. Tap pause to stop auto-advance." : {
 
     },
+    "Back Up Now" : {
+
+    },
+    "Backup" : {
+
+    },
     "Backup & Restore" : {
+
+    },
+    "Backup failed" : {
 
     },
     "Black" : {
@@ -287,6 +296,9 @@
     "Check that notifications are enabled in App Settings and that your device's system settings allow notifications for this app. On iOS, also check Focus mode settings." : {
 
     },
+    "Choose a passphrase to encrypt your confidential cards in this backup. You'll need it to restore them later \u2014 we can't recover it for you." : {
+
+    },
     "Choose Cards" : {
 
     },
@@ -315,6 +327,9 @@
 
     },
     "Color" : {
+
+    },
+    "Continue Unencrypted" : {
 
     },
     "Couldn't Delete" : {
@@ -494,6 +509,9 @@
 
     },
     "Existing Card" : {
+
+    },
+    "Export your prayer data to a file you can restore on another device." : {
 
     },
     "Favorite" : {
@@ -760,6 +778,12 @@
         }
       }
     },
+    "Passphrase" : {
+
+    },
+    "Passphrase (12+ characters)" : {
+
+    },
     "Pastel %@" : {
 
     },
@@ -842,6 +866,12 @@
 
     },
     "Protect All Cards" : {
+
+    },
+    "Protect Backup" : {
+
+    },
+    "Protect with a Passphrase" : {
 
     },
     "Protected" : {
@@ -997,6 +1027,9 @@
           }
         }
       }
+    },
+    "This backup includes confidential cards" : {
+
     },
     "This card has no prayer requests." : {
 
