@@ -58,27 +58,10 @@ struct AppShell: View {
         case .prayers:
             PrayersView(path: $prayersPath)
         case .tags:
-            NavigationStack(path: $tagsPath) { TabPlaceholder(tab: tab) }
+            NavigationStack(path: $tagsPath) { TagsView(path: $tagsPath) }
         case .settings:
             NavigationStack(path: $settingsPath) { SettingsView() }
         }
-    }
-}
-
-private struct TabPlaceholder: View {
-    let tab: AppTab
-
-    var body: some View {
-        ContentUnavailableView {
-            Label {
-                Text(tab.label)
-            } icon: {
-                Image(systemName: tab.systemImage)
-            }
-        }
-        .accessibilityIdentifier("Shell_Root_\(tab)")
-        .navigationTitle(Text(tab.title))
-        .navigationBarTitleDisplayMode(.large)
     }
 }
 

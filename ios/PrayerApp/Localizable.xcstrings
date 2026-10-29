@@ -239,6 +239,9 @@
     "Couldn't Delete" : {
 
     },
+    "Couldn't Delete Tag" : {
+
+    },
     "Couldn't Save" : {
 
     },
@@ -309,6 +312,9 @@
     "Delete Prayer?" : {
 
     },
+    "Delete Tag" : {
+
+    },
     "Delete “%@”?" : {
 
     },
@@ -364,6 +370,9 @@
     "Edit Prayer" : {
 
     },
+    "Edit Tag" : {
+
+    },
     "Existing Card" : {
 
     },
@@ -410,6 +419,9 @@
 
     },
     "Is my data private?" : {
+
+    },
+    "It will be removed from all prayer requests." : {
 
     },
     "Keep Editing" : {
@@ -487,6 +499,9 @@
 
     },
     "New reminders start at this time." : {
+
+    },
+    "New Tag" : {
 
     },
     "No Active Prayers" : {
@@ -659,6 +674,9 @@
 
     },
     "System" : {
+
+    },
+    "Tag deleted" : {
 
     },
     "Tags" : {

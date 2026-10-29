@@ -40,5 +40,5 @@ enum CardsRoute: Hashable {
     case prayer(id: Int64)
 }
 enum PrayersRoute: Hashable { case prayer(id: Int64) }
-enum TagsRoute: Hashable {}
+enum TagsRoute: Hashable { case tagPrayers(id: Int64) }
 enum SettingsRoute: Hashable { case appSettings, collections, backup, help, about }
