@@ -841,6 +841,78 @@
     },
     "Yes. Open the prayer, tap Edit, then use the \"Belongs to Card\" picker to choose a different card. Tap Save when done." : {
 
+    },
+    "Red" : {
+
+    },
+    "Orange" : {
+
+    },
+    "Brown" : {
+
+    },
+    "Teal" : {
+
+    },
+    "Blue" : {
+
+    },
+    "Purple" : {
+
+    },
+    "Pink" : {
+
+    },
+    "Gray" : {
+
+    },
+    "Black" : {
+
+    },
+    "White" : {
+
+    },
+    "Light gray" : {
+
+    },
+    "Dark gray" : {
+
+    },
+    "Yellow" : {
+
+    },
+    "Green" : {
+
+    },
+    "Custom" : {
+
+    },
+    "Dark %@" : {
+
+    },
+    "Pastel %@" : {
+
+    },
+    "Light %@" : {
+
+    },
+    "%@ %lld of %lld" : {
+
+    },
+    "Tag saved" : {
+
+    },
+    "Color" : {
+
+    },
+    "Delete Color" : {
+
+    },
+    "Duplicate Tag Name" : {
+
+    },
+    "A tag named '%@' already exists. Please choose a different name." : {
+
     }
   },
   "version" : "1.0"

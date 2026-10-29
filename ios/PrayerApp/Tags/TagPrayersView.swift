@@ -49,7 +49,7 @@ struct TagPrayersView: View {
                     requestDelete: { model?.pendingDelete = tag })
             }
             .sheet(isPresented: $isEditingTag, onDismiss: { reloadTag() }) {
-                NavigationStack { Color.clear.navigationTitle("Edit Tag") }
+                TagEditorView(database: services.database, tag: tag)
             }
             .sheet(isPresented: editingBinding, onDismiss: reload) {
                 PrayerEditorView(prayerId: editingPrayerID, database: services.database)

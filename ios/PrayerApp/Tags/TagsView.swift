@@ -26,10 +26,12 @@ struct TagsView: View {
             }
             .onAppear { model?.reload() }
             .sheet(isPresented: $isCreatingTag, onDismiss: { model?.reload() }) {
-                NavigationStack { Color.clear.navigationTitle("New Tag") }
+                TagEditorView(database: services.database, tag: nil)
             }
             .sheet(isPresented: editingBinding, onDismiss: { model?.reload() }) {
-                NavigationStack { Color.clear.navigationTitle("Edit Tag") }
+                TagEditorView(
+                    database: services.database,
+                    tag: editingTagID.flatMap { model?.summary(id: $0)?.tag })
             }
             .confirmationDialog(
                 Text("Delete “\(model?.pendingDelete?.name ?? "")”?"), isPresented: deleteBinding,
