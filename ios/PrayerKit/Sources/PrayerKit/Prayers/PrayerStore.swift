@@ -45,23 +45,26 @@ public struct PrayerStore: Sendable {
         try validate(draft)
         return try database.dbQueue.write { db in
             try requireCard(draft.prayerCardId, db)
-            let ticks = now.ticks
-            // Raw insert: the record's encode always writes Id, which would pin it to 0.
-            try db.execute(
-                sql: """
-                    INSERT INTO PrayerRequest (PrayerCardId, Title, Details, CanNotify, PrayerFrequency,
-                        NotifyHour, NotifyMinute, NotifyDayOfWeek, NotifyDayOfMonth, NotifyDate,
-                        IsImported, IsAnswered, AnsweredAt, CreatedAt, UpdatedAt)
-                    VALUES (?, ?, ?, 0, ?, 9, 0, -1, -1, NULL, ?, 0, NULL, ?, ?)
-                    """,
-                arguments: [
-                    draft.prayerCardId, draft.title, draft.details, PrayerFrequency.weekly.rawValue,
-                    draft.isImported ?? false, ticks, ticks,
-                ])
-            let id = db.lastInsertedRowID
-            try replaceTags(id, draft.tagIds, ticks, db)
-            return id
+            return try Self.insertRow(draft, ticks: now.ticks, db)
         }
+    }
+
+    static func insertRow(_ draft: PrayerDraft, ticks: Int64, _ db: Database) throws -> Int64 {
+        // Raw insert: the record's encode always writes Id, which would pin it to 0.
+        try db.execute(
+            sql: """
+                INSERT INTO PrayerRequest (PrayerCardId, Title, Details, CanNotify, PrayerFrequency,
+                    NotifyHour, NotifyMinute, NotifyDayOfWeek, NotifyDayOfMonth, NotifyDate,
+                    IsImported, IsAnswered, AnsweredAt, CreatedAt, UpdatedAt)
+                VALUES (?, ?, ?, 0, ?, 9, 0, -1, -1, NULL, ?, 0, NULL, ?, ?)
+                """,
+            arguments: [
+                draft.prayerCardId, draft.title, draft.details, PrayerFrequency.weekly.rawValue,
+                draft.isImported ?? false, ticks, ticks,
+            ])
+        let id = db.lastInsertedRowID
+        try Self.replaceTags(id, draft.tagIds, ticks, db)
+        return id
     }
 
     public func update(id: Int64, with draft: PrayerDraft, now: Date) throws {
@@ -74,7 +77,7 @@ public struct PrayerStore: Sendable {
             record.prayerCardId = draft.prayerCardId
             record.updatedAtTicks = now.ticks
             try record.update(db)
-            try replaceTags(id, draft.tagIds, now.ticks, db)
+            try Self.replaceTags(id, draft.tagIds, now.ticks, db)
         }
     }
 
@@ -159,7 +162,7 @@ public struct PrayerStore: Sendable {
         return record
     }
 
-    private func replaceTags(_ id: Int64, _ tagIds: [Int64], _ ticks: Int64, _ db: Database) throws {
+    private static func replaceTags(_ id: Int64, _ tagIds: [Int64], _ ticks: Int64, _ db: Database) throws {
         try db.execute(sql: "DELETE FROM PrayerCardTag WHERE PrayerRequestId = ?", arguments: [id])
         for tagId in Set(tagIds).sorted() {
             try db.execute(

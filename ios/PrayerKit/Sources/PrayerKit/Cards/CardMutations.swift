@@ -40,20 +40,25 @@ public struct CardMutations {
         try validate(draft)
         return try database.dbQueue.write { db in
             try requireBox(draft.boxId, db)
-            let ticks = now.ticks
-            // Raw insert: the record's encode always writes Id, which would pin it to 0.
-            try db.execute(
-                sql: """
-                    INSERT INTO PrayerCard (Title, CanNotify, PrayerFrequency, IsAnswered, IsFavorite, IsSystem,
-                        IsImported, ProtectionMode, BoxId, PreArchiveBoxId, SystemKey, CreatedAt, UpdatedAt)
-                    VALUES (?, 0, ?, 0, 0, 0, ?, ?, ?, NULL, NULL, ?, ?)
-                    """,
-                arguments: [
-                    draft.title, PrayerFrequency.weekly.rawValue, draft.isImported ?? false,
-                    draft.protectionMode.rawValue, draft.boxId, ticks, ticks,
-                ])
-            return try requireCard(db.lastInsertedRowID, db)
+            let id = try Self.insertRow(draft, ticks: now.ticks, db)
+            return try requireCard(id, db)
         }
+    }
+
+    // GRDB access is not reentrant, so an import inserts inside its own write.
+    static func insertRow(_ draft: CardDraft, ticks: Int64, _ db: Database) throws -> Int64 {
+        // Raw insert: the record's encode always writes Id, which would pin it to 0.
+        try db.execute(
+            sql: """
+                INSERT INTO PrayerCard (Title, CanNotify, PrayerFrequency, IsAnswered, IsFavorite, IsSystem,
+                    IsImported, ProtectionMode, BoxId, PreArchiveBoxId, SystemKey, CreatedAt, UpdatedAt)
+                VALUES (?, 0, ?, 0, 0, 0, ?, ?, ?, NULL, NULL, ?, ?)
+                """,
+            arguments: [
+                draft.title, PrayerFrequency.weekly.rawValue, draft.isImported ?? false,
+                draft.protectionMode.rawValue, draft.boxId, ticks, ticks,
+            ])
+        return db.lastInsertedRowID
     }
 
     public func update(id: Int64, with draft: CardDraft, now: Date) throws {
