@@ -13,7 +13,8 @@ public struct CardListFilter: Equatable, Sendable {
 
 public struct CardListItem: Equatable, Sendable {
     public let card: PrayerCardRecord
-    public let activePrayerCount: Int
+    public let activePrayerCount: Int?
+    public let isMasked: Bool
 }
 
 public struct CardSection: Equatable, Sendable {
@@ -33,7 +34,7 @@ private func ordered(_ lhs: String, _ rhs: String) -> ComparisonResult {
 }
 
 public extension PrayerDatabase {
-    func cardList(filter: CardListFilter = CardListFilter()) throws -> CardList {
+    func cardList(filter: CardListFilter = CardListFilter(), isSessionUnlocked: Bool = true) throws -> CardList {
         let (boxes, cards, requests, tagRows) = try dbQueue.read { db in
             (
                 try CardBoxRecord.fetchAll(db),
@@ -59,7 +60,18 @@ public extension PrayerDatabase {
         }
 
         let query = filter.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        let items = Dictionary(grouping: cards, by: { $0.boxId ?? 0 }).mapValues { group in
+        let boxesById = Dictionary(boxes.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        func isBlocked(_ card: PrayerCardRecord) -> Bool {
+            ProtectionPolicy.isAccessBlocked(card, box: boxesById[card.boxId ?? 0], isSessionUnlocked: isSessionUnlocked)
+        }
+        let narrowed = !query.isEmpty || !filter.tagIds.isEmpty
+        let visible = isSessionUnlocked ? cards : cards.filter { card in
+            narrowed
+                ? !isBlocked(card)
+                : !ProtectionPolicy.isHiddenWhileLocked(
+                    card, box: boxesById[card.boxId ?? 0], isSessionUnlocked: isSessionUnlocked)
+        }
+        let items = Dictionary(grouping: visible, by: { $0.boxId ?? 0 }).mapValues { group in
             group.sorted { a, b in
                 if a.isFavorite != b.isFavorite { return a.isFavorite }
                 let byTitle = ordered(a.title, b.title)
@@ -81,7 +93,14 @@ public extension PrayerDatabase {
             return CardSection(
                 boxId: boxId,
                 box: box,
-                cards: matching.map { CardListItem(card: $0, activePrayerCount: activeCounts[$0.id] ?? 0) }
+                cards: matching.map { card in
+                    guard isBlocked(card) else {
+                        return CardListItem(card: card, activePrayerCount: activeCounts[card.id] ?? 0, isMasked: false)
+                    }
+                    var masked = card
+                    masked.title = ProtectionPolicy.maskedTitle
+                    return CardListItem(card: masked, activePrayerCount: nil, isMasked: true)
+                }
             )
         }
 

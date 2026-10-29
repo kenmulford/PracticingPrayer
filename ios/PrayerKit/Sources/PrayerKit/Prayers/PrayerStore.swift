@@ -112,10 +112,19 @@ public struct PrayerStore: Sendable {
     }
 
     public func prayers(
-        segment: PrayerSegment, search: String = "", tagIds: Set<Int64> = []
+        segment: PrayerSegment, search: String = "", tagIds: Set<Int64> = [],
+        isSessionUnlocked: Bool = true
     ) throws -> [PrayerListItem] {
         let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
+        var blocked: Set<Int64> = []
+        if !isSessionUnlocked {
+            let (cards, boxes) = try database.dbQueue.read { db in
+                (try PrayerCardRecord.fetchAll(db), try CardBoxRecord.fetchAll(db))
+            }
+            blocked = ProtectionPolicy.blockedCardIds(cards: cards, boxes: boxes, isSessionUnlocked: false)
+        }
         return try loadItems().filter { item in
+            if blocked.contains(item.record.prayerCardId) { return false }
             switch segment {
             case .active where item.record.isAnswered, .answered where !item.record.isAnswered:
                 return false

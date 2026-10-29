@@ -41,8 +41,6 @@ public enum ConfidentialExportSplitter {
     }
 
     private static func isConfidential(_ card: PrayerCardRecord, _ boxesById: [Int64: CardBoxRecord]) -> Bool {
-        if let own = card.protectionMode, own != .unprotected { return true }
-        guard let box = boxesById[card.boxId ?? 0] else { return false }
-        return box.protectAllCards && box.cardProtectionMode != .unprotected
+        ProtectionPolicy.effectiveMode(of: card, box: boxesById[card.boxId ?? 0]) != .unprotected
     }
 }
