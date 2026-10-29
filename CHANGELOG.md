@@ -2,6 +2,46 @@
 
 Release notes for Practicing Prayer, newest first.
 
+## 2.0.0 Core UI
+
+**Theme:** the native SwiftUI screens on top of `PrayerKit`: the five-tab shell, Home, cards, prayers, tags, collections and settings. Lands on `ios-2.0-refactor`, not a release.
+
+### ✨ Features / enhancements
+
+| Issue | PR | What |
+|---|---|---|
+| #396 App shell with a sidebar-adaptable five-tab TabView | #444 | Five tabs that become a sidebar on iPad, each with its own navigation stack |
+| #397 Home screen with tiles and Answered on This Day | #444 | Overdue, Unanswered and Active Cards tiles plus Answered on This Day |
+| #398 Quick Add sheet with the card picker | #444 | Add a prayer to any card from Home |
+| #399 Prayer Cards list with collection sections and search | #444 | Cards grouped by collection in the 1.7.2 order, with search |
+| #400 Tag picker with inline tag creation | #444 | Pick or create tags from any editor |
+| #401 Settings root and App Settings | #444 | Settings, App Settings and the reminder options |
+| #402 Card Detail with toolbar actions and Move To | #444 | Card Detail with favorite, archive, delete, share and Move To |
+| #403 Filter Prayer Cards by tags | #444 | A toolbar menu filters the card list by tag |
+| #404 Collections screen and Collection Editor | #444 | Create, rename, protect and delete collections |
+| #405 Help screen with corrected FAQ copy | #444 | Help with the corrected FAQ |
+| #406 About screen with diagnostics sharing | #444 | About with version details and a diagnostics share |
+| #407 Card Editor sheet | #444 | One sheet for new and existing cards |
+| #408 Select mode on Prayer Cards | #444 | Bulk Move To, Archive and Delete |
+| #409 Prayers list with segments, search and row actions | #444 | Active and Answered segments, search, swipe actions |
+| #410 Overdue, Unanswered and Active Cards lists | #444 | Each Home tile opens its list |
+| #411 Swipe actions and context menu on card rows | #444 | Favorite, Archive, Delete, Edit and Move To from a row |
+| #412 Prayer Detail | #444 | Answer, delete and tag chips |
+| #413 Tags list and Tag Prayers | #444 | Tags with counts and each tag's prayers |
+| #414 Prayer Editor sheet | #444 | One sheet for new and existing prayers, with Save and Add Another |
+| #415 Tag Editor with color swatches and custom colors | #444 | Default swatches, custom colors and color delete |
+
+### 🐛 Fixes found at milestone end
+
+- Move To listed only Loose Cards, because its targets reached the sheet empty.
+- Moving several cards at once crashed on the confirmation message.
+
+### ⚖️ Post-run audit trail
+
+- One UI test is skipped: `HomeListsUITests.testDeleteConfirmsAndCancelKeeps` loses its row after the delete dialog is dismissed. The cause is not found.
+- `UpgradeGateTests.testUpgradeGate` runs only with `UPGRADE_GATE_EXPECTED` set and fails without it.
+- Counts on Collections and Tags include Hidden cards while locked, and protection can be lowered without unlock. This matches 1.7.2 and is open for a decision.
+
 ## 2.0.0 Data and domain
 
 **Theme:** `PrayerKit` carries the 1.7.2 data and domain rules in Swift, with share, backup, and archive formats proven both ways against MAUI. Lands on `ios-2.0-refactor`, not a release.

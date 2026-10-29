@@ -297,4 +297,37 @@ private func scheduler(
             }
         }
     }
+
+    private func scheduledBody(setup: String? = nil) async throws -> String? {
+        try await withCopy("fresh-install.db") { database in
+            try await withPreferences { preferences in
+                try insertNotifying(database, count: 1)
+                if let setup { try await database.dbQueue.write { try $0.execute(sql: setup) } }
+                let center = FakeReminderCenter()
+                try await scheduler(database, preferences, center).reconcile(now: date(2025, 3, 1, 12))
+                return center.pending.first?.body
+            }
+        }
+    }
+
+    @Test func lockedCardUsesGenericBody() async throws {
+        let body = try await scheduledBody(setup: "UPDATE PrayerCard SET ProtectionMode = 1 WHERE Id = 1")
+        #expect(body == ReminderScheduler.protectedBody)
+    }
+
+    @Test func hiddenCardUsesGenericBody() async throws {
+        let body = try await scheduledBody(setup: "UPDATE PrayerCard SET ProtectionMode = 2 WHERE Id = 1")
+        #expect(body == ReminderScheduler.protectedBody)
+    }
+
+    @Test func unprotectedCardInProtectAllBoxUsesGenericBody() async throws {
+        let body = try await scheduledBody(
+            setup: "UPDATE CardBox SET ProtectAllCards = 1, CardProtectionMode = 1 WHERE Id = 1")
+        #expect(body == ReminderScheduler.protectedBody)
+    }
+
+    @Test func unprotectedCardKeepsTitleBody() async throws {
+        let body = try await scheduledBody()
+        #expect(body == "Prayer 1")
+    }
 }

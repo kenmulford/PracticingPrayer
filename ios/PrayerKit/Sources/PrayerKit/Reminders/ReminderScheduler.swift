@@ -28,6 +28,8 @@ public struct SystemReminderCenter: ReminderCenter {
 
 /// Rebuilds the pending local notifications from the database; safe to run on every launch.
 public struct ReminderScheduler {
+    public static let protectedBody = "Time to pray"
+
     private let database: PrayerDatabase
     private let preferences: AppPreferences
     private let center: any ReminderCenter
@@ -52,7 +54,7 @@ public struct ReminderScheduler {
             preferences.nativeRemindersMigrated = true
         }
 
-        // Reminders are not UI, so protected prayers still schedule.
+        // Reminders are not UI, so protected prayers still schedule, with a generic body so the title never shows on the lock screen.
         let records = try PrayerStore(database: database).prayers(segment: .active, isSessionUnlocked: true).map(\.record)
 
         do {
@@ -63,14 +65,20 @@ public struct ReminderScheduler {
 
         guard preferences.allowNotifications else { return }
 
+        let protectedCardIds = try await database.dbQueue.read { db in
+            ProtectionPolicy.blockedCardIds(
+                cards: try PrayerCardRecord.fetchAll(db), boxes: try CardBoxRecord.fetchAll(db), isSessionUnlocked: false)
+        }
+
         await center.removeAllPendingRequests()
         for record in records where record.canNotify {
             do {
                 let hour = record.notifyHour ?? preferences.defaultNotifyHour
                 let minute = record.notifyMinute ?? preferences.defaultNotifyMinute
-                guard let request = try ReminderTrigger.request(
+                guard var request = try ReminderTrigger.request(
                     for: record, hour: hour, minute: minute, now: now, calendar: calendar)
                 else { continue }
+                if protectedCardIds.contains(record.prayerCardId) { request.body = ReminderScheduler.protectedBody }
                 try await center.add(request)
             } catch {
                 log("Scheduling prayer \(record.id) failed: \(error)")

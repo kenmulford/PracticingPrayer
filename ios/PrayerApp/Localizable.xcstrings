@@ -1,7 +1,907 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%@ · %lld" : {
 
+    },
+    "%lld Selected" : {
+
+    },
+    "%lld active prayers" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld active prayer"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld active prayers"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld cards" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld card"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld cards"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld prayers saved" : {
+
+    },
+    "%lld times since %@" : {
+
+    },
+    "1 time since %@" : {
+
+    },
+    "A collection named '%@' already exists. Please choose a different name." : {
+
+    },
+    "A personal worship tool for organizing your prayer life. Create prayer cards, track requests, set reminders, and spend focused time in prayer." : {
+
+    },
+    "About" : {
+
+    },
+    "Active" : {
+
+    },
+    "Active Cards" : {
+
+    },
+    "Add Card" : {
+
+    },
+    "Add Collection" : {
+
+    },
+    "Add Prayer" : {
+
+    },
+    "Add To" : {
+
+    },
+    "Add a prayer to this card." : {
+
+    },
+    "All" : {
+
+    },
+    "All Prayed For" : {
+
+    },
+    "Allow Landscape" : {
+
+    },
+    "Allow Notifications" : {
+
+    },
+    "Answered" : {
+
+    },
+    "Answered On" : {
+
+    },
+    "Answered on This Day" : {
+
+    },
+    "Anyone using this iPhone can see this card." : {
+
+    },
+    "App Settings" : {
+
+    },
+    "Archive" : {
+
+    },
+    "Archive %lld cards? You can find them in your Archived Cards collection." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Archive %lld card? You can find it in your Archived Cards collection."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Archive %lld cards? You can find them in your Archived Cards collection."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Archive Card" : {
+
+    },
+    "Archive Card?" : {
+
+    },
+    "Archive Cards" : {
+
+    },
+    "Archive Cards?" : {
+
+    },
+    "Archived %lld cards" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Archived %lld card"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Archived %lld cards"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Are you sure you want to Archive this card? You can find it in your Archived Cards collection." : {
+
+    },
+    "Auto-mode automatically advances to the next prayer after a set interval (30s, 60s, or 120s). Tap the timer display to cycle through intervals. Tap pause to stop auto-advance." : {
+
+    },
+    "Backup & Restore" : {
+
+    },
+    "Can I filter Prayer Time by tags?" : {
+
+    },
+    "Can I move a prayer to a different card?" : {
+
+    },
+    "Can't Load Cards" : {
+
+    },
+    "Can't Load Collections" : {
+
+    },
+    "Can't Load Prayer Cards" : {
+
+    },
+    "Can't Load Prayers" : {
+
+    },
+    "Can't Load Tags" : {
+
+    },
+    "Can't Open Your Prayers" : {
+
+    },
+    "Cancel" : {
+
+    },
+    "Card" : {
+
+    },
+    "Card Title" : {
+
+    },
+    "Card saved" : {
+
+    },
+    "Cards" : {
+
+    },
+    "Cards with no protection of their own take the collection's setting." : {
+
+    },
+    "Check that notifications are enabled in App Settings and that your device's system settings allow notifications for this app. On iOS, also check Focus mode settings." : {
+
+    },
+    "Clear Filter" : {
+
+    },
+    "Collection" : {
+
+    },
+    "Collection saved" : {
+
+    },
+    "Collections" : {
+
+    },
+    "Collections help you organize your cards." : {
+
+    },
+    "Couldn't Delete" : {
+
+    },
+    "Couldn't Delete Tag" : {
+
+    },
+    "Couldn't Save" : {
+
+    },
+    "Couldn't Update Card" : {
+
+    },
+    "Couldn't Update Cards" : {
+
+    },
+    "Couldn't Update Prayer" : {
+
+    },
+    "Couldn't create the tag." : {
+
+    },
+    "Create %@" : {
+
+    },
+    "Create “%@”" : {
+
+    },
+    "Created tag %@" : {
+
+    },
+    "Default Reminder Time" : {
+
+    },
+    "Delete" : {
+
+    },
+    "Delete %lld Cards?" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Delete %lld Card?"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Delete %lld Cards?"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Delete “%@” and its 1 prayer request?" : {
+
+    },
+    "Delete “%@” and its %lld prayer requests?" : {
+
+    },
+    "Delete All Cards & Requests" : {
+
+    },
+    "Delete Card" : {
+
+    },
+    "Delete Cards" : {
+
+    },
+    "Delete Collection" : {
+
+    },
+    "Delete Prayer" : {
+
+    },
+    "Delete Tag" : {
+
+    },
+    "Delete “%@”?" : {
+
+    },
+    "Deleted %lld cards" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Deleted %lld card"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Deleted %lld cards"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Details" : {
+
+    },
+    "Developer" : {
+
+    },
+    "Diagnostic Log" : {
+
+    },
+    "Discard Changes" : {
+
+    },
+    "Done" : {
+
+    },
+    "Duplicate Collection Name" : {
+
+    },
+    "Edit" : {
+
+    },
+    "Edit Card" : {
+
+    },
+    "Edit Collection" : {
+
+    },
+    "Edit Prayer" : {
+
+    },
+    "Edit Tag" : {
+
+    },
+    "Existing Card" : {
+
+    },
+    "Favorite" : {
+
+    },
+    "Filter" : {
+
+    },
+    "Filtered by %@" : {
+
+    },
+    "Go to Settings → Backup & Restore → Back Up Now. This creates a file you can save or share. To restore, use \"Restore from Backup\" on the same screen." : {
+
+    },
+    "Help" : {
+
+    },
+    "Hidden" : {
+
+    },
+    "Home" : {
+
+    },
+    "How do I add a prayer request?" : {
+
+    },
+    "How do I back up my data?" : {
+
+    },
+    "How do I create a prayer card?" : {
+
+    },
+    "How do I organize prayers with tags?" : {
+
+    },
+    "How do I set up prayer reminders?" : {
+
+    },
+    "How does Prayer Time work?" : {
+
+    },
+    "Imported" : {
+
+    },
+    "Is my data private?" : {
+
+    },
+    "It will be removed from all prayer requests." : {
+
+    },
+    "Keep Editing" : {
+
+    },
+    "Last Prayed" : {
+
+    },
+    "Locked" : {
+
+    },
+    "Loose Cards" : {
+
+    },
+    "Manage Collections" : {
+
+    },
+    "Mark Active" : {
+
+    },
+    "Mark Answered" : {
+
+    },
+    "More" : {
+
+    },
+    "Move To" : {
+
+    },
+    "Move To…" : {
+
+    },
+    "Moved %lld cards to %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%#@cards@ to %2$@"
+          },
+          "substitutions" : {
+            "cards" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "Moved %arg card"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "Moved %arg cards"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Name" : {
+
+    },
+    "New Card" : {
+
+    },
+    "New Collection" : {
+
+    },
+    "New Prayer" : {
+
+    },
+    "New Tag" : {
+
+    },
+    "New reminders start at this time." : {
+
+    },
+    "No Active Cards" : {
+
+    },
+    "No Active Prayers" : {
+
+    },
+    "No Answered Prayers" : {
+
+    },
+    "No Cards" : {
+
+    },
+    "No Collections Yet" : {
+
+    },
+    "No Matching Cards" : {
+
+    },
+    "No Prayer Cards" : {
+
+    },
+    "No Prayers" : {
+
+    },
+    "No Tags" : {
+
+    },
+    "No Unanswered Prayers" : {
+
+    },
+    "No cards have a prayer with the selected tags." : {
+
+    },
+    "None" : {
+
+    },
+    "None Selected" : {
+
+    },
+    "Not Yet" : {
+
+    },
+    "Notifications" : {
+
+    },
+    "Notifications are turned off in Settings." : {
+
+    },
+    "OK" : {
+
+    },
+    "Off" : {
+
+    },
+    "Open Settings" : {
+
+    },
+    "Open a prayer card by tapping its name, then tap \"+ Add prayer\" at the bottom of the expanded card. Fill in a title and any details, then tap Save (to return to the card) or Save + to save and add another prayer request on the same card." : {
+
+    },
+    "Open a prayer request and choose a reminder frequency: Never, Daily, Weekly, Monthly, or Yearly. Choose a time, and optionally a day of the week. The app will send a notification at your chosen time." : {
+
+    },
+    "Overdue" : {
+
+    },
+    "Overdue After %lld Days" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Overdue After %lld Day"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Overdue After %lld Days"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Practicing Prayer" : {
+
+    },
+    "Pray" : {
+
+    },
+    "Prayed" : {
+
+    },
+    "Prayer" : {
+
+    },
+    "Prayer %lld" : {
+
+    },
+    "Prayer Cards" : {
+
+    },
+    "Prayer deleted" : {
+
+    },
+    "Prayer Not Found" : {
+
+    },
+    "Prayer Time" : {
+
+    },
+    "Prayer Time presents your prayers one at a time in a focused view. Swipe or tap the arrows to move between prayers. When you're done, tap \"I'm Done\" to end the session. By default, Prayer Time launches in landscape mode. You can change this in settings." : {
+
+    },
+    "Prayer marked as active" : {
+
+    },
+    "Prayer marked as answered" : {
+
+    },
+    "Prayer saved" : {
+
+    },
+    "Prayers" : {
+
+    },
+    "Prayers not prayed within this many days appear in your overdue list on the home page." : {
+
+    },
+    "Privacy Policy" : {
+
+    },
+    "Protect All Cards" : {
+
+    },
+    "Protected" : {
+
+    },
+    "Protection" : {
+
+    },
+    "Quick Add" : {
+
+    },
+    "Quick Add lets you jot down a prayer request from the home screen without choosing a card. It saves to a special \"Quick Add\" card that you can reorganize later." : {
+
+    },
+    "Retry" : {
+
+    },
+    "Save" : {
+
+    },
+    "Save and Add Another" : {
+
+    },
+    "Search Cards" : {
+
+    },
+    "Search Prayers" : {
+
+    },
+    "Search or Create Tags" : {
+
+    },
+    "Select Card" : {
+
+    },
+    "Select Cards" : {
+
+    },
+    "Select a Prayer" : {
+
+    },
+    "Select a Prayer Card" : {
+
+    },
+    "Selection cancelled" : {
+
+    },
+    "Send Diagnostic Info" : {
+
+    },
+    "Settings" : {
+
+    },
+    "Share" : {
+
+    },
+    "Source" : {
+
+    },
+    "Started" : {
+
+    },
+    "Status" : {
+
+    },
+    "System" : {
+
+    },
+    "Tag deleted" : {
+
+    },
+    "Tags" : {
+
+    },
+    "Tags are like labels you can attach to any prayer. Go to the Tags tab to create tags with custom colors, then add them to prayers from the prayer detail screen." : {
+
+    },
+    "Tap the Prayer Cards tab, then tap \"Add Card\" in the top right. Give your card a name \u2014 a person, topic, or place \u2014 then tap Save, or Save + to save it and start another card in the same collection." : {
+
+    },
+    "The card is hidden from every list until you choose Show Confidential." : {
+
+    },
+    "The card shows as “Protected” until you unlock with Face ID or your passcode." : {
+
+    },
+    "The star marks a card as a favorite. Swipe a card to the right in the Cards list, or touch and hold the card and choose Favorite. Favorited cards sort to the top of their collection so they're always easy to find." : {
+
+    },
+    "This also deletes its %lld prayer requests." : {
+
+    },
+    "This also deletes its 1 prayer request." : {
+
+    },
+    "This also deletes their %lld active prayer requests." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "This also deletes its %lld active prayer request."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "This also deletes their %lld active prayer requests."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "This card has no prayer requests." : {
+
+    },
+    "This is the Quick Add card, so it can't be edited, favorited, archived, or deleted." : {
+
+    },
+    "Title" : {
+
+    },
+    "Try Again" : {
+
+    },
+    "Type a name to create a tag." : {
+
+    },
+    "Unable to Load Home" : {
+
+    },
+    "Unanswered" : {
+
+    },
+    "Unarchive" : {
+
+    },
+    "Unarchive Card" : {
+
+    },
+    "Unassign Cards" : {
+
+    },
+    "Unfavorite" : {
+
+    },
+    "Version %@ (%@)" : {
+
+    },
+    "Website" : {
+
+    },
+    "What does the star icon do?" : {
+
+    },
+    "What is Quick Add?" : {
+
+    },
+    "What is auto-mode in Prayer Time?" : {
+
+    },
+    "Why am I not receiving notifications?" : {
+
+    },
+    "Yes. All your data stays on your device. There are no accounts, no cloud sync, and no way for anyone else to see your prayers. Backups are files you control." : {
+
+    },
+    "Yes. From the home screen, tap \"Prayer Time\" and choose \"By Tags.\" Select one or more tags, then tap Start to pray through only those tagged prayers." : {
+
+    },
+    "Yes. Open the prayer, tap Edit, then use the \"Belongs to Card\" picker to choose a different card. Tap Save when done." : {
+
+    },
+    "Red" : {
+
+    },
+    "Orange" : {
+
+    },
+    "Brown" : {
+
+    },
+    "Teal" : {
+
+    },
+    "Blue" : {
+
+    },
+    "Purple" : {
+
+    },
+    "Pink" : {
+
+    },
+    "Gray" : {
+
+    },
+    "Black" : {
+
+    },
+    "White" : {
+
+    },
+    "Light gray" : {
+
+    },
+    "Dark gray" : {
+
+    },
+    "Yellow" : {
+
+    },
+    "Green" : {
+
+    },
+    "Custom" : {
+
+    },
+    "Dark %@" : {
+
+    },
+    "Pastel %@" : {
+
+    },
+    "Light %@" : {
+
+    },
+    "%@ %lld of %lld" : {
+
+    },
+    "Tag saved" : {
+
+    },
+    "Color" : {
+
+    },
+    "Delete Color" : {
+
+    },
+    "Duplicate Tag Name" : {
+
+    },
+    "A tag named '%@' already exists. Please choose a different name." : {
+
+    }
   },
   "version" : "1.0"
 }
