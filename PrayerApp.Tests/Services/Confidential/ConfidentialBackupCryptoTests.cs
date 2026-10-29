@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using PrayerApp.Services.Confidential;
 using Xunit;
@@ -9,8 +10,25 @@ namespace PrayerApp.Tests.Services.Confidential;
 /// Exercises the round-trip, wrong-passphrase-fails, and nonce/salt-freshness invariants that
 /// the export/import contract depends on, independently of BackupService's file/DB orchestration.
 /// </summary>
+public sealed class BackupFixtureFactAttribute : FactAttribute
+{
+    public const string VariableName = "PP_WRITE_BACKUP_FIXTURES";
+
+    public BackupFixtureFactAttribute()
+    {
+        if (Environment.GetEnvironmentVariable(VariableName) != "1")
+            Skip = $"{VariableName} is not 1; the fixture writer runs on demand only";
+    }
+}
+
 public class ConfidentialBackupCryptoTests
 {
+    private const string FixtureDirectory = "contracts/backup";
+
+    private static string ReadFixture(string name) => File.ReadAllText(Path.Combine(FixtureDirectory, name));
+
+    private static string FixturePassphrase() => ReadFixture("passphrase.txt").Trim();
+
     private const string SamplePayload = """{"SchemaVersion":1,"Cards":[],"Prayers":[]}""";
 
     [Fact]
@@ -64,5 +82,41 @@ public class ConfidentialBackupCryptoTests
 
         Assert.ThrowsAny<CryptographicException>(() =>
             ConfidentialBackupCrypto.Decrypt(blob, "correct horse battery staple"));
+    }
+
+    [Fact]
+    public void Decrypt_NativeFixture_YieldsPayloadFixture() => AssertFixtureYieldsPayload("native/confidential.enc");
+
+    [Fact]
+    public void Decrypt_MauiFixture_YieldsPayloadFixture() => AssertFixtureYieldsPayload("maui/confidential.enc");
+
+    private static void AssertFixtureYieldsPayload(string relativePath)
+    {
+        var blob = File.ReadAllBytes(Path.Combine(FixtureDirectory, relativePath));
+
+        var decrypted = ConfidentialBackupCrypto.Decrypt(blob, FixturePassphrase());
+
+        Assert.Equal(
+            ConfidentialExportPayload.FromJson(ReadFixture("payload.json")).ToJson(),
+            ConfidentialExportPayload.FromJson(decrypted).ToJson());
+    }
+
+    [BackupFixtureFact]
+    public void WriteMauiFixture()
+    {
+        var backupDir = RepoBackupDirectory();
+        var payload = File.ReadAllText(Path.Combine(backupDir, "payload.json"));
+        var passphrase = File.ReadAllText(Path.Combine(backupDir, "passphrase.txt")).Trim();
+        File.WriteAllBytes(
+            Path.Combine(backupDir, "maui", "confidential.enc"),
+            ConfidentialBackupCrypto.Encrypt(payload, passphrase));
+    }
+
+    private static string RepoBackupDirectory([CallerFilePath] string sourceFile = "")
+    {
+        var repoRoot = sourceFile;
+        for (var i = 0; i < 4; i++)
+            repoRoot = Path.GetDirectoryName(repoRoot)!;
+        return Path.Combine(repoRoot, "contracts", "backup");
     }
 }

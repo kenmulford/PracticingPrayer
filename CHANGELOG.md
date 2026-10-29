@@ -2,6 +2,43 @@
 
 Release notes for Practicing Prayer, newest first.
 
+## 2.0.0 Data and domain
+
+**Theme:** `PrayerKit` carries the 1.7.2 data and domain rules in Swift, with share, backup, and archive formats proven both ways against MAUI. Lands on `ios-2.0-refactor`, not a release.
+
+### ✨ Features / enhancements
+
+| Issue | PR | What |
+|---|---|---|
+| #382 Run the 1.7.2 schema upkeep in PrayerKit | #443 | `SchemaUpkeep` runs the 13 idempotent 1.7.2 upkeep steps, adds `PrayerRequest.NotifyDate`, and backfills it |
+| #383 Read the existing preferences through AppPreferences | #443 | `AppPreferences` reads and writes the 1.7.2 `UserDefaults` keys in place |
+| #384 Query cards grouped by collection in the 1.7.2 order | #443 | `cardList` returns sections in 1.7.2 order; a NULL `BoxId` groups as Loose Cards |
+| #385 Create, edit, answer, and query prayers | #443 | `PrayerStore` with request-level tags, segments, search, and a by-card query |
+| #386 Manage tags and user colors | #443 | `TagStore` and `UserColorStore`; duplicate names surface as typed errors |
+| #387 Encode and decode share links and .prayercard files | #443 | `ShareCodec` reads and writes links and files MAUI produces, checked by `contracts/share` fixtures in both suites |
+| #388 Encrypt and decrypt confidential backups | #443 | `confidential.enc` interoperates with MAUI; `contracts/backup` fixtures decrypt in both suites |
+| #389 Create, edit, favorite, move, archive, and delete cards | #443 | `CardMutations`; a card delete removes its prayers, interactions, and tag rows in one transaction |
+| #390 Record prayed interactions and compute the Home metrics | #443 | `recordPrayed` and `homeMetrics` (overdue, last prayed, answered on this day) |
+| #391 Apply the protection policy to card and prayer queries | #443 | `ProtectionPolicy` masks Locked cards as "Protected" and drops Hidden and filtered protected cards while locked |
+| #392 Schedule reminders and reconcile every launch | #443 | `ReminderScheduler` clears MAUI-era requests once, then rebuilds one calendar trigger per notifying prayer each launch |
+| #393 Export and restore .pcrd archives compatibly with MAUI | #443 | `BackupArchive` writes and restores `.pcrd` files MAUI reads, rolling back on failure |
+| #394 Create, rename, protect, and delete collections | #443 | `CollectionStore`; Delete All and unassign each run in one transaction |
+| #395 Resolve an import payload against new or existing cards | #443 | `ImportResolver` detects duplicates and saves a new card and its prayers in one transaction |
+
+### Consumer notes
+
+- iOS work lands on `ios-2.0-refactor`. The MAUI app still ships iOS and Android from `dev`.
+- **Schema change on the native side:** upkeep adds `PrayerRequest.NotifyDate` when absent, as 1.7.2 does.
+- `contracts/backup/` is un-ignored in `.gitignore` past the `Backup*/` rule.
+
+### ⚖️ Post-run audit trail
+
+Judgment-call PRs: none.
+
+- An automated security review of the milestone's commits found four issues, fixed in this PR: unscrubbed free pages in the backup copy, uncapped gzip and ZIP inflation, unvalidated archive structure, and Home queries that ignored lock state.
+- MAUI `BackupService.BuildScrubbedDbBytesAsync` has the same free-page gap; it is unchanged here.
+- Reminders show the prayer title for protected cards, as 1.7.2 does.
+
 ## 2.0.0 Spike - upgrade in place
 
 **Theme:** The native iOS app opens the 1.7.2 database and Keychain PIN in place after an App Store update, proven on Test iPad. Lands on `ios-2.0-refactor`, not a release.

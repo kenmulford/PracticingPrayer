@@ -1,3 +1,5 @@
+using System.IO.Compression;
+using System.Runtime.CompilerServices;
 using PrayerApp.Models;
 using PrayerApp.Services.Confidential;
 using SQLite;
@@ -225,5 +227,51 @@ public class ConfidentialBackupImporterTests : IDisposable
 
         Assert.True(result.Success);
         Assert.Equal(0, result.CardsRestored);
+    }
+
+    // ── Native-made .pcrd archive (issue #393) ──────────────────────────
+
+    [Fact]
+    public async Task NativeMadeArchive_DatabaseEntry_HasSevenTableRowCounts()
+    {
+        using (var archive = ZipFile.OpenRead(Path.Combine("contracts", "backup", "native-made.pcrd")))
+        {
+            archive.GetEntry("prayer_app.db")!.ExtractToFile(_dbPath, overwrite: true);
+            Assert.Null(archive.GetEntry("confidential.enc"));
+        }
+
+        var connection = new SQLiteAsyncConnection(_dbPath);
+        try
+        {
+            var expected = new (string Table, int Rows)[]
+            {
+                ("PrayerCard", 4), ("PrayerRequest", 7), ("PrayerTag", 6), ("PrayerCardTag", 2),
+                ("PrayerInteraction", 3), ("UserColor", 8), ("CardBox", 2),
+            };
+            foreach (var (table, rows) in expected)
+                Assert.Equal(rows, await connection.ExecuteScalarAsync<int>($"SELECT COUNT(*) FROM {table}"));
+        }
+        finally
+        {
+            await connection.CloseAsync();
+        }
+    }
+
+    [BackupFixtureFact]
+    public void WriteMauiArchiveFixture()
+    {
+        var repoRoot = RepoRoot();
+        using var archive = ZipFile.Open(
+            Path.Combine(repoRoot, "contracts", "backup", "maui-made.pcrd"), ZipArchiveMode.Create);
+        archive.CreateEntryFromFile(
+            Path.Combine(repoRoot, "contracts", "db", "long-upgraded.db"), "prayer_app.db", CompressionLevel.Optimal);
+    }
+
+    private static string RepoRoot([CallerFilePath] string sourceFile = "")
+    {
+        var repoRoot = sourceFile;
+        for (var i = 0; i < 4; i++)
+            repoRoot = Path.GetDirectoryName(repoRoot)!;
+        return repoRoot;
     }
 }
