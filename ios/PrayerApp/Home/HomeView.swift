@@ -36,7 +36,14 @@ struct HomeView: View {
         content
             .navigationTitle("Home")
             .navigationBarTitleDisplayMode(.large)
-            .navigationDestination(for: HomeRoute.self) { HomeRoutePlaceholder(route: $0) }
+            .navigationDestination(for: HomeRoute.self) { route in
+                switch route {
+                case .overdue: HomeListView(scope: .overdue)
+                case .unanswered: HomeListView(scope: .unanswered)
+                case .activeCards: HomeListView(scope: .activeCards)
+                case .prayer: ContentUnavailableView("Prayer", systemImage: "hands.and.sparkles")
+                }
+            }
             .toolbar {
                 if #available(iOS 27, *) {
                     ToolbarItem(placement: .topBarTrailing) { quickAddButton }
@@ -133,31 +140,6 @@ struct HomeView: View {
                 try database.homeMetrics(
                     now: .now, overdueDayThreshold: threshold, isSessionUnlocked: false)
             }
-        }
-    }
-}
-
-private struct HomeRoutePlaceholder: View {
-    let route: HomeRoute
-
-    var body: some View {
-        ContentUnavailableView(title, systemImage: systemImage)
-            .navigationTitle(title)
-    }
-
-    private var title: LocalizedStringResource {
-        switch route {
-        case .overdue: "Overdue"
-        case .unanswered: "Unanswered"
-        case .activeCards: "Active Cards"
-        }
-    }
-
-    private var systemImage: String {
-        switch route {
-        case .overdue: "clock.fill"
-        case .unanswered: "hands.and.sparkles.fill"
-        case .activeCards: "rectangle.stack.fill"
         }
     }
 }

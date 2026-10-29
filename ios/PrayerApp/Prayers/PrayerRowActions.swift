@@ -4,8 +4,8 @@ import SwiftUI
 struct PrayerRowActions: ViewModifier {
     let item: PrayerListItem
     let setAnswered: (Bool) -> Void
-    let pray: () -> Void
-    let edit: () -> Void
+    let pray: (() -> Void)?
+    let edit: (() -> Void)?
     let requestDelete: () -> Void
 
     private var isAnswered: Bool { item.record.isAnswered }
@@ -19,12 +19,12 @@ struct PrayerRowActions: ViewModifier {
                 deleteButton
             }
             .contextMenu {
-                Button("Pray", systemImage: "hands.and.sparkles", action: pray)
+                if let pray { Button("Pray", systemImage: "hands.and.sparkles", action: pray) }
                 if case .link(let link)? = try? ShareCodec.encode(request: item.record), let url = URL(string: link) {
                     ShareLink(item: url) { Label("Share", systemImage: "square.and.arrow.up") }
                 }
                 statusButton
-                Button("Edit", systemImage: "pencil", action: edit)
+                if let edit { Button("Edit", systemImage: "pencil", action: edit) }
                 deleteButton
             }
     }
@@ -45,8 +45,8 @@ extension View {
     func prayerRowActions(
         _ item: PrayerListItem,
         setAnswered: @escaping (Bool) -> Void,
-        pray: @escaping () -> Void,
-        edit: @escaping () -> Void,
+        pray: (() -> Void)? = nil,
+        edit: (() -> Void)? = nil,
         requestDelete: @escaping () -> Void
     ) -> some View {
         modifier(PrayerRowActions(

@@ -33,7 +33,7 @@ extension AppTab {
     }
 }
 
-enum HomeRoute: Hashable { case overdue, unanswered, activeCards }
+enum HomeRoute: Hashable { case overdue, unanswered, activeCards; case prayer(id: Int64) }
 enum CardsRoute: Hashable {
     case card(id: Int64)
     case manageCollections
