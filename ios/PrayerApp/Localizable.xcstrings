@@ -22,6 +22,9 @@
     "Can't Load Cards" : {
 
     },
+    "Can't Load Tags" : {
+
+    },
     "Can't Open Your Prayers" : {
 
     },
@@ -41,6 +44,18 @@
 
     },
     "Couldn't Save" : {
+
+    },
+    "Couldn't create the tag." : {
+
+    },
+    "Create %@" : {
+
+    },
+    "Create “%@”" : {
+
+    },
+    "Created tag %@" : {
 
     },
     "Delete" : {
@@ -68,6 +83,9 @@
 
     },
     "New Card" : {
+
+    },
+    "No Tags" : {
 
     },
     "None" : {
@@ -106,6 +124,9 @@
     "Search Cards" : {
 
     },
+    "Search or Create Tags" : {
+
+    },
     "Select Card" : {
 
     },
@@ -119,6 +140,9 @@
 
     },
     "Try Again" : {
+
+    },
+    "Type a name to create a tag." : {
 
     },
     "Unable to Load Home" : {

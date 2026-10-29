@@ -7,6 +7,8 @@ struct AppRoot: View {
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains(UpgradeGateView.argument) {
             UpgradeGateView()
+        } else if ProcessInfo.processInfo.arguments.contains(TagPickerHarness.argument) {
+            TagPickerHarness().environment(services)
         } else {
             AppShell().environment(services)
         }
