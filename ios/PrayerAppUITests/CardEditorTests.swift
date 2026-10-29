@@ -86,11 +86,15 @@ final class CardEditorTests: XCTestCase {
         let row = element(app, labelStartingWith: title)
         XCTAssertTrue(row.waitForExistence(timeout: 10), "\(title) row missing")
         row.tap()
+        openedCard = title
         XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 10), "\(title) detail missing")
     }
 
+    // The Cards list also has a More menu, so scope the lookup to the open card's navigation bar.
+    private var openedCard = ""
+
     private func openMore(_ app: XCUIApplication) {
-        let more = app.buttons["More"].firstMatch
+        let more = app.navigationBars[openedCard].buttons["More"].firstMatch
         XCTAssertTrue(more.waitForExistence(timeout: 10))
         more.tap()
     }

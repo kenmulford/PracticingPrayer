@@ -69,9 +69,9 @@ final class CardRowActionModel {
 
     var deleteMessage: String {
         switch activePrayerCount {
-        case 0: String(localized: "Delete \"\(title)\"?")
-        case 1: String(localized: "Delete \"\(title)\" and its 1 prayer request?")
-        default: String(localized: "Delete \"\(title)\" and its \(activePrayerCount) prayer requests?")
+        case 0: String(localized: "Delete “\(title)”?")
+        case 1: String(localized: "Delete “\(title)” and its 1 prayer request?")
+        default: String(localized: "Delete “\(title)” and its \(activePrayerCount) prayer requests?")
         }
     }
 

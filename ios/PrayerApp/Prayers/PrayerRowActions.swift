@@ -53,3 +53,16 @@ extension View {
             item: item, setAnswered: setAnswered, pray: pray, edit: edit, requestDelete: requestDelete))
     }
 }
+
+extension View {
+    func deletePrayerDialog(
+        isPresented: Binding<Bool>, title: String, confirm: @escaping () -> Void
+    ) -> some View {
+        confirmationDialog(
+            "Delete “\(title)”?", isPresented: isPresented, titleVisibility: .visible
+        ) {
+            Button("Delete Prayer", role: .destructive, action: confirm)
+            Button("Cancel", role: .cancel) {}
+        }
+    }
+}

@@ -108,14 +108,8 @@ private struct CardDetailContent: View {
             default: Text("This also deletes its \(model.prayerCount) prayer requests.")
             }
         }
-        .confirmationDialog(
-            Text("Delete “\(prayerToDelete?.title ?? "")”?"), isPresented: prayerDeleteBinding,
-            titleVisibility: .visible, presenting: prayerToDelete
-        ) { prayer in
-            Button("Delete Prayer", role: .destructive) {
-                perform { model.deletePrayer(id: prayer.id) }
-            }
-            Button("Cancel", role: .cancel) {}
+        .deletePrayerDialog(isPresented: prayerDeleteBinding, title: prayerToDelete?.title ?? "") {
+            if let prayer = prayerToDelete { perform { model.deletePrayer(id: prayer.id) } }
         }
         .alert("Couldn't Update Card", isPresented: errorBinding) {
             Button("OK") {}

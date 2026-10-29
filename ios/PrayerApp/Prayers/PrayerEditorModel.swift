@@ -78,7 +78,7 @@ final class PrayerEditorModel {
         do {
             allTags = try TagStore(database: database).tags().map(\.tag)
             if let prayerId {
-                let items = try PrayerStore(database: database).prayers(segment: .all, isSessionUnlocked: true)
+                let items = try PrayerStore(database: database).prayers(segment: .all, isSessionUnlocked: false)
                 if let item = items.first(where: { $0.record.id == prayerId }) {
                     let record = item.record
                     cardId = record.prayerCardId

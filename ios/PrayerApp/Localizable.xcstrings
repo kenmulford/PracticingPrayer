@@ -281,9 +281,6 @@
     "Delete" : {
 
     },
-    "Delete \"%@\"?" : {
-
-    },
     "Delete %lld Cards?" : {
       "localizations" : {
         "en" : {
@@ -306,13 +303,10 @@
         }
       }
     },
-    "Delete \"%@\"?" : {
+    "Delete “%@” and its 1 prayer request?" : {
 
     },
-    "Delete \"%@\" and its 1 prayer request?" : {
-
-    },
-    "Delete \"%@\" and its %lld prayer requests?" : {
+    "Delete “%@” and its %lld prayer requests?" : {
 
     },
     "Delete All Cards & Requests" : {
@@ -328,12 +322,6 @@
 
     },
     "Delete Prayer" : {
-
-    },
-    "Delete Prayer Request" : {
-
-    },
-    "Delete Prayer?" : {
 
     },
     "Delete Tag" : {
@@ -483,7 +471,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%#@cards@ to %@"
+            "value" : "%#@cards@ to %2$@"
           },
           "substitutions" : {
             "cards" : {

@@ -18,6 +18,8 @@ struct TagsView: View {
             .navigationDestination(for: TagsRoute.self) { route in
                 switch route {
                 case .tagPrayers(let id): TagPrayersView(tagId: id, path: $path)
+                case .prayer(let id): PushedPrayerDetail(prayerId: id, cardRoute: TagsRoute.card(id:))
+                case .card(let id): PushedCardDetail(cardId: id)
                 }
             }
             .task {

@@ -16,8 +16,7 @@ struct PrayersView: View {
     @State private var load: Result<[PrayerListItem], any Error>?
     @State private var pendingDelete: PrayerListItem?
     @State private var errorMessage: String?
-    @State private var isAddingPrayer = false
-    @State private var editingPrayerID: Int64?
+    @State private var editingPrayer: PrayerEditorTarget?
     @State private var prayingPrayerID: Int64?
 
     private struct Query: Hashable {
@@ -49,19 +48,13 @@ struct PrayersView: View {
                     .padding(.bottom, 8)
                 }
                 .toolbar {
-                    PrayersToolbar(tags: tags, selectedTagIds: $selectedTagIds, newPrayer: { isAddingPrayer = true })
+                    PrayersToolbar(tags: tags, selectedTagIds: $selectedTagIds, newPrayer: { editingPrayer = .new })
                 }
-                .sheet(isPresented: $isAddingPrayer) {
-                    NavigationStack { Color.clear.navigationTitle("New Prayer") }
+                .sheet(item: $editingPrayer, onDismiss: reload) { target in
+                    PrayerEditorView(prayerId: target.prayerId, database: services.database)
                 }
-                .sheet(isPresented: editingBinding, onDismiss: reload) {
-                    PrayerEditorView(prayerId: editingPrayerID, database: services.database)
-                }
-                .confirmationDialog(
-                    "Delete Prayer?", isPresented: deleteBinding, titleVisibility: .visible, presenting: pendingDelete
-                ) { item in
-                    Button("Delete", role: .destructive) { perform { try store.delete(id: item.record.id) } }
-                    Button("Cancel", role: .cancel) {}
+                .deletePrayerDialog(isPresented: deleteBinding, title: pendingDelete?.record.title ?? "") {
+                    if let item = pendingDelete { perform { try store.delete(id: item.record.id) } }
                 }
                 .alert("Couldn't Update Prayer", isPresented: errorBinding) {
                     Button("OK") {}
@@ -147,7 +140,7 @@ struct PrayersView: View {
                             }
                         },
                         pray: { prayingPrayerID = item.record.id },
-                        edit: { editingPrayerID = item.record.id },
+                        edit: { editingPrayer = .edit(item.record.id) },
                         requestDelete: { pendingDelete = item })
                 }
             }
@@ -156,10 +149,6 @@ struct PrayersView: View {
 
     private var deleteBinding: Binding<Bool> {
         Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } })
-    }
-
-    private var editingBinding: Binding<Bool> {
-        Binding(get: { editingPrayerID != nil }, set: { if !$0 { editingPrayerID = nil } })
     }
 
     private var errorBinding: Binding<Bool> {

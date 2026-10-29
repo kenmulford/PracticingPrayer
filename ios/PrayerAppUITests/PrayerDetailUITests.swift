@@ -94,14 +94,14 @@ final class PrayerDetailUITests: XCTestCase {
     func testDeleteConfirmsAndCancelKeeps() throws {
         let (app, title) = try openPrayer("Delete")
         app.buttons["Delete Prayer"].firstMatch.tap()
-        XCTAssertTrue(app.staticTexts["Delete Prayer Request"].waitForExistence(timeout: 5), "confirmation missing")
+        XCTAssertTrue(app.staticTexts["Delete “\(title)”?"].waitForExistence(timeout: 5), "confirmation missing")
 
         // iPad confirmation dialogs are popovers with no Cancel button; tapping outside dismisses.
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.5)).tap()
         XCTAssertTrue(app.buttons["Delete Prayer"].firstMatch.waitForExistence(timeout: 5), "cancel keeps the detail")
 
         app.buttons["Delete Prayer"].firstMatch.tap()
-        let confirm = app.popovers.buttons["Delete"].firstMatch
+        let confirm = app.popovers.buttons["Delete Prayer"].firstMatch
         XCTAssertTrue(confirm.waitForExistence(timeout: 5), "confirm button missing")
         confirm.tap()
         XCTAssertFalse(row(app, title).waitForExistence(timeout: 3), "row removed after confirm")

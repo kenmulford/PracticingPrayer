@@ -122,16 +122,11 @@ struct PrayerDetailView<CardLink: Hashable>: View {
         ) {
             PrayerEditorView(prayerId: prayer.id, database: services.database) { if $0 == .deleted { onClose() } }
         }
-        .confirmationDialog("Delete Prayer Request", isPresented: $confirmDelete, titleVisibility: .visible) {
-            Button("Delete", role: .destructive) {
-                if model.delete() {
-                    onChange()
-                    onClose()
-                }
+        .deletePrayerDialog(isPresented: $confirmDelete, title: prayer.title) {
+            if model.delete() {
+                onChange()
+                onClose()
             }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Delete \"\(prayer.title)\"?")
         }
         .alert(
             "Couldn't Update Prayer",
@@ -152,6 +147,26 @@ struct PrayerDetailView<CardLink: Hashable>: View {
     private func date(_ ticks: Int64) -> String {
         guard let value = try? Date(ticks: ticks) else { return "" }
         return value.formatted(date: .abbreviated, time: .omitted)
+    }
+}
+
+/// Detail screens for stacks whose route enum holds no selection state: closing pops the pushed screen.
+struct PushedPrayerDetail<CardLink: Hashable>: View {
+    let prayerId: Int64
+    let cardRoute: (Int64) -> CardLink
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        PrayerDetailView(prayerId: prayerId, cardRoute: cardRoute, onChange: {}, onClose: { dismiss() })
+    }
+}
+
+struct PushedCardDetail: View {
+    let cardId: Int64
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        CardDetailView(cardId: cardId, onChange: {}, onClose: { dismiss() })
     }
 }
 

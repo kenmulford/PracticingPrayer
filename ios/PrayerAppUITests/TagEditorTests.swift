@@ -108,7 +108,8 @@ final class TagEditorTests: XCTestCase {
         let delete = app.buttons["TagEditor_DeleteTag"]
         XCTAssertTrue(delete.waitForExistence(timeout: 5))
         delete.tap()
-        let confirm = app.buttons["Delete Tag"].firstMatch
+        // The editor behind the popover has a button with the same label.
+        let confirm = app.popovers.buttons["Delete Tag"].firstMatch
         XCTAssertTrue(confirm.waitForExistence(timeout: 5))
         confirm.tap()
         XCTAssertTrue(target.waitForNonExistence(timeout: 10))

@@ -14,6 +14,7 @@ struct HomeListView: View {
         content
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
+            .onAppear { model?.load() }
             .task {
                 if model == nil {
                     model = HomeListModel(
@@ -84,17 +85,10 @@ struct HomeListView: View {
                 }
             }
         }
-        .confirmationDialog(
-            "Delete Prayer?",
+        .deletePrayerDialog(
             isPresented: Binding(get: { model.pendingDelete != nil }, set: { if !$0 { model.pendingDelete = nil } }),
-            titleVisibility: .visible, presenting: model.pendingDelete
-        ) { item in
-            Button("Delete", role: .destructive) {
-                model.pendingDelete = item
-                model.confirmDelete()
-            }
-            Button("Cancel", role: .cancel) {}
-        }
+            title: model.pendingDelete?.record.title ?? ""
+        ) { model.confirmDelete() }
         .alert(
             "Couldn't Update Prayer",
             isPresented: Binding(get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })

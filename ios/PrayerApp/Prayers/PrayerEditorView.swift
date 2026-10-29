@@ -1,6 +1,17 @@
 import PrayerKit
 import SwiftUI
 
+enum PrayerEditorTarget: Identifiable {
+    case new
+    case edit(Int64)
+
+    var id: Int64? {
+        if case .edit(let id) = self { id } else { nil }
+    }
+
+    var prayerId: Int64? { id }
+}
+
 struct PrayerEditorView: View {
     @State private var model: PrayerEditorModel
     @Environment(\.dismiss) private var dismiss
@@ -108,12 +119,7 @@ struct PrayerEditorView: View {
             Button("Discard Changes", role: .destructive) { finish(.saved) }
             Button("Keep Editing", role: .cancel) {}
         }
-        .confirmationDialog("Delete Prayer Request", isPresented: $showingDelete, titleVisibility: .visible) {
-            Button("Delete", role: .destructive) { run(.deleted) { model.delete() } }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Delete \"\(model.title)\"?")
-        }
+        .deletePrayerDialog(isPresented: $showingDelete, title: model.title) { run(.deleted) { model.delete() } }
         .alert("Couldn't Save", isPresented: alertBinding) {
             Button("OK") {}
         } message: {

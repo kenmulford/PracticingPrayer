@@ -41,7 +41,8 @@ struct HomeView: View {
                 case .overdue: HomeListView(scope: .overdue)
                 case .unanswered: HomeListView(scope: .unanswered)
                 case .activeCards: HomeListView(scope: .activeCards)
-                case .prayer: ContentUnavailableView("Prayer", systemImage: "hands.and.sparkles")
+                case .prayer(let id): PushedPrayerDetail(prayerId: id, cardRoute: HomeRoute.card(id:))
+                case .card(let id): PushedCardDetail(cardId: id)
                 }
             }
             .toolbar {

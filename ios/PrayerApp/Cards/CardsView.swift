@@ -27,7 +27,6 @@ struct CardsView: View {
     @State private var isMoving = false
     @State private var confirmArchive = false
     @State private var confirmDelete = false
-    @State private var moveTargets: [CardBoxRecord] = []
     @State private var cardToDelete: CardListItem?
     @State private var rowCard: CardListItem?
     @State private var isEditingRow = false
@@ -340,12 +339,12 @@ struct CardsView: View {
     }
 
     private func startMove() {
-        loadMoveTargets()
         isMoving = true
     }
 
-    private func loadMoveTargets() {
-        moveTargets = (try? CollectionStore(database: services.database).collections()
+    // Read at presentation time: a @State copy set in the same transaction as the sheet flag reached the sheet empty.
+    private var moveTargets: [CardBoxRecord] {
+        (try? CollectionStore(database: services.database).collections()
             .filter { !$0.isSystem }
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }) ?? []
     }
@@ -363,7 +362,6 @@ struct CardsView: View {
             isEditingRow = true
         case .moveTo:
             rowCard = item
-            loadMoveTargets()
             isMovingRow = true
         case .delete:
             cardToDelete = item

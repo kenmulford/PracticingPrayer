@@ -94,7 +94,9 @@ final class CardRowActionsTests: XCTestCase {
         waitForList(app)
         let row = element(app, labelStartingWith: "RowSwipeFavorite")
         XCTAssertTrue(row.waitForExistence(timeout: 10))
-        row.swipeRight()
+        // A full swipe runs the action itself, so drag only far enough to reveal the button.
+        row.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.5))
+            .press(forDuration: 0.1, thenDragTo: row.coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: 0.5)))
         XCTAssertTrue(app.buttons["Favorite"].waitForExistence(timeout: 5))
     }
 

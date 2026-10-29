@@ -99,7 +99,7 @@ final class PrayerEditorTests: XCTestCase {
         let delete = app.buttons["Delete Prayer"].firstMatch
         XCTAssertTrue(delete.waitForExistence(timeout: 10), "delete button missing")
         delete.tap()
-        let confirm = app.popovers.buttons["Delete"].firstMatch
+        let confirm = app.popovers.buttons["Delete Prayer"].firstMatch
         XCTAssertTrue(confirm.waitForExistence(timeout: 5), "confirm button missing")
         confirm.tap()
         XCTAssertFalse(row(app, title).waitForExistence(timeout: 5), "row removed after delete")

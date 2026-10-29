@@ -15,7 +15,7 @@ struct TagPrayersView: View {
     @State private var pendingDelete: PrayerListItem?
     @State private var errorMessage: String?
     @State private var isEditingTag = false
-    @State private var editingPrayerID: Int64?
+    @State private var editingPrayer: PrayerEditorTarget?
     @State private var prayingPrayerID: Int64?
 
     private struct Query: Hashable {
@@ -51,14 +51,11 @@ struct TagPrayersView: View {
             .sheet(isPresented: $isEditingTag, onDismiss: { reloadTag() }) {
                 TagEditorView(database: services.database, tag: tag)
             }
-            .sheet(isPresented: editingBinding, onDismiss: reload) {
-                PrayerEditorView(prayerId: editingPrayerID, database: services.database)
+            .sheet(item: $editingPrayer, onDismiss: reload) { target in
+                PrayerEditorView(prayerId: target.prayerId, database: services.database)
             }
-            .confirmationDialog(
-                "Delete Prayer?", isPresented: deleteBinding, titleVisibility: .visible, presenting: pendingDelete
-            ) { item in
-                Button("Delete", role: .destructive) { perform { try store.delete(id: item.record.id) } }
-                Button("Cancel", role: .cancel) {}
+            .deletePrayerDialog(isPresented: deleteBinding, title: pendingDelete?.record.title ?? "") {
+                if let item = pendingDelete { perform { try store.delete(id: item.record.id) } }
             }
             .confirmationDialog(
                 Text("Delete “\(model?.pendingDelete?.name ?? "")”?"), isPresented: tagDeleteBinding,
@@ -85,6 +82,7 @@ struct TagPrayersView: View {
                 if model == nil { model = TagsModel(database: services.database) }
                 reloadTag()
             }
+            .onAppear { reload() }
             .task(id: Query(segment: segment, searchText: searchText)) { reload() }
     }
 
@@ -116,9 +114,11 @@ struct TagPrayersView: View {
         case .success(let items):
             List {
                 ForEach(items, id: \.record.id) { item in
-                    PrayerListRow(
-                        prayer: item.record, cardTitle: item.cardTitle, isImported: item.record.isImported ?? false)
-                        .prayerRowActions(
+                    NavigationLink(value: TagsRoute.prayer(id: item.record.id)) {
+                        PrayerListRow(
+                            prayer: item.record, cardTitle: item.cardTitle, isImported: item.record.isImported ?? false)
+                    }
+                    .prayerRowActions(
                             item,
                             setAnswered: { answered in
                                 perform {
@@ -130,7 +130,7 @@ struct TagPrayersView: View {
                                 }
                             },
                             pray: { prayingPrayerID = item.record.id },
-                            edit: { editingPrayerID = item.record.id },
+                            edit: { editingPrayer = .edit(item.record.id) },
                             requestDelete: { pendingDelete = item })
                 }
             }
@@ -143,10 +143,6 @@ struct TagPrayersView: View {
 
     private var tagDeleteBinding: Binding<Bool> {
         Binding(get: { model?.pendingDelete != nil }, set: { if !$0 { model?.pendingDelete = nil } })
-    }
-
-    private var editingBinding: Binding<Bool> {
-        Binding(get: { editingPrayerID != nil }, set: { if !$0 { editingPrayerID = nil } })
     }
 
     private var errorBinding: Binding<Bool> {

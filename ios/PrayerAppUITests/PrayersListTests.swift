@@ -89,7 +89,13 @@ final class PrayersListTests: XCTestCase {
 
     private func swipeAction(_ app: XCUIApplication, on row: XCUIElement, leading: Bool, button: String) {
         XCTAssertTrue(row.waitForExistence(timeout: 20), "row missing")
-        if leading { row.swipeRight() } else { row.swipeLeft() }
+        // A full swipe runs the leading action itself, so drag only far enough to reveal the button.
+        if leading {
+            row.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.5))
+                .press(forDuration: 0.1, thenDragTo: row.coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: 0.5)))
+        } else {
+            row.swipeLeft()
+        }
         let action = app.buttons[button].firstMatch
         XCTAssertTrue(action.waitForExistence(timeout: 5), "\(button) swipe action missing")
         action.tap()
@@ -178,15 +184,15 @@ final class PrayersListTests: XCTestCase {
         let app = launch(
             database: try prepareDatabase([insertCard("Card \(test)"), insertRequest(for: "Card \(test)", title)]))
         swipeAction(app, on: row(app, title), leading: false, button: "Delete")
-        XCTAssertTrue(app.staticTexts["Delete Prayer?"].waitForExistence(timeout: 5), "confirmation missing")
+        XCTAssertTrue(app.staticTexts["Delete “\(title)”?"].waitForExistence(timeout: 5), "confirmation missing")
 
         // iPad confirmation dialogs are popovers with no Cancel button; tapping outside dismisses.
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.5)).tap()
         XCTAssertTrue(row(app, title).waitForExistence(timeout: 5), "cancel keeps the row")
 
         swipeAction(app, on: row(app, title), leading: false, button: "Delete")
-        XCTAssertTrue(app.staticTexts["Delete Prayer?"].waitForExistence(timeout: 5))
-        let confirm = app.popovers.buttons["Delete"].firstMatch
+        XCTAssertTrue(app.staticTexts["Delete “\(title)”?"].waitForExistence(timeout: 5))
+        let confirm = app.popovers.buttons["Delete Prayer"].firstMatch
         XCTAssertTrue(confirm.waitForExistence(timeout: 5), "confirm button missing")
         confirm.tap()
         XCTAssertFalse(row(app, title).waitForExistence(timeout: 3), "row removed after confirm")

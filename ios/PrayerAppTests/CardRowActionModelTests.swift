@@ -62,9 +62,9 @@ private func model(
     }
 
     @Test func deleteMessageCounts() {
-        #expect(model(count: 0).deleteMessage == "Delete \"Card\"?")
-        #expect(model(count: 1).deleteMessage == "Delete \"Card\" and its 1 prayer request?")
-        #expect(model(count: 2).deleteMessage == "Delete \"Card\" and its 2 prayer requests?")
+        #expect(model(count: 0).deleteMessage == "Delete “Card”?")
+        #expect(model(count: 1).deleteMessage == "Delete “Card” and its 1 prayer request?")
+        #expect(model(count: 2).deleteMessage == "Delete “Card” and its 2 prayer requests?")
     }
 
     @Test func performFavoritePersists() async throws {
