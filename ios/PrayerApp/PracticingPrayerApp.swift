@@ -5,7 +5,7 @@ import SwiftUI
 struct PracticingPrayerApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            AppRoot()
         }
     }
 }
