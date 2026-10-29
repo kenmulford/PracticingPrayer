@@ -24,10 +24,15 @@ struct PrayerEditorView: View {
 
     init(
         prayerId: Int64?, cardId: Int64? = nil, cardTitle: String? = nil, database: PrayerDatabase,
+        preferences: AppPreferences = AppServices.defaultPreferences,
+        reminders: (any ReminderReconciling)? = nil,
         onFinish: @escaping (PrayerEditorModel.Outcome) -> Void = { _ in }
     ) {
         let model = PrayerEditorModel(
-            prayerId: prayerId, cardId: cardId, cardTitle: cardTitle, database: database)
+            prayerId: prayerId, cardId: cardId, cardTitle: cardTitle, database: database,
+            preferences: preferences,
+            reminders: reminders
+                ?? ReminderScheduler(database: database, preferences: preferences, center: SystemReminderCenter()))
         model.load()
         self.model = model
         self.database = database
@@ -59,6 +64,7 @@ struct PrayerEditorView: View {
                         .lineLimit(3...8)
                         .accessibilityIdentifier("PrayerEditor_Details")
                 }
+                ReminderSection(model: model)
                 Section {
                     Toggle("Answered", isOn: $model.isAnswered)
                         .accessibilityIdentifier("PrayerEditor_Answered")
@@ -85,7 +91,7 @@ struct PrayerEditorView: View {
                 if model.isNew {
                     Section {
                         Button("Save and Add Another") {
-                            if model.saveAndAddAnother() { titleFocused = true }
+                            Task { if await model.saveAndAddAnother() { titleFocused = true } }
                         }
                         .disabled(!model.canSave)
                         .accessibilityIdentifier("PrayerEditor_SaveAndAdd")
@@ -107,7 +113,7 @@ struct PrayerEditorView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save", systemImage: "checkmark", role: .confirm) {
-                        run(.saved) { model.save() }
+                        Task { if await model.save() { finish(.saved) } }
                     }
                     .disabled(!model.canSave)
                     .accessibilityIdentifier("PrayerEditor_Confirm")
@@ -119,13 +125,16 @@ struct PrayerEditorView: View {
             Button("Discard Changes", role: .destructive) { finish(.saved) }
             Button("Keep Editing", role: .cancel) {}
         }
-        .deletePrayerDialog(isPresented: $showingDelete, title: model.title) { run(.deleted) { model.delete() } }
+        .deletePrayerDialog(isPresented: $showingDelete, title: model.title) {
+            Task { if await model.delete() { finish(.deleted) } }
+        }
         .alert("Couldn't Save", isPresented: alertBinding) {
             Button("OK") {}
         } message: {
             Text(model.alert ?? "")
         }
         .onAppear { if model.isNew { titleFocused = true } }
+        .task { await model.refreshAuthorization() }
         .onChange(of: model.tagIds) { model.loadTags() }
     }
 
@@ -148,10 +157,6 @@ struct PrayerEditorView: View {
             }
             .accessibilityElement(children: .combine)
         }
-    }
-
-    private func run(_ outcome: PrayerEditorModel.Outcome, _ work: () -> Bool) {
-        if work() { finish(outcome) }
     }
 
     private func finish(_ outcome: PrayerEditorModel.Outcome) {

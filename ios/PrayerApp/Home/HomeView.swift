@@ -31,6 +31,7 @@ struct HomeView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var model = HomeModel()
     @State private var showingQuickAdd = false
+    @State private var showingPrayerTime = false
 
     var body: some View {
         content
@@ -73,6 +74,7 @@ struct HomeView: View {
                         Button("Retry", action: reload)
                     }
                 } else {
+                    prayerTimeButton
                     LazyVGrid(columns: columns, spacing: 12) {
                         tiles
                     }
@@ -86,6 +88,22 @@ struct HomeView: View {
             .frame(maxWidth: .infinity)
         }
         .accessibilityIdentifier("Shell_Root_home")
+    }
+
+    private var prayerTimeButton: some View {
+        Button {
+            showingPrayerTime = true
+            services.onboarding.advance(from: .prayerTime)
+        } label: {
+            Label("Prayer Time", systemImage: "hands.and.sparkles.fill")
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.glassProminent)
+        .controlSize(.large)
+        .disabled(model.metrics.unanswered == 0)
+        .accessibilityIdentifier("Home_PrayerTimeButton")
+        .onboardingTip(.prayerTime)
+        .prayerTimeLauncher(isPresented: $showingPrayerTime)
     }
 
     private var columns: [GridItem] {
@@ -116,9 +134,16 @@ struct HomeView: View {
                 value: count(metrics.activeCards))
         }
         .buttonStyle(.plain)
-        HomeTileView(
-            title: "Last Prayed", systemImage: "calendar", color: .gray,
-            value: lastPrayedText(metrics.lastPrayed))
+        Button {
+            showingPrayerTime = true
+        } label: {
+            HomeTileView(
+                title: "Last Prayed", systemImage: "calendar", color: .gray,
+                value: lastPrayedText(metrics.lastPrayed))
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint("Choose what to pray for")
+        .disabled(metrics.unanswered == 0)
     }
 
     private func count(_ n: Int) -> Text {

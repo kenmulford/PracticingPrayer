@@ -34,6 +34,7 @@ private struct CardDetailContent: View {
     @State private var isMoving = false
     @State private var isEditing = false
     @State private var isAddingPrayer = false
+    @State private var prayScope: PrayerTimeScope?
     @State private var confirmArchive = false
     @State private var confirmDelete = false
     @State private var prayerToDelete: PrayerRequestRecord?
@@ -66,6 +67,7 @@ private struct CardDetailContent: View {
         }
         .overlay { emptyState }
         .navigationTitle(model.card?.title ?? "")
+        .prayerTimeStart($prayScope)
         .navigationSubtitle(model.collectionName)
         .navigationBarTitleDisplayMode(.large)
         .searchable(text: searchBinding, prompt: Text("Search Prayers"))
@@ -98,7 +100,10 @@ private struct CardDetailContent: View {
             Text("Delete “\(model.card?.title ?? "")”?"), isPresented: $confirmDelete, titleVisibility: .visible
         ) {
             Button("Delete Card", role: .destructive) {
-                if model.delete() { onClose() }
+                if model.delete() {
+                    services.reconcileReminders()
+                    onClose()
+                }
             }
             Button("Cancel", role: .cancel) {}
         } message: {
@@ -109,7 +114,10 @@ private struct CardDetailContent: View {
             }
         }
         .deletePrayerDialog(isPresented: prayerDeleteBinding, title: prayerToDelete?.title ?? "") {
-            if let prayer = prayerToDelete { perform { model.deletePrayer(id: prayer.id) } }
+            if let prayer = prayerToDelete { perform {
+                    model.deletePrayer(id: prayer.id)
+                    services.reconcileReminders()
+                } }
         }
         .alert("Couldn't Update Card", isPresented: errorBinding) {
             Button("OK") {}
@@ -132,9 +140,17 @@ private struct CardDetailContent: View {
 
     @ViewBuilder
     private var toolbarButtons: some View {
-        Button { isAddingPrayer = true } label: {
+        Button("Pray", systemImage: "hands.and.sparkles") {
+            if let id = model.card?.id { prayScope = .cards([id]) }
+        }
+        .disabled(!model.canPray)
+        Button {
+            isAddingPrayer = true
+            services.onboarding.advance(from: .addPrayer)
+        } label: {
             Label("New Prayer", systemImage: "plus")
         }
+        .onboardingTip(.addPrayer)
         Menu {
             if !model.isSystem {
                 Button(
@@ -178,11 +194,17 @@ private struct CardDetailContent: View {
     private func statusButton(_ prayer: PrayerRequestRecord) -> some View {
         if prayer.isAnswered {
             Button("Mark Active", systemImage: "arrow.uturn.backward") {
-                perform { model.markActive(prayerId: prayer.id) }
+                perform {
+                    model.markActive(prayerId: prayer.id)
+                    services.reconcileReminders()
+                }
             }
         } else {
             Button("Mark Answered", systemImage: "checkmark.circle") {
-                perform { model.markAnswered(prayerId: prayer.id) }
+                perform {
+                    model.markAnswered(prayerId: prayer.id)
+                    services.reconcileReminders()
+                }
             }
             .tint(.green)
         }

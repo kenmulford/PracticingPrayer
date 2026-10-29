@@ -1,6 +1,12 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%@ %lld of %lld" : {
+
+    },
+    "%@ marked as answered" : {
+
+    },
     "%@ · %lld" : {
 
     },
@@ -51,19 +57,34 @@
         }
       }
     },
+    "%lld of %lld" : {
+
+    },
     "%lld prayers saved" : {
 
     },
     "%lld times since %@" : {
 
     },
+    "1 Minute" : {
+
+    },
     "1 time since %@" : {
+
+    },
+    "2 Minutes" : {
+
+    },
+    "30 Seconds" : {
 
     },
     "A collection named '%@' already exists. Please choose a different name." : {
 
     },
     "A personal worship tool for organizing your prayer life. Create prayer cards, track requests, set reminders, and spend focused time in prayer." : {
+
+    },
+    "A tag named '%@' already exists. Please choose a different name." : {
 
     },
     "About" : {
@@ -73,6 +94,9 @@
 
     },
     "Active Cards" : {
+
+    },
+    "Add a Prayer Request" : {
 
     },
     "Add Card" : {
@@ -90,10 +114,16 @@
     "Add a prayer to this card." : {
 
     },
+    "Add your first prayer request to this card." : {
+
+    },
     "All" : {
 
     },
     "All Prayed For" : {
+
+    },
+    "All Requests" : {
 
     },
     "Allow Landscape" : {
@@ -179,10 +209,37 @@
     "Are you sure you want to Archive this card? You can find it in your Archived Cards collection." : {
 
     },
+    "Auto Advance" : {
+
+    },
+    "Auto-advance started" : {
+
+    },
     "Auto-mode automatically advances to the next prayer after a set interval (30s, 60s, or 120s). Tap the timer display to cycle through intervals. Tap pause to stop auto-advance." : {
 
     },
     "Backup & Restore" : {
+
+    },
+    "Black" : {
+
+    },
+    "Blue" : {
+
+    },
+    "Brown" : {
+
+    },
+    "By Collection" : {
+
+    },
+    "By Collection…" : {
+
+    },
+    "By Tags" : {
+
+    },
+    "By Tags…" : {
 
     },
     "Can I filter Prayer Time by tags?" : {
@@ -230,7 +287,19 @@
     "Check that notifications are enabled in App Settings and that your device's system settings allow notifications for this app. On iOS, also check Focus mode settings." : {
 
     },
+    "Choose Cards" : {
+
+    },
+    "Choose Cards…" : {
+
+    },
+    "Choose what to pray for" : {
+
+    },
     "Clear Filter" : {
+
+    },
+    "Close" : {
 
     },
     "Collection" : {
@@ -243,6 +312,9 @@
 
     },
     "Collections help you organize your cards." : {
+
+    },
+    "Color" : {
 
     },
     "Couldn't Delete" : {
@@ -260,6 +332,9 @@
     "Couldn't Update Cards" : {
 
     },
+    "Couldn't Start Prayer Time" : {
+
+    },
     "Couldn't Update Prayer" : {
 
     },
@@ -269,10 +344,37 @@
     "Create %@" : {
 
     },
+    "Create Your First Prayer Card" : {
+
+    },
     "Create “%@”" : {
 
     },
     "Created tag %@" : {
+
+    },
+    "Custom" : {
+
+    },
+    "Daily" : {
+
+    },
+    "Daily at %@" : {
+
+    },
+    "Dark %@" : {
+
+    },
+    "Dark gray" : {
+
+    },
+    "Date" : {
+
+    },
+    "Day" : {
+
+    },
+    "Day of Month" : {
 
     },
     "Default Reminder Time" : {
@@ -303,12 +405,6 @@
         }
       }
     },
-    "Delete “%@” and its 1 prayer request?" : {
-
-    },
-    "Delete “%@” and its %lld prayer requests?" : {
-
-    },
     "Delete All Cards & Requests" : {
 
     },
@@ -321,10 +417,19 @@
     "Delete Collection" : {
 
     },
+    "Delete Color" : {
+
+    },
     "Delete Prayer" : {
 
     },
     "Delete Tag" : {
+
+    },
+    "Delete “%@” and its %lld prayer requests?" : {
+
+    },
+    "Delete “%@” and its 1 prayer request?" : {
 
     },
     "Delete “%@”?" : {
@@ -370,6 +475,9 @@
     "Duplicate Collection Name" : {
 
     },
+    "Duplicate Tag Name" : {
+
+    },
     "Edit" : {
 
     },
@@ -397,7 +505,22 @@
     "Filtered by %@" : {
 
     },
+    "Get Started" : {
+
+    },
+    "Give it a name \u2014 a person, a topic, or a place." : {
+
+    },
     "Go to Settings → Backup & Restore → Back Up Now. This creates a file you can save or share. To restore, use \"Restore from Backup\" on the same screen." : {
+
+    },
+    "Got a shared prayer? Tap the link again to open it here." : {
+
+    },
+    "Gray" : {
+
+    },
+    "Green" : {
 
     },
     "Help" : {
@@ -430,6 +553,9 @@
     "Imported" : {
 
     },
+    "Interval" : {
+
+    },
     "Is my data private?" : {
 
     },
@@ -440,6 +566,15 @@
 
     },
     "Last Prayed" : {
+
+    },
+    "Let's set up your first prayer card." : {
+
+    },
+    "Light %@" : {
+
+    },
+    "Light gray" : {
 
     },
     "Locked" : {
@@ -455,6 +590,12 @@
 
     },
     "Mark Answered" : {
+
+    },
+    "Monthly" : {
+
+    },
+    "Monthly on the %@ at %@" : {
 
     },
     "More" : {
@@ -501,6 +642,9 @@
     "Name" : {
 
     },
+    "Never" : {
+
+    },
     "New Card" : {
 
     },
@@ -516,6 +660,9 @@
     "New reminders start at this time." : {
 
     },
+    "Next" : {
+
+    },
     "No Active Cards" : {
 
     },
@@ -526,6 +673,9 @@
 
     },
     "No Cards" : {
+
+    },
+    "No Collections" : {
 
     },
     "No Collections Yet" : {
@@ -570,6 +720,9 @@
     "Off" : {
 
     },
+    "Once on %@ at %@" : {
+
+    },
     "Open Settings" : {
 
     },
@@ -577,6 +730,9 @@
 
     },
     "Open a prayer request and choose a reminder frequency: Never, Daily, Weekly, Monthly, or Yearly. Choose a time, and optionally a day of the week. The app will send a notification at your chosen time." : {
+
+    },
+    "Orange" : {
 
     },
     "Overdue" : {
@@ -604,10 +760,28 @@
         }
       }
     },
+    "Pastel %@" : {
+
+    },
+    "Pause" : {
+
+    },
+    "Paused" : {
+
+    },
+    "Pink" : {
+
+    },
     "Practicing Prayer" : {
 
     },
     "Pray" : {
+
+    },
+    "Pray Now" : {
+
+    },
+    "Pray through your requests one by one." : {
 
     },
     "Prayed" : {
@@ -619,10 +793,10 @@
     "Prayer %lld" : {
 
     },
-    "Prayer Cards" : {
+    "Prayer %lld of %lld. %@" : {
 
     },
-    "Prayer deleted" : {
+    "Prayer Cards" : {
 
     },
     "Prayer Not Found" : {
@@ -634,6 +808,9 @@
     "Prayer Time presents your prayers one at a time in a focused view. Swipe or tap the arrows to move between prayers. When you're done, tap \"I'm Done\" to end the session. By default, Prayer Time launches in landscape mode. You can change this in settings." : {
 
     },
+    "Prayer deleted" : {
+
+    },
     "Prayer marked as active" : {
 
     },
@@ -643,10 +820,22 @@
     "Prayer saved" : {
 
     },
+    "Prayer saved. Reminder off." : {
+
+    },
+    "Prayer saved. Reminder on." : {
+
+    },
+    "Prayer session complete" : {
+
+    },
     "Prayers" : {
 
     },
     "Prayers not prayed within this many days appear in your overdue list on the home page." : {
+
+    },
+    "Previous" : {
 
     },
     "Privacy Policy" : {
@@ -661,10 +850,31 @@
     "Protection" : {
 
     },
+    "Purple" : {
+
+    },
     "Quick Add" : {
 
     },
     "Quick Add lets you jot down a prayer request from the home screen without choosing a card. It saves to a special \"Quick Add\" card that you can reorganize later." : {
+
+    },
+    "Red" : {
+
+    },
+    "Remind Me" : {
+
+    },
+    "Reminder" : {
+
+    },
+    "Repeat" : {
+
+    },
+    "Resume" : {
+
+    },
+    "Resumed" : {
 
     },
     "Retry" : {
@@ -709,7 +919,16 @@
     "Share" : {
 
     },
+    "Skip Tour" : {
+
+    },
     "Source" : {
+
+    },
+    "Start" : {
+
+    },
+    "Start (%lld)" : {
 
     },
     "Started" : {
@@ -724,13 +943,22 @@
     "Tag deleted" : {
 
     },
+    "Tag saved" : {
+
+    },
     "Tags" : {
 
     },
     "Tags are like labels you can attach to any prayer. Go to the Tags tab to create tags with custom colors, then add them to prayers from the prayer detail screen." : {
 
     },
+    "Take the Tour Again" : {
+
+    },
     "Tap the Prayer Cards tab, then tap \"Add Card\" in the top right. Give your card a name \u2014 a person, topic, or place \u2014 then tap Save, or Save + to save it and start another card in the same collection." : {
+
+    },
+    "Teal" : {
 
     },
     "The card is hidden from every list until you choose Show Confidential." : {
@@ -776,6 +1004,9 @@
     "This is the Quick Add card, so it can't be edited, favorited, archived, or deleted." : {
 
     },
+    "Time" : {
+
+    },
     "Title" : {
 
     },
@@ -783,6 +1014,9 @@
 
     },
     "Type a name to create a tag." : {
+
+    },
+    "Unable to Load" : {
 
     },
     "Unable to Load Home" : {
@@ -809,6 +1043,15 @@
     "Website" : {
 
     },
+    "Weekly" : {
+
+    },
+    "Weekly on %@ at %@" : {
+
+    },
+    "Welcome to Practicing Prayer" : {
+
+    },
     "What does the star icon do?" : {
 
     },
@@ -818,7 +1061,22 @@
     "What is auto-mode in Prayer Time?" : {
 
     },
+    "White" : {
+
+    },
     "Why am I not receiving notifications?" : {
+
+    },
+    "Would you like to pray for your recently notified prayer requests now?" : {
+
+    },
+    "Yearly" : {
+
+    },
+    "Yearly on %@ at %@" : {
+
+    },
+    "Yellow" : {
 
     },
     "Yes. All your data stays on your device. There are no accounts, no cloud sync, and no way for anyone else to see your prayers. Backups are files you control." : {
@@ -830,76 +1088,7 @@
     "Yes. Open the prayer, tap Edit, then use the \"Belongs to Card\" picker to choose a different card. Tap Save when done." : {
 
     },
-    "Red" : {
-
-    },
-    "Orange" : {
-
-    },
-    "Brown" : {
-
-    },
-    "Teal" : {
-
-    },
-    "Blue" : {
-
-    },
-    "Purple" : {
-
-    },
-    "Pink" : {
-
-    },
-    "Gray" : {
-
-    },
-    "Black" : {
-
-    },
-    "White" : {
-
-    },
-    "Light gray" : {
-
-    },
-    "Dark gray" : {
-
-    },
-    "Yellow" : {
-
-    },
-    "Green" : {
-
-    },
-    "Custom" : {
-
-    },
-    "Dark %@" : {
-
-    },
-    "Pastel %@" : {
-
-    },
-    "Light %@" : {
-
-    },
-    "%@ %lld of %lld" : {
-
-    },
-    "Tag saved" : {
-
-    },
-    "Color" : {
-
-    },
-    "Delete Color" : {
-
-    },
-    "Duplicate Tag Name" : {
-
-    },
-    "A tag named '%@' already exists. Please choose a different name." : {
+    "You've prayed through all your requests!" : {
 
     }
   },

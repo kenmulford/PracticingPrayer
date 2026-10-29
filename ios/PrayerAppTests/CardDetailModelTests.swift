@@ -39,6 +39,14 @@ private func withModel(
         }
     }
 
+    @Test func canPrayIgnoresSearch() async throws {
+        try await withModel { model, _ in
+            model.searchText = "zzz"
+            model.load()
+            #expect(model.canPray)
+        }
+    }
+
     @Test func searchScopesToCard() async throws {
         try await withModel { model, _ in
             model.searchText = "zzz"

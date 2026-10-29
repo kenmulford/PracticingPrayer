@@ -32,6 +32,7 @@ struct CardsView: View {
     @State private var isEditingRow = false
     @State private var isMovingRow = false
     @State private var rowError: String?
+    @State private var prayScope: PrayerTimeScope?
 
     private var isSearching: Bool {
         !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -70,7 +71,10 @@ struct CardsView: View {
                     CardsToolbar(
                         tags: tags,
                         selectedTagIds: $selectedTagIds,
-                        addCard: { isAddingCard = true },
+                        addCard: {
+                            isAddingCard = true
+                            services.onboarding.advance(from: .addCard)
+                        },
                         manageCollections: { selection = .manageCollections },
                         select: selectState
                     )
@@ -110,6 +114,7 @@ struct CardsView: View {
                         rowError = CardRowActionModel.perform(
                             .delete, cardId: card.card.id, database: services.database,
                             preferences: services.preferences)
+                        if rowError == nil { services.reconcileReminders() }
                         reload()
                     }
                 )
@@ -122,6 +127,7 @@ struct CardsView: View {
                     MoveToCollectionSheet(
                         collections: moveTargets, currentBoxId: rowCard?.card.boxId ?? 0, select: moveRowCard)
                 }
+                .prayerTimeStart($prayScope)
                 .alert("Couldn't Update Card", isPresented: rowErrorBinding) {
                     Button("OK") {}
                 } message: {
@@ -357,6 +363,8 @@ struct CardsView: View {
 
     private func rowAction(_ action: CardRowAction, _ item: CardListItem) {
         switch action {
+        case .pray:
+            prayScope = .cards([item.card.id])
         case .edit:
             rowCard = item
             isEditingRow = true
@@ -391,6 +399,7 @@ struct CardsView: View {
 
     private func deleteSelected() {
         finish(bulk.delete(Set(mutableItems.map(\.card.id)))) { String(localized: "Deleted \($0) cards") }
+        services.reconcileReminders()
     }
 
     private func finish(_ result: CardBulkResult, announcement: (Int) -> String) {

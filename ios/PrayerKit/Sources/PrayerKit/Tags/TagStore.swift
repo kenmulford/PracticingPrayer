@@ -92,6 +92,26 @@ public struct TagStore: Sendable {
         }
     }
 
+    public func recentlyNotifiedTagId() throws -> Int64? {
+        try database.dbQueue.read { db in
+            try Int64.fetchOne(
+                db, sql: "SELECT Id FROM PrayerTag WHERE LOWER(Name) = LOWER(?)",
+                arguments: [Self.recentlyNotifiedName])
+        }
+    }
+
+    public func removeRecentlyNotified(prayerId: Int64) throws {
+        try database.dbQueue.write { db in
+            guard let tagId = try Int64.fetchOne(
+                db, sql: "SELECT Id FROM PrayerTag WHERE LOWER(Name) = LOWER(?)",
+                arguments: [Self.recentlyNotifiedName])
+            else { return }
+            try db.execute(
+                sql: "DELETE FROM PrayerCardTag WHERE PrayerRequestId = ? AND PrayerTagId = ?",
+                arguments: [prayerId, tagId])
+        }
+    }
+
     private func mappingDuplicate<T>(_ body: () throws -> T) throws -> T {
         do {
             return try body()

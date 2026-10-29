@@ -19,7 +19,7 @@ struct PrayerRowActions: ViewModifier {
                 deleteButton
             }
             .contextMenu {
-                if let pray { Button("Pray", systemImage: "hands.and.sparkles", action: pray) }
+                if let pray { Button("Pray", systemImage: "hands.and.sparkles", action: pray).disabled(isAnswered) }
                 if case .link(let link)? = try? ShareCodec.encode(request: item.record), let url = URL(string: link) {
                     ShareLink(item: url) { Label("Share", systemImage: "square.and.arrow.up") }
                 }

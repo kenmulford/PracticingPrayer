@@ -70,6 +70,37 @@ private func item(_ store: PrayerStore, _ id: Int64) throws -> PrayerListItem {
         }
     }
 
+    @Test func createWithReminderPersistsFields() throws {
+        try withCopy("fresh-install.db") { database in
+            let store = PrayerStore(database: database)
+            let reminder = PrayerReminder(
+                canNotify: true, frequency: .weekly, hour: 7, minute: 30, dayOfWeek: 3, dayOfMonth: nil, dateTicks: nil)
+            let id = try store.create(PrayerDraft(prayerCardId: 1, title: "Heal", reminder: reminder), now: now)
+            let record = try item(store, id).record
+            #expect(record.canNotify)
+            #expect(record.prayerFrequency == .weekly)
+            #expect(record.notifyHour == 7)
+            #expect(record.notifyMinute == 30)
+            #expect(record.notifyDayOfWeek == 3)
+            #expect(record.notifyDayOfMonth == -1)
+        }
+    }
+
+    @Test func updateWithReminderPersistsFields() throws {
+        try withCopy("long-upgraded.db") { database in
+            let store = PrayerStore(database: database)
+            let reminder = PrayerReminder(
+                canNotify: true, frequency: .monthly, hour: 20, minute: 5, dayOfWeek: nil, dayOfMonth: 17, dateTicks: nil)
+            try store.update(id: 5, with: PrayerDraft(prayerCardId: 3, title: "New", reminder: reminder), now: now)
+            let record = try item(store, 5).record
+            #expect(record.canNotify)
+            #expect(record.prayerFrequency == .monthly)
+            #expect(record.notifyHour == 20)
+            #expect(record.notifyMinute == 5)
+            #expect(record.notifyDayOfMonth == 17)
+        }
+    }
+
     @Test func markAnsweredStampsMidnightOfNow() throws {
         try withCopy("long-upgraded.db") { database in
             let store = PrayerStore(database: database)
