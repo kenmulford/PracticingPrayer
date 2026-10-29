@@ -4,6 +4,7 @@ import SwiftUI
 struct BackupRestoreView: View {
     @Environment(AppServices.self) private var services
     @State private var flow: BackupExportFlow?
+    @State private var restore: RestoreFlow?
     @State private var passphrase = ""
 
     var body: some View {
@@ -24,11 +25,14 @@ struct BackupRestoreView: View {
             } footer: {
                 Text("Export your prayer data to a file you can restore on another device.")
             }
+            RestoreSection(flow: restore)
         }
+        .restorePresentation(restore)
         .navigationTitle(Text("Backup & Restore"))
         .navigationBarTitleDisplayMode(.inline)
         .task {
             if flow == nil { flow = BackupExportFlow(database: services.database) }
+            if restore == nil { restore = RestoreFlow(services: services) }
         }
         .confirmationDialog("This backup includes confidential cards", isPresented: choosingBinding, titleVisibility: .visible) {
             Button("Protect with a Passphrase") { flow?.chooseProtect() }

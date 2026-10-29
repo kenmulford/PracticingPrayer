@@ -105,6 +105,15 @@ struct AppShell: View {
             }
         }
         .tabViewStyle(.sidebarAdaptable)
+        .id(services.databaseGeneration)
+        .onChange(of: services.databaseGeneration) {
+            homePath = []
+            cardsPath = []
+            prayersPath = []
+            tagsPath = []
+            settingsPath = []
+            selection = .home
+        }
     }
 
     @ViewBuilder

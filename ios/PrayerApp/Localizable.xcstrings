@@ -520,6 +520,9 @@
     "Edit Tag" : {
 
     },
+    "Enter the backup passphrase" : {
+
+    },
     "Existing Card" : {
 
     },
@@ -922,6 +925,33 @@
     "Repeat" : {
 
     },
+    "Replace all current data with a previously exported backup. This cannot be undone." : {
+
+    },
+    "Restore" : {
+
+    },
+    "Restore Backup?" : {
+
+    },
+    "Restore complete" : {
+
+    },
+    "Restore Failed" : {
+
+    },
+    "Restore failed. Please restart the app." : {
+
+    },
+    "Restore from Backup…" : {
+
+    },
+    "Restoring" : {
+
+    },
+    "Restoring…" : {
+
+    },
     "Resume" : {
 
     },
@@ -1061,10 +1091,19 @@
     "This backup includes confidential cards" : {
 
     },
+    "This backup includes confidential cards protected by a passphrase. Enter it to restore them." : {
+
+    },
     "This card has no prayer requests." : {
 
     },
+    "This file doesn't appear to be a valid Practicing Prayer backup." : {
+
+    },
     "This is the Quick Add card, so it can't be edited, favorited, archived, or deleted." : {
+
+    },
+    "This will permanently replace all your current prayer data." : {
 
     },
     "Time" : {

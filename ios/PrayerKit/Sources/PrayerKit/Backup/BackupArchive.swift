@@ -8,6 +8,10 @@ public struct BackupRestoreResult: Equatable, Sendable {
     public let confidentialPayload: Data?
 }
 
+public struct BackupInspection: Equatable, Sendable {
+    public let confidentialPayload: Data?
+}
+
 /// The `.pcrd` backup container, a ZIP archive shared with the MAUI app (`BackupService`).
 /// Hand-rolled so no third-party package is needed; DEFLATE and CRC-32 come from `Gzip`.
 public enum BackupArchive {
@@ -49,6 +53,18 @@ public enum BackupArchive {
     }
 
     // MARK: Restore
+
+    /// Validates the archive and returns its confidential blob without touching any database.
+    public static func inspect(archiveURL: URL) throws -> BackupInspection {
+        let parsed: [String: Data]
+        do {
+            parsed = try entries(of: Data(contentsOf: archiveURL))
+        } catch {
+            throw BackupArchiveError.invalidBackup
+        }
+        guard parsed[databaseEntry] != nil else { throw BackupArchiveError.invalidBackup }
+        return BackupInspection(confidentialPayload: parsed[confidentialEntry])
+    }
 
     public static func restore(
         archiveURL: URL,
