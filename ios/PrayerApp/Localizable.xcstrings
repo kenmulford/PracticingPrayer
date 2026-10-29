@@ -135,6 +135,9 @@
     "Check that notifications are enabled in App Settings and that your device's system settings allow notifications for this app. On iOS, also check Focus mode settings." : {
 
     },
+    "Clear Filter" : {
+
+    },
     "Collection" : {
 
     },
@@ -207,6 +210,12 @@
     "Favorite" : {
 
     },
+    "Filter" : {
+
+    },
+    "Filtered by %@" : {
+
+    },
     "Go to Settings → Backup & Restore → Back Up Now. This creates a file you can save or share. To restore, use \"Restore from Backup\" on the same screen." : {
 
     },
@@ -273,10 +282,16 @@
     "No Collections Yet" : {
 
     },
+    "No Matching Cards" : {
+
+    },
     "No Prayer Cards" : {
 
     },
     "No Tags" : {
+
+    },
+    "No cards have a prayer with the selected tags." : {
 
     },
     "None" : {

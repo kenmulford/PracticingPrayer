@@ -72,8 +72,7 @@ struct TagPickerView: View {
 
     private func row(for tag: PrayerTagRecord) -> some View {
         let isSelected = selection.contains(tag.id)
-        let defaultHex = UserColorStore.defaultPaletteHexValues[0]
-        let color = Color(hex: tag.color ?? defaultHex) ?? Color(hex: defaultHex) ?? .accentColor
+        let color = Color.tag(tag.color)
         return Button {
             if isSelected { selection.remove(tag.id) } else { selection.insert(tag.id) }
         } label: {
