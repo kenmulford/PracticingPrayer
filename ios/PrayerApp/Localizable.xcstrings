@@ -1,25 +1,100 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%lld prayers saved" : {
+
+    },
+    "Add Prayer" : {
+
+    },
+    "Add To" : {
+
+    },
+    "Can't Load Cards" : {
+
+    },
     "Can't Open Your Prayers" : {
+
+    },
+    "Cancel" : {
+
+    },
+    "Card" : {
+
+    },
+    "Card Title" : {
 
     },
     "Cards" : {
 
     },
+    "Collection" : {
+
+    },
+    "Couldn't Save" : {
+
+    },
+    "Delete" : {
+
+    },
+    "Details" : {
+
+    },
+    "Discard Changes" : {
+
+    },
+    "Existing Card" : {
+
+    },
     "Home" : {
+
+    },
+    "Keep Editing" : {
+
+    },
+    "Loose Cards" : {
+
+    },
+    "New Card" : {
+
+    },
+    "None" : {
+
+    },
+    "OK" : {
+
+    },
+    "Prayer %lld" : {
 
     },
     "Prayer Cards" : {
 
     },
+    "Prayer saved" : {
+
+    },
     "Prayers" : {
+
+    },
+    "Quick Add" : {
+
+    },
+    "Save" : {
+
+    },
+    "Search Cards" : {
+
+    },
+    "Select Card" : {
 
     },
     "Settings" : {
 
     },
     "Tags" : {
+
+    },
+    "Title" : {
 
     },
     "Try Again" : {
