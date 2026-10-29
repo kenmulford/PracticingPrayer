@@ -12,7 +12,7 @@ struct PracticingPrayerApp: App {
             try? Tips.resetDatastore()
         }
         #endif
-        try? Tips.configure()
+        try? Tips.configure([.displayFrequency(.immediate)])
     }
 
     var body: some Scene {

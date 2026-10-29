@@ -96,6 +96,9 @@
     "Active Cards" : {
 
     },
+    "Add a Prayer Request" : {
+
+    },
     "Add Card" : {
 
     },
@@ -109,6 +112,9 @@
 
     },
     "Add a prayer to this card." : {
+
+    },
+    "Add your first prayer request to this card." : {
 
     },
     "All" : {
@@ -338,6 +344,9 @@
     "Create %@" : {
 
     },
+    "Create Your First Prayer Card" : {
+
+    },
     "Create “%@”" : {
 
     },
@@ -496,7 +505,16 @@
     "Filtered by %@" : {
 
     },
+    "Get Started" : {
+
+    },
+    "Give it a name \u2014 a person, a topic, or a place." : {
+
+    },
     "Go to Settings → Backup & Restore → Back Up Now. This creates a file you can save or share. To restore, use \"Restore from Backup\" on the same screen." : {
+
+    },
+    "Got a shared prayer? Tap the link again to open it here." : {
 
     },
     "Gray" : {
@@ -548,6 +566,9 @@
 
     },
     "Last Prayed" : {
+
+    },
+    "Let's set up your first prayer card." : {
 
     },
     "Light %@" : {
@@ -760,6 +781,9 @@
     "Pray Now" : {
 
     },
+    "Pray through your requests one by one." : {
+
+    },
     "Prayed" : {
 
     },
@@ -895,6 +919,9 @@
     "Share" : {
 
     },
+    "Skip Tour" : {
+
+    },
     "Source" : {
 
     },
@@ -923,6 +950,9 @@
 
     },
     "Tags are like labels you can attach to any prayer. Go to the Tags tab to create tags with custom colors, then add them to prayers from the prayer detail screen." : {
+
+    },
+    "Take the Tour Again" : {
 
     },
     "Tap the Prayer Cards tab, then tap \"Add Card\" in the top right. Give your card a name \u2014 a person, topic, or place \u2014 then tap Save, or Save + to save it and start another card in the same collection." : {
@@ -1017,6 +1047,9 @@
 
     },
     "Weekly on %@ at %@" : {
+
+    },
+    "Welcome to Practicing Prayer" : {
 
     },
     "What does the star icon do?" : {

@@ -138,9 +138,13 @@ private struct CardDetailContent: View {
             if let id = model.card?.id { prayScope = .cards([id]) }
         }
         .disabled(!model.canPray)
-        Button { isAddingPrayer = true } label: {
+        Button {
+            isAddingPrayer = true
+            services.onboarding.advance(from: .addPrayer)
+        } label: {
             Label("New Prayer", systemImage: "plus")
         }
+        .onboardingTip(.addPrayer)
         Menu {
             if !model.isSystem {
                 Button(

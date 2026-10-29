@@ -28,6 +28,17 @@ struct AppShell: View {
                 }
             case .open:
                 tabs.fullScreenCover(item: Bindable(services).prayerSession) { PrayerSessionView(session: $0) }
+                    .environment(services.onboarding)
+                    .sheet(isPresented: welcomeBinding) {
+                        WelcomeSheet(
+                            getStarted: {
+                                selection = .cards
+                                services.onboarding.getStarted()
+                            },
+                            skip: services.onboarding.skip)
+                    }
+                    .onChange(of: services.onboarding.stage, initial: true) { services.onboarding.syncTips() }
+                    .task(id: services.onboarding.run) { await services.onboarding.watchTips() }
             }
         }
         .task {
@@ -55,6 +66,10 @@ struct AppShell: View {
         } message: {
             Text("Would you like to pray for your recently notified prayer requests now?")
         }
+    }
+
+    private var welcomeBinding: Binding<Bool> {
+        Binding(get: { services.onboarding.stage == .welcome }, set: { _ in })
     }
 
     private var tabs: some View {

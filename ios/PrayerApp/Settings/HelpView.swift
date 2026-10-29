@@ -1,8 +1,13 @@
 import SwiftUI
 
 struct HelpView: View {
+    @Environment(OnboardingCoordinator.self) private var onboarding
+
     var body: some View {
         List {
+            Section {
+                Button("Take the Tour Again", systemImage: "questionmark.bubble") { onboarding.replay() }
+            }
             ForEach(FaqItem.all) { item in
                 FaqRow(item: item)
             }

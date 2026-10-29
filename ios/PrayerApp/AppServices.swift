@@ -14,6 +14,7 @@ final class AppServices {
 
     private(set) var phase: Phase = .opening
     let preferences: AppPreferences
+    let onboarding: OnboardingCoordinator
     var prayerSession: PrayerSession?
 
     @ObservationIgnored private var openedDatabase: PrayerDatabase?
@@ -28,6 +29,7 @@ final class AppServices {
 
     init(preferences: AppPreferences = AppServices.defaultPreferences, databasePath: String = AppServices.defaultDatabasePath) {
         self.preferences = preferences
+        onboarding = OnboardingCoordinator(preferences: preferences, isSuppressed: Self.suppressesOnboarding)
         self.databasePath = databasePath
     }
 
@@ -39,6 +41,17 @@ final class AppServices {
         }
         #endif
         return AppPreferences()
+    }
+
+    // UI suites that point at a fixture database skip the tour unless they pass an onboarding argument.
+    static var suppressesOnboarding: Bool {
+        #if DEBUG
+        let arguments = ProcessInfo.processInfo.arguments
+        return ProcessInfo.processInfo.environment["PRAYER_DB_PATH"] != nil
+            && !arguments.contains("-OnboardingStep") && !arguments.contains("-OnboardingComplete")
+        #else
+        return false
+        #endif
     }
 
     static var defaultDatabasePath: String {

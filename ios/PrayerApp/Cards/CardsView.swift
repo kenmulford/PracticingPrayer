@@ -71,7 +71,10 @@ struct CardsView: View {
                     CardsToolbar(
                         tags: tags,
                         selectedTagIds: $selectedTagIds,
-                        addCard: { isAddingCard = true },
+                        addCard: {
+                            isAddingCard = true
+                            services.onboarding.advance(from: .addCard)
+                        },
                         manageCollections: { selection = .manageCollections },
                         select: selectState
                     )

@@ -93,6 +93,7 @@ struct HomeView: View {
     private var prayerTimeButton: some View {
         Button {
             showingPrayerTime = true
+            services.onboarding.advance(from: .prayerTime)
         } label: {
             Label("Prayer Time", systemImage: "hands.and.sparkles.fill")
                 .frame(maxWidth: .infinity)
@@ -101,6 +102,7 @@ struct HomeView: View {
         .controlSize(.large)
         .disabled(model.metrics.unanswered == 0)
         .accessibilityIdentifier("Home_PrayerTimeButton")
+        .onboardingTip(.prayerTime)
         .prayerTimeLauncher(isPresented: $showingPrayerTime)
     }
 
