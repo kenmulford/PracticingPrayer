@@ -33,6 +33,10 @@ public enum PinHasher {
     }
 
     static func derive(passwordBytes: [UInt8], salt: Data) -> Data? {
+        derive(passwordBytes: passwordBytes, salt: salt, rounds: iterations)
+    }
+
+    static func derive(passwordBytes: [UInt8], salt: Data, rounds: UInt32) -> Data? {
         var derived = [UInt8](repeating: 0, count: hashSizeBytes)
         let saltBytes = [UInt8](salt)
         let status = passwordBytes.withUnsafeBufferPointer { pw in
@@ -42,7 +46,7 @@ public enum PinHasher {
                     pwChars.baseAddress, pwChars.count,
                     saltBytes, saltBytes.count,
                     CCPseudoRandomAlgorithm(kCCPRFHmacAlgSHA256),
-                    iterations,
+                    rounds,
                     &derived, derived.count)
             }
         }

@@ -400,6 +400,7 @@ PrayerApp/iOS-signing.local.props
 ios/Configuration/Local.xcconfig
 ios/PrayerKit/.build/
 !ios/**/Backup/
+!contracts/backup/
 /.superpowers
 /screenshots
 
