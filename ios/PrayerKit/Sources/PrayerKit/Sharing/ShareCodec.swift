@@ -239,7 +239,7 @@ enum Gzip {
         return crc
     }
 
-    private static func crc32(_ data: Data) -> UInt32 {
+    static func crc32(_ data: Data) -> UInt32 {
         ~data.reduce(UInt32.max) { crcTable[Int(($0 ^ UInt32($1)) & 0xFF)] ^ ($0 >> 8) }
     }
 
@@ -247,8 +247,19 @@ enum Gzip {
         (0..<4).map { UInt8((value >> (8 * UInt32($0))) & 0xFF) }
     }
 
+    static func rawDeflate(_ data: Data) throws -> Data {
+        try (data as NSData).compressed(using: .zlib) as Data
+    }
+
+    /// Throws once the output exceeds `maxOutputBytes`, so a hostile archive cannot inflate without bound.
+    static func rawInflate(_ data: Data, maxOutputBytes: Int) throws -> Data {
+        let inflated = try (data as NSData).decompressed(using: .zlib) as Data
+        guard inflated.count <= maxOutputBytes else { throw GzipError.invalid }
+        return inflated
+    }
+
     static func compress(_ data: Data) throws -> Data {
-        let deflated = try (data as NSData).compressed(using: .zlib) as Data
+        let deflated = try rawDeflate(data)
         var out = Data([0x1F, 0x8B, 0x08, 0x00, 0, 0, 0, 0, 0x00, 0xFF])
         out.append(deflated)
         out.append(contentsOf: littleEndian(crc32(data)))
@@ -275,7 +286,7 @@ enum Gzip {
         if flags & 0x02 != 0 { index += 2 }
         guard index <= end else { throw GzipError.invalid }
 
-        let inflated = try (Data(bytes[index..<end]) as NSData).decompressed(using: .zlib) as Data
+        let inflated = try rawInflate(Data(bytes[index..<end]), maxOutputBytes: .max)
         let trailer = Array(bytes[end...])
         guard Array(trailer[0..<4]) == littleEndian(crc32(inflated)),
               Array(trailer[4..<8]) == littleEndian(UInt32(truncatingIfNeeded: inflated.count))
