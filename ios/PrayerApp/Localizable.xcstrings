@@ -96,9 +96,6 @@
     "Active Cards" : {
 
     },
-    "Add a Prayer Request" : {
-
-    },
     "Add Card" : {
 
     },
@@ -109,6 +106,9 @@
 
     },
     "Add To" : {
+
+    },
+    "Add a Prayer Request" : {
 
     },
     "Add a prayer to this card." : {
@@ -293,16 +293,22 @@
     "Cards with no protection of their own take the collection's setting." : {
 
     },
-    "Check that notifications are enabled in App Settings and that your device's system settings allow notifications for this app. On iOS, also check Focus mode settings." : {
+    "Change card protection" : {
 
     },
-    "Choose a passphrase to encrypt your confidential cards in this backup. You'll need it to restore them later \u2014 we can't recover it for you." : {
+    "Change collection protection" : {
+
+    },
+    "Check that notifications are enabled in App Settings and that your device's system settings allow notifications for this app. On iOS, also check Focus mode settings." : {
 
     },
     "Choose Cards" : {
 
     },
     "Choose Cards…" : {
+
+    },
+    "Choose a passphrase to encrypt your confidential cards in this backup. You'll need it to restore them later \u2014 we can't recover it for you." : {
 
     },
     "Choose what to pray for" : {
@@ -329,6 +335,9 @@
     "Color" : {
 
     },
+    "Confidential cards unlocked" : {
+
+    },
     "Continue Unencrypted" : {
 
     },
@@ -341,13 +350,13 @@
     "Couldn't Save" : {
 
     },
+    "Couldn't Start Prayer Time" : {
+
+    },
     "Couldn't Update Card" : {
 
     },
     "Couldn't Update Cards" : {
-
-    },
-    "Couldn't Start Prayer Time" : {
 
     },
     "Couldn't Update Prayer" : {
@@ -439,6 +448,9 @@
 
     },
     "Delete Tag" : {
+
+    },
+    "Delete protected collection" : {
 
     },
     "Delete “%@” and its %lld prayer requests?" : {
@@ -545,6 +557,9 @@
 
     },
     "Hidden" : {
+
+    },
+    "Hide Confidential" : {
 
     },
     "Home" : {
@@ -750,6 +765,9 @@
     "Open a prayer request and choose a reminder frequency: Never, Daily, Weekly, Monthly, or Yearly. Choose a time, and optionally a day of the week. The app will send a notification at your chosen time." : {
 
     },
+    "Open protected card" : {
+
+    },
     "Orange" : {
 
     },
@@ -877,6 +895,9 @@
     "Protected" : {
 
     },
+    "Protected, locked" : {
+
+    },
     "Protection" : {
 
     },
@@ -949,6 +970,12 @@
     "Share" : {
 
     },
+    "Show Confidential" : {
+
+    },
+    "Show confidential cards" : {
+
+    },
     "Skip Tour" : {
 
     },
@@ -959,6 +986,9 @@
 
     },
     "Start (%lld)" : {
+
+    },
+    "Start Prayer Time with protected prayers" : {
 
     },
     "Started" : {

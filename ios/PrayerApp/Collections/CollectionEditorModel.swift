@@ -45,7 +45,21 @@ final class CollectionEditorModel {
             || ((protectAllCards || (original?.protectAllCards ?? false)) && protectionMode != originalMode)
     }
 
-    func save(now: Date = .now) -> Bool {
+    var requiresOwnerVerification: Bool {
+        guard let original else { return false }
+        let old = original.protectAllCards ? original.cardProtectionMode : .unprotected
+        return ProtectionPolicy.isLowering(from: old, to: protectAllCards ? protectionMode : .unprotected)
+    }
+
+    var requiresOwnerVerificationToDelete: Bool {
+        original.map(Self.requiresOwnerVerificationToDelete) ?? false
+    }
+
+    static func requiresOwnerVerificationToDelete(_ box: CardBoxRecord) -> Bool {
+        box.protectAllCards && box.cardProtectionMode != .unprotected
+    }
+
+    func save(now: Date = .now, ownerVerified: Bool = false) -> Bool {
         guard canSave else { return false }
         let store = CollectionStore(database: database)
         do {
@@ -60,7 +74,7 @@ final class CollectionEditorModel {
                 try store.setProtection(
                     id: id, protectAllCards: protectAllCards,
                     mode: protectAllCards || isNew ? protectionMode : (original?.cardProtectionMode ?? protectionMode),
-                    now: now)
+                    now: now, ownerVerified: ownerVerified)
             }
             AccessibilityNotification.Announcement(String(localized: "Collection saved")).post()
             return true
@@ -73,10 +87,10 @@ final class CollectionEditorModel {
         }
     }
 
-    func delete(option: CollectionDeleteOption) -> Bool {
+    func delete(option: CollectionDeleteOption, ownerVerified: Bool = false) -> Bool {
         guard let original else { return false }
         do {
-            try CollectionStore(database: database).delete(id: original.id, option: option)
+            try CollectionStore(database: database).delete(id: original.id, option: option, ownerVerified: ownerVerified)
             return true
         } catch {
             alert = .failure(error.localizedDescription)

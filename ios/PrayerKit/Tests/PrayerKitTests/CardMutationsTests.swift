@@ -89,13 +89,28 @@ private func addBox(_ database: PrayerDatabase, _ id: Int64) throws {
             let later = now.addingTimeInterval(60)
             try mutations.update(
                 id: 2, with: CardDraft(title: "Renamed", boxId: 10, protectionMode: .hidden, isImported: true),
-                now: later)
+                now: later, ownerVerified: false)
             var expected = before
             expected.title = "Renamed"
             expected.boxId = 10
             expected.protectionMode = .hidden
             expected.updatedAtTicks = later.ticks
             #expect(try card(database, 2) == expected)
+        }
+    }
+
+    @Test func loweringProtectionNeedsOwnerVerification() throws {
+        try withCopy("long-upgraded.db") { database, mutations in
+            try run(database, "UPDATE PrayerCard SET ProtectionMode = 2 WHERE Id = 2")
+            let before = try card(database, 2)
+            #expect(throws: ProtectionError.ownerVerificationRequired) {
+                try mutations.update(
+                    id: 2, with: CardDraft(title: "Open", protectionMode: .unprotected), now: now, ownerVerified: false)
+            }
+            #expect(try card(database, 2) == before)
+            try mutations.update(
+                id: 2, with: CardDraft(title: "Open", protectionMode: .unprotected), now: now, ownerVerified: true)
+            #expect(try card(database, 2).protectionMode == .unprotected)
         }
     }
 
@@ -161,7 +176,7 @@ private func addBox(_ database: PrayerDatabase, _ id: Int64) throws {
                     try mutations.create(CardDraft(title: title), now: now)
                 }
                 #expect(throws: CardMutationError.emptyTitle) {
-                    try mutations.update(id: 2, with: CardDraft(title: title), now: now)
+                    try mutations.update(id: 2, with: CardDraft(title: title), now: now, ownerVerified: false)
                 }
             }
             #expect(try count(database, "PrayerCard") == cards)
@@ -200,7 +215,7 @@ private func addBox(_ database: PrayerDatabase, _ id: Int64) throws {
                 try mutations.create(CardDraft(title: "X", boxId: 99), now: now)
             }
             #expect(throws: CardMutationError.boxNotFound(99)) {
-                try mutations.update(id: 2, with: CardDraft(title: "X", boxId: 99), now: now)
+                try mutations.update(id: 2, with: CardDraft(title: "X", boxId: 99), now: now, ownerVerified: false)
             }
             #expect(try count(database, "PrayerCard") == cards)
             #expect(try card(database, 2) == before)
@@ -230,7 +245,7 @@ private func addBox(_ database: PrayerDatabase, _ id: Int64) throws {
     @Test func missingCardThrowsNotFound() throws {
         try withCopy("long-upgraded.db") { _, mutations in
             let error = CardMutationError.cardNotFound(999)
-            #expect(throws: error) { try mutations.update(id: 999, with: CardDraft(title: "X"), now: now) }
+            #expect(throws: error) { try mutations.update(id: 999, with: CardDraft(title: "X"), now: now, ownerVerified: false) }
             #expect(throws: error) { try mutations.setFavorite(id: 999, true, now: now) }
             #expect(throws: error) { try mutations.move(id: 999, toBox: 0, now: now) }
             #expect(throws: error) { try mutations.archive(id: 999, now: now) }

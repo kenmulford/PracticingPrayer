@@ -6,7 +6,7 @@ struct CardsView: View {
     @Binding var path: [CardsRoute]
     @Environment(AppServices.self) private var services
 
-    private let isSessionUnlocked = false
+    private var isSessionUnlocked: Bool { services.confidential.isUnlocked }
     private let tip = CollectionsTip()
 
     @State private var searchText = ""
@@ -76,6 +76,8 @@ struct CardsView: View {
                             services.onboarding.advance(from: .addCard)
                         },
                         manageCollections: { selection = .manageCollections },
+                        isUnlocked: isSessionUnlocked,
+                        toggleConfidential: services.confidential.toggle,
                         select: selectState
                     )
                 }
@@ -149,6 +151,10 @@ struct CardsView: View {
         .task(id: CardListFilter(searchText: searchText, tagIds: selectedTagIds)) { reload() }
         .task { await watchTip() }
         .onChange(of: selection) { path = [] }
+        .onChange(of: isSessionUnlocked) {
+            reload()
+            reloadTags()
+        }
         .onChange(of: selectedIds) { refreshSelection() }
     }
 
@@ -212,7 +218,8 @@ struct CardsView: View {
                         if item.isMasked {
                             CardRow(item: item).selectionDisabled()
                         } else {
-                            CardRow(item: item, isSelected: selectedIds.contains(item.card.id)).tag(item.card.id)
+                            CardRow(item: item, isSelected: selectedIds.contains(item.card.id), isHidden: isHidden(item, in: section))
+                                .tag(item.card.id)
                         }
                     }
                 } header: {
@@ -241,10 +248,16 @@ struct CardsView: View {
                 Section(isExpanded: expansion(for: section, in: list)) {
                     ForEach(section.cards, id: \.card.id) { item in
                         if item.isMasked {
-                            CardRow(item: item).selectionDisabled()
+                            Button {
+                                Task { await openProtected(item) }
+                            } label: {
+                                CardRow(item: item)
+                            }
+                            .buttonStyle(.plain)
+                            .selectionDisabled()
                         } else {
                             NavigationLink(value: CardsRoute.card(id: item.card.id)) {
-                                CardRow(item: item)
+                                CardRow(item: item, isHidden: isHidden(item, in: section))
                             }
                             .modifier(
                                 CardRowActions(
@@ -259,6 +272,16 @@ struct CardsView: View {
             }
         }
         .listStyle(.sidebar)
+    }
+
+    private func isHidden(_ item: CardListItem, in section: CardSection) -> Bool {
+        ProtectionPolicy.effectiveMode(of: item.card, box: section.box) == .hidden
+    }
+
+    private func openProtected(_ item: CardListItem) async {
+        if await services.confidential.authenticate(reason: "Open protected card") {
+            selection = .card(id: item.card.id)
+        }
     }
 
     private var filterSubtitle: LocalizedStringKey {
@@ -416,7 +439,7 @@ struct CardsView: View {
     }
 
     private func reloadTags() {
-        tags = (try? TagStore(database: services.database).tags().map(\.tag)) ?? []
+        tags = (try? TagStore(database: services.database).tags(isSessionUnlocked: isSessionUnlocked).map(\.tag)) ?? []
         #if DEBUG
         // UI tests cannot read menu row labels, so `-CardsFilterTagIds 7,8` seeds the selection once.
         if !seededFilter, let ids = UserDefaults.standard.string(forKey: "CardsFilterTagIds") {

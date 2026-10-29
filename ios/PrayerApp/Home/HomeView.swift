@@ -161,10 +161,11 @@ struct HomeView: View {
     private func reload() {
         let database = services.database
         let threshold = services.preferences.overdueDayThreshold
+        let isUnlocked = services.confidential.isUnlocked
         Task {
             await model.load {
                 try database.homeMetrics(
-                    now: .now, overdueDayThreshold: threshold, isSessionUnlocked: false)
+                    now: .now, overdueDayThreshold: threshold, isSessionUnlocked: isUnlocked)
             }
         }
     }

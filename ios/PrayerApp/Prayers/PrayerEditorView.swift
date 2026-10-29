@@ -20,22 +20,26 @@ struct PrayerEditorView: View {
     @State private var showingDelete = false
 
     private let database: PrayerDatabase
+    private let isSessionUnlocked: Bool
     private let onFinish: (PrayerEditorModel.Outcome) -> Void
 
     init(
         prayerId: Int64?, cardId: Int64? = nil, cardTitle: String? = nil, database: PrayerDatabase,
         preferences: AppPreferences = AppServices.defaultPreferences,
         reminders: (any ReminderReconciling)? = nil,
+        isSessionUnlocked: Bool = false,
         onFinish: @escaping (PrayerEditorModel.Outcome) -> Void = { _ in }
     ) {
         let model = PrayerEditorModel(
             prayerId: prayerId, cardId: cardId, cardTitle: cardTitle, database: database,
             preferences: preferences,
             reminders: reminders
-                ?? ReminderScheduler(database: database, preferences: preferences, center: SystemReminderCenter()))
+                ?? ReminderScheduler(database: database, preferences: preferences, center: SystemReminderCenter()),
+            isSessionUnlocked: isSessionUnlocked)
         model.load()
         self.model = model
         self.database = database
+        self.isSessionUnlocked = isSessionUnlocked
         self.onFinish = onFinish
     }
 
@@ -44,7 +48,9 @@ struct PrayerEditorView: View {
             Form {
                 Section {
                     NavigationLink {
-                        CardPickerView(database: database, selectedCardId: model.cardId) { id, title in
+                        CardPickerView(
+                            database: database, selectedCardId: model.cardId, isSessionUnlocked: isSessionUnlocked
+                        ) { id, title in
                             model.selectCard(id: id, title: title)
                         }
                     } label: {

@@ -15,6 +15,7 @@ final class HomeListModel {
     private let scope: HomeListScope
     private let database: PrayerDatabase
     private let overdueDayThreshold: Int
+    private let isSessionUnlocked: Bool
     private let now: () -> Date
 
     private(set) var sections: [HomeListSection]?
@@ -24,11 +25,12 @@ final class HomeListModel {
 
     init(
         scope: HomeListScope, database: PrayerDatabase, overdueDayThreshold: Int,
-        now: @escaping () -> Date = { .now }
+        isSessionUnlocked: Bool = false, now: @escaping () -> Date = { .now }
     ) {
         self.scope = scope
         self.database = database
         self.overdueDayThreshold = overdueDayThreshold
+        self.isSessionUnlocked = isSessionUnlocked
         self.now = now
     }
 
@@ -36,12 +38,12 @@ final class HomeListModel {
 
     func load() {
         do {
-            let active = try store.prayers(segment: .active, isSessionUnlocked: false)
+            let active = try store.prayers(segment: .active, isSessionUnlocked: isSessionUnlocked)
             switch scope {
             case .overdue:
                 let byId = Dictionary(uniqueKeysWithValues: active.map { ($0.record.id, $0) })
                 let overdue = try database.overduePrayers(
-                    now: now(), overdueDayThreshold: overdueDayThreshold, isSessionUnlocked: false)
+                    now: now(), overdueDayThreshold: overdueDayThreshold, isSessionUnlocked: isSessionUnlocked)
                 sections = [HomeListSection(id: 0, title: nil, items: overdue.compactMap { byId[$0.id] })]
             case .unanswered:
                 sections = [HomeListSection(id: 0, title: nil, items: active)]

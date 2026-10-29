@@ -15,6 +15,7 @@ final class AppServices {
     private(set) var phase: Phase = .opening
     let preferences: AppPreferences
     let onboarding: OnboardingCoordinator
+    let confidential: ConfidentialSession
     var prayerSession: PrayerSession?
 
     @ObservationIgnored private var openedDatabase: PrayerDatabase?
@@ -31,6 +32,17 @@ final class AppServices {
         self.preferences = preferences
         onboarding = OnboardingCoordinator(preferences: preferences, isSuppressed: Self.suppressesOnboarding)
         self.databasePath = databasePath
+        confidential = ConfidentialSession(authenticator: Self.defaultAuthenticator)
+    }
+
+    static var defaultAuthenticator: any DeviceOwnerAuthenticating {
+        #if DEBUG
+        if let stub = StubDeviceOwnerAuthenticator(
+            environmentValue: ProcessInfo.processInfo.environment["CONFIDENTIAL_AUTH_STUB"]) {
+            return stub
+        }
+        #endif
+        return SystemDeviceOwnerAuthenticator()
     }
 
     static var defaultPreferences: AppPreferences {

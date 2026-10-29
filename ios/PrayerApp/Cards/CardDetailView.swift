@@ -18,7 +18,9 @@ struct CardDetailView: View {
             }
         }
         .task(id: cardId) {
-            let loaded = CardDetailModel(cardId: cardId, database: services.database, preferences: services.preferences)
+            let loaded = CardDetailModel(
+                cardId: cardId, database: services.database, preferences: services.preferences,
+                isSessionUnlocked: services.confidential.isUnlocked)
             loaded.load()
             model = loaded
         }
@@ -72,9 +74,13 @@ private struct CardDetailContent: View {
         .navigationBarTitleDisplayMode(.large)
         .searchable(text: searchBinding, prompt: Text("Search Prayers"))
         .toolbar { toolbar }
+        .onChange(of: services.confidential.isUnlocked) { _, isUnlocked in
+            if !isUnlocked && model.isProtected { onClose() }
+        }
         .sheet(isPresented: $isAddingPrayer, onDismiss: refresh) {
             PrayerEditorView(
-                prayerId: nil, cardId: model.card?.id, cardTitle: model.card?.title, database: services.database)
+                prayerId: nil, cardId: model.card?.id, cardTitle: model.card?.title, database: services.database,
+                isSessionUnlocked: services.confidential.isUnlocked)
         }
         .sheet(isPresented: $isEditing, onDismiss: refresh) {
             CardEditorView(card: model.card, database: services.database, preferences: services.preferences) { outcome in

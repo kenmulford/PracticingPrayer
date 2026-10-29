@@ -22,7 +22,8 @@ struct PrayerDetailView<CardLink: Hashable>: View {
         }
         .task(id: prayerId) {
             let loaded = PrayerDetailModel(
-                prayerId: prayerId, database: services.database, reminders: services.reminders)
+                prayerId: prayerId, database: services.database, reminders: services.reminders,
+                isSessionUnlocked: services.confidential.isUnlocked)
             loaded.load()
             model = loaded
         }
@@ -124,7 +125,9 @@ struct PrayerDetailView<CardLink: Hashable>: View {
                 onChange()
             }
         ) {
-            PrayerEditorView(prayerId: prayer.id, database: services.database) { if $0 == .deleted { onClose() } }
+            PrayerEditorView(
+                prayerId: prayer.id, database: services.database, isSessionUnlocked: services.confidential.isUnlocked
+            ) { if $0 == .deleted { onClose() } }
         }
         .deletePrayerDialog(isPresented: $confirmDelete, title: prayer.title) {
             Task {

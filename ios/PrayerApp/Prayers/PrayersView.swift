@@ -5,7 +5,7 @@ struct PrayersView: View {
     @Binding var path: [PrayersRoute]
     @Environment(AppServices.self) private var services
 
-    private let isSessionUnlocked = false
+    private var isSessionUnlocked: Bool { services.confidential.isUnlocked }
 
     @State private var selection: PrayersRoute?
     @State private var segment: PrayerSegment = .active
@@ -50,11 +50,17 @@ struct PrayersView: View {
                 .toolbar {
                     PrayersToolbar(
                         tags: tags, selectedTagIds: $selectedTagIds, prayerTime: toolbarScope,
-                        startPrayerTime: { prayScope = $0 }, newPrayer: { editingPrayer = .new })
+                        startPrayerTime: { prayScope = $0 }, newPrayer: { editingPrayer = .new },
+                        isUnlocked: isSessionUnlocked, toggleConfidential: services.confidential.toggle)
                 }
                 .prayerTimeStart($prayScope)
+                .onChange(of: isSessionUnlocked) {
+                    reload()
+                    reloadTags()
+                }
                 .sheet(item: $editingPrayer, onDismiss: reload) { target in
-                    PrayerEditorView(prayerId: target.prayerId, database: services.database)
+                    PrayerEditorView(
+                        prayerId: target.prayerId, database: services.database, isSessionUnlocked: isSessionUnlocked)
                 }
                 .deletePrayerDialog(isPresented: deleteBinding, title: pendingDelete?.record.title ?? "") {
                     if let item = pendingDelete {
@@ -186,7 +192,7 @@ struct PrayersView: View {
     }
 
     private func reloadTags() {
-        tags = (try? TagStore(database: services.database).tags().map(\.tag)) ?? []
+        tags = (try? TagStore(database: services.database).tags(isSessionUnlocked: isSessionUnlocked).map(\.tag)) ?? []
         #if DEBUG
         // UI tests cannot read menu row labels, so `-PrayersFilterTagIds 7,8` seeds the selection once.
         if !seededFilter, let ids = UserDefaults.standard.string(forKey: "PrayersFilterTagIds") {

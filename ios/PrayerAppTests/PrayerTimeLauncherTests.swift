@@ -61,6 +61,16 @@ private func ids(_ items: [PrayerListItem]) -> Set<Int64> {
         }
     }
 
+    @Test func cardsScopeIncludesProtectedPrayersOnlyWhenUnlocked() throws {
+        try withLauncher { launcher, database, cards in
+            let store = PrayerStore(database: database)
+            let card = try cards.create(CardDraft(title: "Secret cardsScope", protectionMode: .lockedVisible), now: now)
+            let prayer = try store.create(PrayerDraft(prayerCardId: card.id, title: "secret"), now: now)
+            #expect(ids(try launcher.items(for: .cards([card.id]), isSessionUnlocked: true)) == [prayer])
+            #expect(try launcher.items(for: .cards([card.id]), isSessionUnlocked: false).isEmpty)
+        }
+    }
+
     @Test func eligibleCardsExcludeArchivedAndEmpty() throws {
         try withLauncher { launcher, database, cards in
             let store = PrayerStore(database: database)
