@@ -121,13 +121,18 @@ public struct CardMutations {
     public func delete(id: Int64) throws {
         try database.dbQueue.write { db in
             _ = try requireMutableCard(id, db)
-            let prayerIds = try Int64.fetchAll(
-                db, sql: "SELECT Id FROM PrayerRequest WHERE PrayerCardId = ? ORDER BY Id", arguments: [id])
-            for prayerId in prayerIds {
-                _ = try PrayerStore.deleteRows(prayerId: prayerId, db)
-            }
-            _ = try PrayerCardRecord.deleteOne(db, key: id)
+            try Self.deleteRows(cardId: id, db)
         }
+    }
+
+    // GRDB access is not reentrant, so a collection delete runs this inside its own write.
+    static func deleteRows(cardId: Int64, _ db: Database) throws {
+        let prayerIds = try Int64.fetchAll(
+            db, sql: "SELECT Id FROM PrayerRequest WHERE PrayerCardId = ? ORDER BY Id", arguments: [cardId])
+        for prayerId in prayerIds {
+            _ = try PrayerStore.deleteRows(prayerId: prayerId, db)
+        }
+        _ = try PrayerCardRecord.deleteOne(db, key: cardId)
     }
 
     private func validate(_ draft: CardDraft) throws {
