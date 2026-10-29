@@ -70,18 +70,37 @@ struct PrayersView: View {
                 }
         } detail: {
             NavigationStack(path: $path) {
-                ContentUnavailableView("Select a Prayer", systemImage: "hands.and.sparkles")
-                    .navigationDestination(for: PrayersRoute.self) { route in
-                        switch route {
-                        case .prayer:
-                            ContentUnavailableView("Prayer", systemImage: "hands.and.sparkles")
-                        }
-                    }
+                detailRoot
+                    .navigationDestination(for: PrayersRoute.self) { destination($0) }
             }
         }
         .onAppear { reloadTags() }
         .task(id: Query(segment: segment, searchText: searchText, tagIds: selectedTagIds)) { reload() }
         .onChange(of: selection) { path = [] }
+    }
+
+    @ViewBuilder
+    private var detailRoot: some View {
+        if let selection {
+            destination(selection)
+        } else {
+            ContentUnavailableView("Select a Prayer", systemImage: "hands.and.sparkles")
+        }
+    }
+
+    @ViewBuilder
+    private func destination(_ route: PrayersRoute) -> some View {
+        switch route {
+        case .prayer(let id):
+            PrayerDetailView(prayerId: id, cardRoute: PrayersRoute.card(id:), onChange: reload, onClose: closeDetail)
+        case .card(let id):
+            CardDetailView(cardId: id, onChange: reload, onClose: closeDetail)
+        }
+    }
+
+    private func closeDetail() {
+        if path.isEmpty { selection = nil } else { path.removeLast() }
+        reload()
     }
 
     private var store: PrayerStore { PrayerStore(database: services.database) }

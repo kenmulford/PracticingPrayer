@@ -260,8 +260,8 @@ struct CardsView: View {
         switch route {
         case .card(let id):
             CardDetailView(cardId: id, onChange: reload, onClose: closeDetail)
-        case .prayer:
-            ContentUnavailableView("Prayer", systemImage: "hands.and.sparkles")
+        case .prayer(let id):
+            PrayerDetailView(prayerId: id, cardRoute: CardsRoute.card(id:), onChange: reload, onClose: closeDetail)
         case .manageCollections:
             CollectionsView()
         }

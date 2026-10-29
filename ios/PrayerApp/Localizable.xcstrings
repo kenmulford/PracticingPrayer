@@ -54,6 +54,12 @@
     "%lld prayers saved" : {
 
     },
+    "%lld times since %@" : {
+
+    },
+    "1 time since %@" : {
+
+    },
     "A collection named '%@' already exists. Please choose a different name." : {
 
     },
@@ -272,6 +278,9 @@
     "Delete" : {
 
     },
+    "Delete \"%@\"?" : {
+
+    },
     "Delete %lld Cards?" : {
       "localizations" : {
         "en" : {
@@ -309,10 +318,7 @@
     "Delete Prayer" : {
 
     },
-    "No Unanswered Prayers" : {
-
-    },
-    "No Active Cards" : {
+    "Delete Prayer Request" : {
 
     },
     "Delete Prayer?" : {
@@ -504,10 +510,13 @@
     "New Prayer" : {
 
     },
+    "New Tag" : {
+
+    },
     "New reminders start at this time." : {
 
     },
-    "New Tag" : {
+    "No Active Cards" : {
 
     },
     "No Active Prayers" : {
@@ -529,6 +538,9 @@
 
     },
     "No Tags" : {
+
+    },
+    "No Unanswered Prayers" : {
 
     },
     "No cards have a prayer with the selected tags." : {
@@ -595,6 +607,9 @@
     "Pray" : {
 
     },
+    "Prayed" : {
+
+    },
     "Prayer" : {
 
     },
@@ -604,10 +619,19 @@
     "Prayer Cards" : {
 
     },
+    "Prayer Not Found" : {
+
+    },
     "Prayer Time" : {
 
     },
     "Prayer Time presents your prayers one at a time in a focused view. Swipe or tap the arrows to move between prayers. When you're done, tap \"I'm Done\" to end the session. By default, Prayer Time launches in landscape mode. You can change this in settings." : {
+
+    },
+    "Prayer marked as active" : {
+
+    },
+    "Prayer marked as answered" : {
 
     },
     "Prayer saved" : {
@@ -677,6 +701,12 @@
 
     },
     "Share" : {
+
+    },
+    "Source" : {
+
+    },
+    "Started" : {
 
     },
     "System" : {
