@@ -71,7 +71,8 @@ private struct CardDetailContent: View {
         .searchable(text: searchBinding, prompt: Text("Search Prayers"))
         .toolbar { toolbar }
         .sheet(isPresented: $isAddingPrayer, onDismiss: refresh) {
-            NavigationStack { Color.clear.navigationTitle("New Prayer") }
+            PrayerEditorView(
+                prayerId: nil, cardId: model.card?.id, cardTitle: model.card?.title, database: services.database)
         }
         .sheet(isPresented: $isEditing, onDismiss: refresh) {
             CardEditorView(card: model.card, database: services.database, preferences: services.preferences) { outcome in

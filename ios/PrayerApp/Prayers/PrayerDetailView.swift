@@ -120,7 +120,7 @@ struct PrayerDetailView<CardLink: Hashable>: View {
                 onChange()
             }
         ) {
-            NavigationStack { Color.clear.navigationTitle("Edit Prayer") }
+            PrayerEditorView(prayerId: prayer.id, database: services.database) { if $0 == .deleted { onClose() } }
         }
         .confirmationDialog("Delete Prayer Request", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete", role: .destructive) {
@@ -155,7 +155,7 @@ struct PrayerDetailView<CardLink: Hashable>: View {
     }
 }
 
-private struct TagFlowLayout: Layout {
+struct TagFlowLayout: Layout {
     var spacing: CGFloat = 8
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {

@@ -60,6 +60,8 @@ struct CardPickerView: View {
         .overlay {
             if visible.isEmpty, !searchText.isEmpty {
                 ContentUnavailableView.search(text: searchText)
+            } else if visible.isEmpty {
+                ContentUnavailableView("No Cards", systemImage: "rectangle.stack")
             }
         }
     }

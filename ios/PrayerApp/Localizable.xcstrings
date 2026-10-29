@@ -105,6 +105,9 @@
     "Answered" : {
 
     },
+    "Answered On" : {
+
+    },
     "Answered on This Day" : {
 
     },
@@ -534,6 +537,9 @@
     "No Answered Prayers" : {
 
     },
+    "No Cards" : {
+
+    },
     "No Collections Yet" : {
 
     },
@@ -628,6 +634,9 @@
     "Prayer Cards" : {
 
     },
+    "Prayer deleted" : {
+
+    },
     "Prayer Not Found" : {
 
     },
@@ -716,6 +725,9 @@
 
     },
     "Started" : {
+
+    },
+    "Status" : {
 
     },
     "System" : {

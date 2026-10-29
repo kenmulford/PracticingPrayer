@@ -51,8 +51,8 @@ struct TagPrayersView: View {
             .sheet(isPresented: $isEditingTag, onDismiss: { reloadTag() }) {
                 NavigationStack { Color.clear.navigationTitle("Edit Tag") }
             }
-            .sheet(isPresented: editingBinding) {
-                NavigationStack { Color.clear.navigationTitle("Edit Prayer") }
+            .sheet(isPresented: editingBinding, onDismiss: reload) {
+                PrayerEditorView(prayerId: editingPrayerID, database: services.database)
             }
             .confirmationDialog(
                 "Delete Prayer?", isPresented: deleteBinding, titleVisibility: .visible, presenting: pendingDelete
