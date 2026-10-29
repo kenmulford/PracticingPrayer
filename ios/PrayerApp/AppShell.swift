@@ -54,7 +54,7 @@ struct AppShell: View {
         case .home:
             NavigationStack(path: $homePath) { HomeView() }
         case .cards:
-            NavigationStack(path: $cardsPath) { TabPlaceholder(tab: tab) }
+            CardsView(path: $cardsPath)
         case .prayers:
             NavigationStack(path: $prayersPath) { TabPlaceholder(tab: tab) }
         case .tags:

@@ -1,6 +1,31 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%@ · %lld" : {
+
+    },
+    "%lld active prayers" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld active prayer"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld active prayers"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld prayers saved" : {
 
     },
@@ -11,6 +36,9 @@
 
     },
     "Active Cards" : {
+
+    },
+    "Add Card" : {
 
     },
     "Add Prayer" : {
@@ -49,6 +77,9 @@
     "Can't Load Cards" : {
 
     },
+    "Can't Load Prayer Cards" : {
+
+    },
     "Can't Load Tags" : {
 
     },
@@ -74,6 +105,9 @@
 
     },
     "Collections" : {
+
+    },
+    "Collections help you organize your cards." : {
 
     },
     "Couldn't Save" : {
@@ -110,6 +144,9 @@
 
     },
     "Existing Card" : {
+
+    },
+    "Favorite" : {
 
     },
     "Go to Settings → Backup & Restore → Back Up Now. This creates a file you can save or share. To restore, use \"Restore from Backup\" on the same screen." : {
@@ -151,10 +188,16 @@
     "Loose Cards" : {
 
     },
+    "Manage Collections" : {
+
+    },
     "New Card" : {
 
     },
     "New reminders start at this time." : {
+
+    },
+    "No Prayer Cards" : {
 
     },
     "No Tags" : {
@@ -236,6 +279,9 @@
     "Privacy Policy" : {
 
     },
+    "Protected" : {
+
+    },
     "Quick Add" : {
 
     },
@@ -255,6 +301,9 @@
 
     },
     "Select Card" : {
+
+    },
+    "Select a Prayer Card" : {
 
     },
     "Send Diagnostic Info" : {
