@@ -4,10 +4,19 @@
     "%lld prayers saved" : {
 
     },
+    "Active Cards" : {
+
+    },
     "Add Prayer" : {
 
     },
     "Add To" : {
+
+    },
+    "All Prayed For" : {
+
+    },
+    "Answered on This Day" : {
 
     },
     "Can't Load Cards" : {
@@ -52,6 +61,9 @@
     "Keep Editing" : {
 
     },
+    "Last Prayed" : {
+
+    },
     "Loose Cards" : {
 
     },
@@ -61,7 +73,13 @@
     "None" : {
 
     },
+    "Not Yet" : {
+
+    },
     "OK" : {
+
+    },
+    "Overdue" : {
 
     },
     "Prayer %lld" : {
@@ -77,6 +95,9 @@
 
     },
     "Quick Add" : {
+
+    },
+    "Retry" : {
 
     },
     "Save" : {
@@ -98,6 +119,12 @@
 
     },
     "Try Again" : {
+
+    },
+    "Unable to Load Home" : {
+
+    },
+    "Unanswered" : {
 
     }
   },

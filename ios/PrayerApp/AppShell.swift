@@ -52,7 +52,7 @@ struct AppShell: View {
     private func root(for tab: AppTab) -> some View {
         switch tab {
         case .home:
-            NavigationStack(path: $homePath) { TabPlaceholder(tab: tab) }
+            NavigationStack(path: $homePath) { HomeView() }
         case .cards:
             NavigationStack(path: $cardsPath) { TabPlaceholder(tab: tab) }
         case .prayers:
