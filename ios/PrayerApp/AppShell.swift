@@ -60,7 +60,7 @@ struct AppShell: View {
         case .tags:
             NavigationStack(path: $tagsPath) { TabPlaceholder(tab: tab) }
         case .settings:
-            NavigationStack(path: $settingsPath) { TabPlaceholder(tab: tab) }
+            NavigationStack(path: $settingsPath) { SettingsView() }
         }
     }
 }

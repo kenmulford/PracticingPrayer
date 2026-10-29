@@ -19,9 +19,19 @@ final class AppServices {
         return openedDatabase
     }
 
-    init(preferences: AppPreferences = AppPreferences(), databasePath: String = AppServices.defaultDatabasePath) {
+    init(preferences: AppPreferences = AppServices.defaultPreferences, databasePath: String = AppServices.defaultDatabasePath) {
         self.preferences = preferences
         self.databasePath = databasePath
+    }
+
+    static var defaultPreferences: AppPreferences {
+        #if DEBUG
+        if let suite = ProcessInfo.processInfo.environment["PRAYER_DEFAULTS_SUITE"],
+           let defaults = UserDefaults(suiteName: suite) {
+            return AppPreferences(defaults: defaults)
+        }
+        #endif
+        return AppPreferences()
     }
 
     static var defaultDatabasePath: String {

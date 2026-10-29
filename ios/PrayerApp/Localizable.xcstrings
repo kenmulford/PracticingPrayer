@@ -4,6 +4,9 @@
     "%lld prayers saved" : {
 
     },
+    "About" : {
+
+    },
     "Active Cards" : {
 
     },
@@ -16,7 +19,19 @@
     "All Prayed For" : {
 
     },
+    "Allow Landscape" : {
+
+    },
+    "Allow Notifications" : {
+
+    },
     "Answered on This Day" : {
+
+    },
+    "App Settings" : {
+
+    },
+    "Backup & Restore" : {
 
     },
     "Can't Load Cards" : {
@@ -43,6 +58,9 @@
     "Collection" : {
 
     },
+    "Collections" : {
+
+    },
     "Couldn't Save" : {
 
     },
@@ -58,16 +76,25 @@
     "Created tag %@" : {
 
     },
+    "Default Reminder Time" : {
+
+    },
     "Delete" : {
 
     },
     "Details" : {
 
     },
+    "Developer" : {
+
+    },
     "Discard Changes" : {
 
     },
     "Existing Card" : {
+
+    },
+    "Help" : {
 
     },
     "Home" : {
@@ -85,6 +112,9 @@
     "New Card" : {
 
     },
+    "New reminders start at this time." : {
+
+    },
     "No Tags" : {
 
     },
@@ -94,11 +124,42 @@
     "Not Yet" : {
 
     },
+    "Notifications" : {
+
+    },
+    "Notifications are turned off in Settings." : {
+
+    },
     "OK" : {
+
+    },
+    "Open Settings" : {
 
     },
     "Overdue" : {
 
+    },
+    "Overdue After %lld Days" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Overdue After %lld Day"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Overdue After %lld Days"
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "Prayer %lld" : {
 
@@ -106,10 +167,16 @@
     "Prayer Cards" : {
 
     },
+    "Prayer Time" : {
+
+    },
     "Prayer saved" : {
 
     },
     "Prayers" : {
+
+    },
+    "Prayers not prayed within this many days appear in your overdue list on the home page." : {
 
     },
     "Quick Add" : {
