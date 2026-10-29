@@ -19,6 +19,8 @@ final class CardDetailModel {
         return folder != 0 && card?.boxId == folder
     }
     private(set) var prayerCount = 0
+    private(set) var activePrayerCount = 0
+    var canPray: Bool { activePrayerCount > 0 }
     private(set) var activePrayers: [PrayerRequestRecord] = []
     private(set) var answeredPrayers: [PrayerRequestRecord] = []
     private(set) var moveTargets: [CardBoxRecord] = []
@@ -42,6 +44,7 @@ final class CardDetailModel {
 
             let all = try PrayerStore(database: database).prayers(cardId: cardId).map(\.record)
             prayerCount = all.count
+            activePrayerCount = all.filter { !$0.isAnswered }.count
             let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
             let matching = query.isEmpty ? all : all.filter { $0.title.range(of: query, options: .caseInsensitive) != nil }
             activePrayers = matching.filter { !$0.isAnswered }

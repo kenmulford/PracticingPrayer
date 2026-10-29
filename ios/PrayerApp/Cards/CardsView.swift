@@ -32,6 +32,7 @@ struct CardsView: View {
     @State private var isEditingRow = false
     @State private var isMovingRow = false
     @State private var rowError: String?
+    @State private var prayScope: PrayerTimeScope?
 
     private var isSearching: Bool {
         !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -122,6 +123,7 @@ struct CardsView: View {
                     MoveToCollectionSheet(
                         collections: moveTargets, currentBoxId: rowCard?.card.boxId ?? 0, select: moveRowCard)
                 }
+                .prayerTimeStart($prayScope)
                 .alert("Couldn't Update Card", isPresented: rowErrorBinding) {
                     Button("OK") {}
                 } message: {
@@ -357,6 +359,8 @@ struct CardsView: View {
 
     private func rowAction(_ action: CardRowAction, _ item: CardListItem) {
         switch action {
+        case .pray:
+            prayScope = .cards([item.card.id])
         case .edit:
             rowCard = item
             isEditingRow = true

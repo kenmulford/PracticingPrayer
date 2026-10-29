@@ -136,4 +136,41 @@ private func ids(_ items: [PrayerListItem]) -> Set<Int64> {
             #expect(ids(try launcher.items(for: .tags([one.id]))) == [p1])
         }
     }
+
+    @Test func prayersScopeKeepsOrderAndDropsAnswered() throws {
+        try withLauncher { launcher, database, cards in
+            let store = PrayerStore(database: database)
+            let card = try cards.create(CardDraft(title: "Order prayersScope"), now: now)
+            let p1 = try store.create(PrayerDraft(prayerCardId: card.id, title: "p1"), now: now)
+            let p2 = try store.create(PrayerDraft(prayerCardId: card.id, title: "p2"), now: now)
+            let p3 = try store.create(PrayerDraft(prayerCardId: card.id, title: "p3"), now: now)
+            try store.markAnswered(id: p2, now: now)
+            let found = try launcher.items(for: .prayers([p3, p2, p1])).map(\.record.id)
+            #expect(found == [p3, p1])
+        }
+    }
+
+    @Test func cardsScopeIncludesSystemAndArchivedCards() throws {
+        try withLauncher { launcher, database, cards in
+            let store = PrayerStore(database: database)
+            let archived = try cards.create(CardDraft(title: "Archived cardsScope"), now: now)
+            let onSystem = try store.create(PrayerDraft(prayerCardId: 4, title: "on system"), now: now)
+            let onArchived = try store.create(PrayerDraft(prayerCardId: archived.id, title: "on archived"), now: now)
+            try cards.archive(id: archived.id, now: now)
+            #expect(ids(try launcher.items(for: .cards([4, archived.id]))).isSuperset(of: [onSystem, onArchived]))
+        }
+    }
+
+    @Test func activePrayersScopeIsNilWhenAllAnswered() throws {
+        try withLauncher { _, database, cards in
+            let store = PrayerStore(database: database)
+            let card = try cards.create(CardDraft(title: "Active scope"), now: now)
+            let live = try store.create(PrayerDraft(prayerCardId: card.id, title: "live"), now: now)
+            let done = try store.create(PrayerDraft(prayerCardId: card.id, title: "done"), now: now)
+            try store.markAnswered(id: done, now: now)
+            let items = try store.prayers(cardId: card.id)
+            #expect(PrayerTimeScope.activePrayers(in: items) == .prayers([live]))
+            #expect(PrayerTimeScope.activePrayers(in: items.filter { $0.record.isAnswered }) == nil)
+        }
+    }
 }

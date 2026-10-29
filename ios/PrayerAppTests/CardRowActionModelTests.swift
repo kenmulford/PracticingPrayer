@@ -39,16 +39,21 @@ private func model(
 @Suite struct CardRowActionModelTests {
     @Test func activeCardActions() {
         let m = model()
-        #expect(m.menuActions == [.favorite, .edit, .moveTo, .archive, .delete])
+        #expect(m.menuActions == [.pray, .favorite, .edit, .moveTo, .archive, .delete])
         #expect(m.leadingActions == [.favorite])
         #expect(m.trailingActions == [.delete, .archive])
     }
 
     @Test func favoritedArchivedCardActions() {
         let m = model(favorite: true, archived: true)
-        #expect(m.menuActions == [.unfavorite, .edit, .moveTo, .unarchive, .delete])
+        #expect(m.menuActions == [.pray, .unfavorite, .edit, .moveTo, .unarchive, .delete])
         #expect(m.leadingActions == [.unfavorite])
         #expect(m.trailingActions == [.delete, .unarchive])
+    }
+
+    @Test func prayDisabledWithoutActivePrayers() {
+        #expect(!model(count: 0).canPray)
+        #expect(model(count: 1).canPray)
     }
 
     @Test func systemCardHasNoActions() {

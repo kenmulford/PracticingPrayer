@@ -17,7 +17,7 @@ struct PrayersView: View {
     @State private var pendingDelete: PrayerListItem?
     @State private var errorMessage: String?
     @State private var editingPrayer: PrayerEditorTarget?
-    @State private var prayingPrayerID: Int64?
+    @State private var prayScope: PrayerTimeScope?
 
     private struct Query: Hashable {
         var segment: PrayerSegment
@@ -48,8 +48,11 @@ struct PrayersView: View {
                     .padding(.bottom, 8)
                 }
                 .toolbar {
-                    PrayersToolbar(tags: tags, selectedTagIds: $selectedTagIds, newPrayer: { editingPrayer = .new })
+                    PrayersToolbar(
+                        tags: tags, selectedTagIds: $selectedTagIds, prayerTime: toolbarScope,
+                        startPrayerTime: { prayScope = $0 }, newPrayer: { editingPrayer = .new })
                 }
+                .prayerTimeStart($prayScope)
                 .sheet(item: $editingPrayer, onDismiss: reload) { target in
                     PrayerEditorView(prayerId: target.prayerId, database: services.database)
                 }
@@ -96,6 +99,11 @@ struct PrayersView: View {
         reload()
     }
 
+    private var toolbarScope: PrayerTimeScope? {
+        guard case .success(let items)? = load else { return nil }
+        return PrayerTimeScope.activePrayers(in: items)
+    }
+
     private var store: PrayerStore { PrayerStore(database: services.database) }
 
     @ViewBuilder
@@ -140,7 +148,7 @@ struct PrayersView: View {
                                 services.reconcileReminders()
                             }
                         },
-                        pray: { prayingPrayerID = item.record.id },
+                        pray: { prayScope = .prayers([item.record.id]) },
                         edit: { editingPrayer = .edit(item.record.id) },
                         requestDelete: { pendingDelete = item })
                 }

@@ -30,8 +30,14 @@ nonisolated struct PrayerTimeLauncher: Sendable {
         case .tags(let ids):
             return try store.prayers(segment: .active, tagIds: ids, isSessionUnlocked: false)
         case .cards(let ids):
-            let cards = try eligibleCards(search: "").flatMap(\.cards).filter { ids.contains($0.card.id) }
+            let list = try database.cardList(filter: CardListFilter(searchText: ""), isSessionUnlocked: false)
+            let cards = list.sections.flatMap(\.cards).filter { ids.contains($0.card.id) && !$0.isMasked }
             return try activePrayers(of: cards, store: store)
+        case .prayers(let ids):
+            let active = Dictionary(
+                try store.prayers(segment: .active, isSessionUnlocked: false).map { ($0.record.id, $0) },
+                uniquingKeysWith: { first, _ in first })
+            return ids.compactMap { active[$0] }
         case .collection(let id):
             let cards = try eligibleCards(search: "").filter { $0.boxId == id }.flatMap(\.cards)
             return try activePrayers(of: cards, store: store)
@@ -139,7 +145,44 @@ private struct PrayerTimeLauncherModifier: ViewModifier {
     }
 }
 
+private struct PrayerTimeStartModifier: ViewModifier {
+    @Binding var scope: PrayerTimeScope?
+    @Environment(AppServices.self) private var services
+    @State private var errorMessage: String?
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: scope) { _, newScope in
+                guard let newScope else { return }
+                scope = nil
+                start(newScope)
+            }
+            .alert("Couldn't Start Prayer Time", isPresented: errorBinding) {
+                Button("OK") {}
+            } message: {
+                Text(errorMessage ?? "")
+            }
+    }
+
+    private var errorBinding: Binding<Bool> {
+        Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })
+    }
+
+    private func start(_ scope: PrayerTimeScope) {
+        do {
+            let items = try PrayerTimeLauncher(database: services.database).items(for: scope)
+            services.prayerSession = PrayerSession(items: items, database: services.database)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
 extension View {
+    func prayerTimeStart(_ scope: Binding<PrayerTimeScope?>) -> some View {
+        modifier(PrayerTimeStartModifier(scope: scope))
+    }
+
     func prayerTimeLauncher(isPresented: Binding<Bool>) -> some View {
         modifier(PrayerTimeLauncherModifier(isPresented: isPresented))
     }

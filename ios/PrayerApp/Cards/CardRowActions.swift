@@ -31,7 +31,7 @@ struct CardRowActions: ViewModifier {
                         if action == .delete {
                             Button(action.title, systemImage: action.systemImage, role: .destructive) { perform(action) }
                         } else {
-                            button(action)
+                            button(action).disabled(action == .pray && !model.canPray)
                         }
                     }
                 } preview: {

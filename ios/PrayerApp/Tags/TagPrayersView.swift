@@ -16,7 +16,7 @@ struct TagPrayersView: View {
     @State private var errorMessage: String?
     @State private var isEditingTag = false
     @State private var editingPrayer: PrayerEditorTarget?
-    @State private var prayingPrayerID: Int64?
+    @State private var prayScope: PrayerTimeScope?
 
     private struct Query: Hashable {
         var segment: PrayerSegment
@@ -51,6 +51,7 @@ struct TagPrayersView: View {
             .sheet(isPresented: $isEditingTag, onDismiss: { reloadTag() }) {
                 TagEditorView(database: services.database, tag: tag)
             }
+            .prayerTimeStart($prayScope)
             .sheet(item: $editingPrayer, onDismiss: reload) { target in
                 PrayerEditorView(prayerId: target.prayerId, database: services.database)
             }
@@ -129,7 +130,7 @@ struct TagPrayersView: View {
                                     }
                                 }
                             },
-                            pray: { prayingPrayerID = item.record.id },
+                            pray: { prayScope = .prayers([item.record.id]) },
                             edit: { editingPrayer = .edit(item.record.id) },
                             requestDelete: { pendingDelete = item })
                 }

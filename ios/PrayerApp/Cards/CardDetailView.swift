@@ -34,6 +34,7 @@ private struct CardDetailContent: View {
     @State private var isMoving = false
     @State private var isEditing = false
     @State private var isAddingPrayer = false
+    @State private var prayScope: PrayerTimeScope?
     @State private var confirmArchive = false
     @State private var confirmDelete = false
     @State private var prayerToDelete: PrayerRequestRecord?
@@ -66,6 +67,7 @@ private struct CardDetailContent: View {
         }
         .overlay { emptyState }
         .navigationTitle(model.card?.title ?? "")
+        .prayerTimeStart($prayScope)
         .navigationSubtitle(model.collectionName)
         .navigationBarTitleDisplayMode(.large)
         .searchable(text: searchBinding, prompt: Text("Search Prayers"))
@@ -132,6 +134,10 @@ private struct CardDetailContent: View {
 
     @ViewBuilder
     private var toolbarButtons: some View {
+        Button("Pray", systemImage: "hands.and.sparkles") {
+            if let id = model.card?.id { prayScope = .cards([id]) }
+        }
+        .disabled(!model.canPray)
         Button { isAddingPrayer = true } label: {
             Label("New Prayer", systemImage: "plus")
         }
