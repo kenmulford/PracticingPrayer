@@ -102,6 +102,9 @@
     "All Prayed For" : {
 
     },
+    "All Requests" : {
+
+    },
     "Allow Landscape" : {
 
     },
@@ -191,6 +194,18 @@
     "Backup & Restore" : {
 
     },
+    "By Collection" : {
+
+    },
+    "By Collection…" : {
+
+    },
+    "By Tags" : {
+
+    },
+    "By Tags…" : {
+
+    },
     "Can I filter Prayer Time by tags?" : {
 
     },
@@ -234,6 +249,15 @@
 
     },
     "Check that notifications are enabled in App Settings and that your device's system settings allow notifications for this app. On iOS, also check Focus mode settings." : {
+
+    },
+    "Choose Cards" : {
+
+    },
+    "Choose Cards…" : {
+
+    },
+    "Choose what to pray for" : {
 
     },
     "Clear Filter" : {
@@ -540,6 +564,9 @@
     "No Cards" : {
 
     },
+    "No Collections" : {
+
+    },
     "No Collections Yet" : {
 
     },
@@ -733,6 +760,12 @@
     "Source" : {
 
     },
+    "Start" : {
+
+    },
+    "Start (%lld)" : {
+
+    },
     "Started" : {
 
     },
@@ -804,6 +837,9 @@
 
     },
     "Type a name to create a tag." : {
+
+    },
+    "Unable to Load" : {
 
     },
     "Unable to Load Home" : {
