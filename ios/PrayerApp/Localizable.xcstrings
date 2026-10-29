@@ -60,6 +60,9 @@
     "About" : {
 
     },
+    "Active" : {
+
+    },
     "Active Cards" : {
 
     },
@@ -76,6 +79,9 @@
 
     },
     "Add a prayer to this card." : {
+
+    },
+    "All" : {
 
     },
     "All Prayed For" : {
@@ -124,6 +130,9 @@
 
     },
     "Can't Load Prayer Cards" : {
+
+    },
+    "Can't Load Prayers" : {
 
     },
     "Can't Load Tags" : {
@@ -177,6 +186,9 @@
     "Couldn't create the tag." : {
 
     },
+    "Couldn't Update Prayer" : {
+
+    },
     "Create %@" : {
 
     },
@@ -204,6 +216,9 @@
     "Delete Prayer" : {
 
     },
+    "Delete Prayer?" : {
+
+    },
     "Delete “%@”?" : {
 
     },
@@ -229,6 +244,9 @@
 
     },
     "Edit Collection" : {
+
+    },
+    "Edit Prayer" : {
 
     },
     "Existing Card" : {
@@ -271,6 +289,9 @@
 
     },
     "How does Prayer Time work?" : {
+
+    },
+    "Imported" : {
 
     },
     "Is my data private?" : {
@@ -319,6 +340,12 @@
 
     },
     "New reminders start at this time." : {
+
+    },
+    "No Active Prayers" : {
+
+    },
+    "No Answered Prayers" : {
 
     },
     "No Collections Yet" : {
@@ -391,6 +418,9 @@
     "Practicing Prayer" : {
 
     },
+    "Pray" : {
+
+    },
     "Prayer" : {
 
     },
@@ -448,6 +478,9 @@
     "Search or Create Tags" : {
 
     },
+    "Select a Prayer" : {
+
+    },
     "Select Card" : {
 
     },
@@ -458,6 +491,9 @@
 
     },
     "Settings" : {
+
+    },
+    "Share" : {
 
     },
     "System" : {
