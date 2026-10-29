@@ -132,6 +132,31 @@ private func link(path: String, payload: Data, prefix: String = "z.") -> String 
         #expect(ShareCodec.decode(file: try gzipped(#"{"title":"  ","notes":"x"}"#)) == .empty)
     }
 
+    @Test func gzipBombIsRejected() throws {
+        let bomb = try Gzip.compress(Data(repeating: 0, count: 2 * 1_048_576))
+        #expect(bomb.count < 10_000)
+        #expect(throws: GzipError.self) { try Gzip.decompress(bomb) }
+        #expect(ShareCodec.decode(file: bomb) == .invalid)
+        #expect(ShareCodec.decode(link: link(path: "r", payload: bomb)) == .invalid)
+    }
+
+    @Test func decompressCapIsAParameter() throws {
+        let packed = try Gzip.compress(Data(repeating: 7, count: 5000))
+        #expect(throws: GzipError.self) { try Gzip.decompress(packed, maxOutputBytes: 4999) }
+        #expect(try Gzip.decompress(packed, maxOutputBytes: 5000) == Data(repeating: 7, count: 5000))
+    }
+
+    @Test func rawInflateStopsAtTheCap() throws {
+        let deflated = try Gzip.rawDeflate(Data(repeating: 0, count: 8 * 1_048_576))
+        #expect(throws: GzipError.self) { try Gzip.rawInflate(deflated, maxOutputBytes: 1_048_576) }
+        #expect(try Gzip.rawInflate(deflated, maxOutputBytes: 8 * 1_048_576).count == 8 * 1_048_576)
+    }
+
+    @Test func truncatedDeflateStreamIsRejected() throws {
+        let deflated = try Gzip.rawDeflate(Data((0..<4000).map { UInt8($0 % 251) }))
+        #expect(throws: GzipError.self) { try Gzip.rawInflate(deflated.prefix(deflated.count / 2), maxOutputBytes: 1 << 20) }
+    }
+
     @Test func notAShareLink() {
         #expect(ShareCodec.decode(link: "\(shareBase)/x?v=2&d=abc") == .notAShareLink)
         #expect(ShareCodec.decode(link: "https://example.com/share/r?v=2&d=abc") == .notAShareLink)

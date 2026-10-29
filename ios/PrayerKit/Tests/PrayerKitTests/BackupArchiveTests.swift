@@ -22,6 +22,26 @@ private let legacySchema = [
     #"CREATE TABLE "CardBox" ("Id" integer primary key autoincrement not null, "Name" varchar(50), "IsSystem" integer, "SystemKey" varchar(20), "SortOrder" integer, "CreatedAt" bigint, "UpdatedAt" bigint)"#,
 ]
 
+private func le16(_ data: Data, _ at: Int) -> Int { Int(data[at]) | Int(data[at + 1]) << 8 }
+private func le32(_ data: Data, _ at: Int) -> Int { le16(data, at) | le16(data, at + 2) << 16 }
+
+private func put32(_ data: inout Data, _ at: Int, _ value: Int) {
+    for shift in 0..<4 { data[at + shift] = UInt8((value >> (8 * shift)) & 0xFF) }
+}
+
+/// Offsets of each central-directory header in an archive written by `BackupArchive.archive`
+/// (no extra fields, no comments).
+private func centralHeaders(_ data: Data) -> [Int] {
+    let end = data.count - 22
+    var cursor = le32(data, end + 16)
+    var offsets: [Int] = []
+    for _ in 0..<le16(data, end + 10) {
+        offsets.append(cursor)
+        cursor += 46 + le16(data, cursor + 28)
+    }
+    return offsets
+}
+
 private struct ForcedFailure: Error {}
 
 @Suite struct BackupArchiveTests {
@@ -175,6 +195,80 @@ private struct ForcedFailure: Error {}
             try BackupArchive.entries(of: data, maxEntryBytes: 10)
         }
         #expect(try BackupArchive.entries(of: data)["prayer_app.db"] == Data(repeating: 7, count: 64))
+    }
+
+    @Test func entriesIgnoresUnexpectedNames() throws {
+        let data = try BackupArchive.archive(entries: [
+            ("junk.bin", Data(repeating: 1, count: 100)), ("prayer_app.db", Data(repeating: 2, count: 64)),
+            ("confidential.enc", Data(repeating: 3, count: 32)), ("zzz.txt", Data(repeating: 4, count: 10)),
+        ])
+        let entries = try BackupArchive.entries(of: data)
+        #expect(Set(entries.keys) == ["prayer_app.db", "confidential.enc"])
+        #expect(entries["prayer_app.db"] == Data(repeating: 2, count: 64))
+    }
+
+    @Test func restoreIgnoresUnexpectedEntry() throws {
+        let directory = try workDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let source = try fixtureCopy("long-upgraded.db", into: directory)
+        let archive = directory.appendingPathComponent("extra.pcrd")
+        try BackupArchive.archive(entries: [
+            ("readme.txt", Data("hello".utf8)), ("prayer_app.db", try Data(contentsOf: source)),
+        ]).write(to: archive)
+        let live = try fixtureCopy("fresh-install.db", into: directory)
+
+        let result = try BackupArchive.restore(archiveURL: archive, databaseURL: live, upkeep: { _ in })
+
+        #expect(result.confidentialPayload == nil)
+        #expect(try snapshot(of: live) == snapshot(of: source))
+    }
+
+    @Test func rejectsMoreThanSixteenEntries() throws {
+        let many = (0..<17).map { ("extra\($0).txt", Data([UInt8($0)])) }
+        #expect(throws: BackupArchiveError.invalidBackup) {
+            try BackupArchive.entries(of: try BackupArchive.archive(entries: [("prayer_app.db", Data([9]))] + many))
+        }
+        let sixteen = (0..<15).map { ("extra\($0).txt", Data([UInt8($0)])) }
+        let ok = try BackupArchive.archive(entries: [("prayer_app.db", Data([9]))] + sixteen)
+        #expect(try BackupArchive.entries(of: ok).keys.contains("prayer_app.db"))
+    }
+
+    @Test func rejectsLocalNameThatDiffersFromCentralName() throws {
+        var data = try BackupArchive.archive(entries: [("prayer_app.db", Data(repeating: 5, count: 64))])
+        data[30] = UInt8(ascii: "q")
+        #expect(throws: BackupArchiveError.invalidBackup) { try BackupArchive.entries(of: data) }
+    }
+
+    @Test func rejectsEntryRangesThatOverlap() throws {
+        var data = try BackupArchive.archive(entries: [
+            ("prayer_app.db", Data((0..<400).map { UInt8($0 % 251) })), ("confidential.enc", Data(repeating: 1, count: 200)),
+        ])
+        let first = centralHeaders(data)[0]
+        put32(&data, first + 20, le32(data, first + 20) + 40)
+        #expect(throws: BackupArchiveError.invalidBackup) { try BackupArchive.entries(of: data) }
+    }
+
+    @Test func rejectsEntryRangeThatReachesCentralDirectory() throws {
+        var data = try BackupArchive.archive(entries: [("prayer_app.db", Data((0..<400).map { UInt8($0 % 251) }))])
+        let only = centralHeaders(data)[0]
+        put32(&data, only + 20, le32(data, only + 20) + 10)
+        #expect(throws: BackupArchiveError.invalidBackup) { try BackupArchive.entries(of: data) }
+    }
+
+    @Test func keepsRunningTotalOfInflatedBytes() throws {
+        let data = try BackupArchive.archive(entries: [
+            ("prayer_app.db", Data(repeating: 1, count: 600)), ("confidential.enc", Data(repeating: 2, count: 600)),
+        ])
+        #expect(throws: BackupArchiveError.invalidBackup) { try BackupArchive.entries(of: data, maxEntryBytes: 1000) }
+        #expect(try BackupArchive.entries(of: data, maxEntryBytes: 1200).count == 2)
+    }
+
+    @Test func bombEntryUnderDeclaredCapIsRejected() throws {
+        var data = try BackupArchive.archive(entries: [("prayer_app.db", Data(repeating: 0, count: 8 * 1_048_576))])
+        #expect(data.count < 100_000)
+        let only = centralHeaders(data)[0]
+        put32(&data, only + 24, 1000)
+        #expect(throws: BackupArchiveError.invalidBackup) { try BackupArchive.entries(of: data, maxEntryBytes: 1_048_576) }
     }
 
     @Test func failureAfterSwapRestoresOriginal() throws {

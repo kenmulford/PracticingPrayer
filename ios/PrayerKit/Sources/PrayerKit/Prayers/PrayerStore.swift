@@ -113,7 +113,7 @@ public struct PrayerStore: Sendable {
 
     public func prayers(
         segment: PrayerSegment, search: String = "", tagIds: Set<Int64> = [],
-        isSessionUnlocked: Bool = true
+        isSessionUnlocked: Bool
     ) throws -> [PrayerListItem] {
         let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
         var blocked: Set<Int64> = []

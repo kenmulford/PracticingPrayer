@@ -155,8 +155,21 @@ public enum BackupArchive {
 
     // MARK: ZIP reader
 
+    private static let maxEntryCount = 16
+    private static let expectedEntries: Set<String> = [databaseEntry, confidentialEntry]
+
+    private struct CentralEntry {
+        let name: String
+        let method: Int
+        let crc: Int
+        let compressedSize: Int
+        let size: Int
+        let start: Int
+    }
+
     /// Sizes, CRC, and offsets come from the central directory; the local header is used only to find
-    /// where the data starts, because writers differ in the extra field they put there.
+    /// where the data starts, because writers differ in the extra field they put there. Only the two
+    /// expected entries are inflated, and `maxEntryBytes` bounds their combined inflated size.
     static func entries(of archive: Data, maxEntryBytes: Int = maxEntryBytes) throws -> [String: Data] {
         let bytes = [UInt8](archive)
         func u16(_ at: Int) throws -> Int {
@@ -175,12 +188,15 @@ public enum BackupArchive {
 
         let count = try u16(end + 10)
         let centralSize = try u32(end + 12)
-        var cursor = try u32(end + 16)
-        guard count != 0xFFFF, centralSize != 0xFFFF_FFFF, cursor != 0xFFFF_FFFF,
-              cursor + centralSize <= end
+        let centralStart = try u32(end + 16)
+        var cursor = centralStart
+        guard count != 0xFFFF, count <= maxEntryCount, centralSize != 0xFFFF_FFFF, centralStart != 0xFFFF_FFFF,
+              centralStart + centralSize <= end
         else { throw BackupArchiveError.invalidBackup }
 
-        var result = [String: Data]()
+        var central = [CentralEntry]()
+        var names = Set<String>()
+        var ranges = [Range<Int>]()
         for _ in 0..<count {
             guard try u32(cursor) == Int(centralSignature) else { throw BackupArchiveError.invalidBackup }
             let flags = try u16(cursor + 8)
@@ -192,31 +208,51 @@ public enum BackupArchive {
             let extraLength = try u16(cursor + 30)
             let commentLength = try u16(cursor + 32)
             let localOffset = try u32(cursor + 42)
-            guard cursor + 46 + nameLength <= bytes.count,
-                  let name = String(data: Data(bytes[(cursor + 46)..<(cursor + 46 + nameLength)]), encoding: .utf8)
-            else { throw BackupArchiveError.invalidBackup }
+            guard cursor + 46 + nameLength <= bytes.count else { throw BackupArchiveError.invalidBackup }
+            let nameBytes = bytes[(cursor + 46)..<(cursor + 46 + nameLength)]
+            guard let name = String(data: Data(nameBytes), encoding: .utf8) else { throw BackupArchiveError.invalidBackup }
             cursor += 46 + nameLength + extraLength + commentLength
 
             guard flags & 0x01 == 0, method == 0 || method == 8,
-                  size <= maxEntryBytes, size != 0xFFFF_FFFF, compressedSize != 0xFFFF_FFFF,
-                  try u32(localOffset) == Int(localSignature), result[name] == nil
+                  size != 0xFFFF_FFFF, compressedSize != 0xFFFF_FFFF,
+                  try u32(localOffset) == Int(localSignature), names.insert(name).inserted
             else { throw BackupArchiveError.invalidBackup }
-            let start = localOffset + 30 + (try u16(localOffset + 26)) + (try u16(localOffset + 28))
-            guard start + compressedSize <= bytes.count else { throw BackupArchiveError.invalidBackup }
-            let stored = Data(bytes[start..<(start + compressedSize)])
+            let localNameLength = try u16(localOffset + 26)
+            guard localNameLength == nameLength, localOffset + 30 + nameLength <= bytes.count,
+                  bytes[(localOffset + 30)..<(localOffset + 30 + nameLength)].elementsEqual(nameBytes)
+            else { throw BackupArchiveError.invalidBackup }
+            let start = localOffset + 30 + localNameLength + (try u16(localOffset + 28))
+            let finish = start + compressedSize
+            guard finish <= centralStart else { throw BackupArchiveError.invalidBackup }
+            ranges.append(localOffset..<finish)
+            central.append(CentralEntry(
+                name: name, method: method, crc: crc, compressedSize: compressedSize, size: size, start: start))
+        }
+        let ordered = ranges.sorted { $0.lowerBound < $1.lowerBound }
+        for (previous, next) in zip(ordered, ordered.dropFirst()) where previous.upperBound > next.lowerBound {
+            throw BackupArchiveError.invalidBackup
+        }
 
+        var result = [String: Data]()
+        var inflatedTotal = 0
+        for entry in central where expectedEntries.contains(entry.name) {
+            guard entry.size <= maxEntryBytes - inflatedTotal else { throw BackupArchiveError.invalidBackup }
+            let stored = Data(bytes[entry.start..<(entry.start + entry.compressedSize)])
             let data: Data
-            if method == 0 {
+            if entry.method == 0 {
                 data = stored
             } else {
                 do {
-                    data = size == 0 ? Data() : try Gzip.rawInflate(stored, maxOutputBytes: maxEntryBytes)
+                    data = entry.size == 0 ? Data() : try Gzip.rawInflate(stored, maxOutputBytes: entry.size)
                 } catch {
                     throw BackupArchiveError.invalidBackup
                 }
             }
-            guard data.count == size, Int(Gzip.crc32(data)) == crc else { throw BackupArchiveError.invalidBackup }
-            if !name.hasSuffix("/") { result[name] = data }
+            guard data.count == entry.size, Int(Gzip.crc32(data)) == entry.crc else {
+                throw BackupArchiveError.invalidBackup
+            }
+            inflatedTotal += data.count
+            result[entry.name] = data
         }
         return result
     }

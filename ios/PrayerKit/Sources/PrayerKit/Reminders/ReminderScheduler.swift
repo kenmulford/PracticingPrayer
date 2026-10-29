@@ -52,7 +52,8 @@ public struct ReminderScheduler {
             preferences.nativeRemindersMigrated = true
         }
 
-        let records = try PrayerStore(database: database).prayers(segment: .active).map(\.record)
+        // Reminders are not UI, so protected prayers still schedule.
+        let records = try PrayerStore(database: database).prayers(segment: .active, isSessionUnlocked: true).map(\.record)
 
         do {
             try recomputeRecentlyNotified(records, now: now)

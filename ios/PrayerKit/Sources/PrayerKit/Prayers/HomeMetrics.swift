@@ -21,14 +21,15 @@ public struct HomeMetrics: Sendable, Equatable {
 }
 
 public extension PrayerDatabase {
-    func homeMetrics(now: Date, overdueDayThreshold: Int = 30) throws -> HomeMetrics {
-        let active = try PrayerStore(database: self).prayers(segment: .active)
+    func homeMetrics(now: Date, overdueDayThreshold: Int = 30, isSessionUnlocked: Bool) throws -> HomeMetrics {
+        let active = try PrayerStore(database: self).prayers(segment: .active, isSessionUnlocked: isSessionUnlocked)
         return HomeMetrics(
-            overdue: try overduePrayers(now: now, overdueDayThreshold: overdueDayThreshold),
+            overdue: try overduePrayers(
+                now: now, overdueDayThreshold: overdueDayThreshold, isSessionUnlocked: isSessionUnlocked),
             activeCards: Set(active.map(\.record.prayerCardId)).count,
             unanswered: active.count,
             lastPrayed: try lastPrayed(),
-            answeredOnThisDay: try answeredOnThisDay(now: now))
+            answeredOnThisDay: try answeredOnThisDay(now: now, isSessionUnlocked: isSessionUnlocked))
     }
 
     func interactionCount(prayerId: Int64) throws -> Int {
@@ -38,8 +39,8 @@ public extension PrayerDatabase {
         }
     }
 
-    func overduePrayers(now: Date, overdueDayThreshold: Int = 30) throws -> [PrayerRequestRecord] {
-        let active = try PrayerStore(database: self).prayers(segment: .active).map(\.record)
+    func overduePrayers(now: Date, overdueDayThreshold: Int = 30, isSessionUnlocked: Bool) throws -> [PrayerRequestRecord] {
+        let active = try PrayerStore(database: self).prayers(segment: .active, isSessionUnlocked: isSessionUnlocked).map(\.record)
         let latest: [Int64: Int64] = try dbQueue.read { db in
             let rows = try Row.fetchAll(
                 db,
@@ -66,11 +67,11 @@ public extension PrayerDatabase {
         return try TicksDate.decode(value, column: "InteractionAt")
     }
 
-    func answeredOnThisDay(now: Date) throws -> [PrayerRequestRecord] {
+    func answeredOnThisDay(now: Date, isSessionUnlocked: Bool) throws -> [PrayerRequestRecord] {
         let calendar = Calendar.current
         let today = calendar.dateComponents([.year, .month, .day], from: now)
         var matches: [PrayerRequestRecord] = []
-        for item in try PrayerStore(database: self).prayers(segment: .answered) {
+        for item in try PrayerStore(database: self).prayers(segment: .answered, isSessionUnlocked: isSessionUnlocked) {
             guard let ticks = item.record.answeredAtTicks else { continue }
             let answered = calendar.dateComponents([.year, .month, .day], from: try Date(ticks: ticks))
             if answered.month == today.month, answered.day == today.day, answered.year! < today.year! {

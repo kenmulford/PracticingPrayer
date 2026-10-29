@@ -41,7 +41,7 @@ private func count(_ database: PrayerDatabase, _ table: String, where clause: St
 private func ids(_ items: [PrayerListItem]) -> [Int64] { items.map(\.record.id) }
 
 private func item(_ store: PrayerStore, _ id: Int64) throws -> PrayerListItem {
-    try #require(store.prayers(segment: .all).first { $0.record.id == id })
+    try #require(store.prayers(segment: .all, isSessionUnlocked: true).first { $0.record.id == id })
 }
 
 @Suite struct PrayerStoreTests {
@@ -51,7 +51,7 @@ private func item(_ store: PrayerStore, _ id: Int64) throws -> PrayerListItem {
         try withCopy("fresh-install.db") { database in
             let store = PrayerStore(database: database)
             let id = try store.create(PrayerDraft(prayerCardId: 1, title: "Heal"), now: now)
-            let active = try store.prayers(segment: .active)
+            let active = try store.prayers(segment: .active, isSessionUnlocked: true)
             #expect(ids(active) == [id])
             #expect(active[0].cardTitle == "Quick Add")
         }
@@ -104,17 +104,17 @@ private func item(_ store: PrayerStore, _ id: Int64) throws -> PrayerListItem {
         try withCopy("long-upgraded.db") { database in
             let store = PrayerStore(database: database)
             try store.markAnswered(id: 5, now: now)
-            let active = try ids(store.prayers(segment: .active))
+            let active = try ids(store.prayers(segment: .active, isSessionUnlocked: true))
             #expect(!active.contains(5) && !active.contains(6))
-            try #expect(ids(store.prayers(segment: .answered)) == [5, 6])
-            try #expect(store.prayers(segment: .all).count == 7)
+            try #expect(ids(store.prayers(segment: .answered, isSessionUnlocked: true)) == [5, 6])
+            try #expect(store.prayers(segment: .all, isSessionUnlocked: true).count == 7)
         }
     }
 
     @Test func allSortsByCardTitleThenTitle() throws {
         try withCopy("long-upgraded.db") { database in
             let store = PrayerStore(database: database)
-            try #expect(ids(store.prayers(segment: .all)) == [5, 6, 7, 1, 2, 3, 4])
+            try #expect(ids(store.prayers(segment: .all, isSessionUnlocked: true)) == [5, 6, 7, 1, 2, 3, 4])
         }
     }
 
@@ -124,15 +124,15 @@ private func item(_ store: PrayerStore, _ id: Int64) throws -> PrayerListItem {
             for title in ["beta", "Alpha", "Charlie"] {
                 _ = try store.create(PrayerDraft(prayerCardId: 1, title: title), now: now)
             }
-            try #expect(store.prayers(segment: .all).map(\.record.title) == ["Alpha", "beta", "Charlie"])
+            try #expect(store.prayers(segment: .all, isSessionUnlocked: true).map(\.record.title) == ["Alpha", "beta", "Charlie"])
         }
     }
 
     @Test func searchTrimsAndMatchesTitleOrCardTitle() throws {
         try withCopy("long-upgraded.db") { database in
             let store = PrayerStore(database: database)
-            try #expect(ids(store.prayers(segment: .all, search: "  fixture card 2 ")) == [7])
-            try #expect(ids(store.prayers(segment: .all, search: "ENTRY 3")) == [3])
+            try #expect(ids(store.prayers(segment: .all, search: "  fixture card 2 ", isSessionUnlocked: true)) == [7])
+            try #expect(ids(store.prayers(segment: .all, search: "ENTRY 3", isSessionUnlocked: true)) == [3])
         }
     }
 
@@ -142,9 +142,9 @@ private func item(_ store: PrayerStore, _ id: Int64) throws -> PrayerListItem {
             let a = try store.create(PrayerDraft(prayerCardId: 1, title: "Aaa", tagIds: [1]), now: now)
             let b = try store.create(PrayerDraft(prayerCardId: 1, title: "Bbb", tagIds: [2]), now: now)
             _ = try store.create(PrayerDraft(prayerCardId: 1, title: "Ccc"), now: now)
-            try #expect(ids(store.prayers(segment: .all, tagIds: [1, 2])) == [a, b])
-            try #expect(ids(store.prayers(segment: .all, search: "Aaa", tagIds: [1, 2])) == [a])
-            try #expect(store.prayers(segment: .answered, tagIds: [1, 2]).isEmpty)
+            try #expect(ids(store.prayers(segment: .all, tagIds: [1, 2], isSessionUnlocked: true)) == [a, b])
+            try #expect(ids(store.prayers(segment: .all, search: "Aaa", tagIds: [1, 2], isSessionUnlocked: true)) == [a])
+            try #expect(store.prayers(segment: .answered, tagIds: [1, 2], isSessionUnlocked: true).isEmpty)
         }
     }
 
@@ -161,7 +161,7 @@ private func item(_ store: PrayerStore, _ id: Int64) throws -> PrayerListItem {
         try withCopy("fresh-install.db") { database in
             let store = PrayerStore(database: database)
             for segment in PrayerSegment.allCases {
-                try #expect(store.prayers(segment: segment).isEmpty)
+                try #expect(store.prayers(segment: segment, isSessionUnlocked: true).isEmpty)
             }
             try #expect(store.prayers(cardId: 1).isEmpty)
         }
@@ -170,16 +170,16 @@ private func item(_ store: PrayerStore, _ id: Int64) throws -> PrayerListItem {
     @Test func blankSearchAndEmptyTagsApplyNoFilter() throws {
         try withCopy("long-upgraded.db") { database in
             let store = PrayerStore(database: database)
-            try #expect(store.prayers(segment: .all, search: "   ").count == 7)
-            try #expect(store.prayers(segment: .all, tagIds: []).count == 7)
+            try #expect(store.prayers(segment: .all, search: "   ", isSessionUnlocked: true).count == 7)
+            try #expect(store.prayers(segment: .all, tagIds: [], isSessionUnlocked: true).count == 7)
         }
     }
 
     @Test func noMatchReturnsEmpty() throws {
         try withCopy("long-upgraded.db") { database in
             let store = PrayerStore(database: database)
-            try #expect(store.prayers(segment: .all, search: "zzz").isEmpty)
-            try #expect(store.prayers(segment: .all, tagIds: [999]).isEmpty)
+            try #expect(store.prayers(segment: .all, search: "zzz", isSessionUnlocked: true).isEmpty)
+            try #expect(store.prayers(segment: .all, tagIds: [999], isSessionUnlocked: true).isEmpty)
         }
     }
 

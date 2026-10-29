@@ -67,7 +67,8 @@ private func ids(_ records: [PrayerRequestRecord]) -> [Int64] { records.map(\.id
         try withStore { _, preferences in
             try withDatabase("long-upgraded.db") { database in
                 let metrics = try database.homeMetrics(
-                    now: local(2025, 2, 15, 12), overdueDayThreshold: preferences.overdueDayThreshold)
+                    now: local(2025, 2, 15, 12), overdueDayThreshold: preferences.overdueDayThreshold,
+                    isSessionUnlocked: true)
                 #expect(ids(metrics.overdue) == [5, 7])
             }
         }
@@ -76,9 +77,9 @@ private func ids(_ records: [PrayerRequestRecord]) -> [Int64] { records.map(\.id
     @Test func latestExactlyAtCutoffIsNotOverdue() throws {
         try withDatabase("long-upgraded.db") { database in
             let now = local(2025, 1, 31)
-            let r3 = try (database.overduePrayers(now: now, overdueDayThreshold: 30).isEmpty)
+            let r3 = try (database.overduePrayers(now: now, overdueDayThreshold: 30, isSessionUnlocked: true).isEmpty)
             #expect(r3)
-            let r4 = try (ids(database.overduePrayers(now: now.addingTimeInterval(1), overdueDayThreshold: 30)) == [5, 7])
+            let r4 = try (ids(database.overduePrayers(now: now.addingTimeInterval(1), overdueDayThreshold: 30, isSessionUnlocked: true)) == [5, 7])
             #expect(r4)
         }
     }
@@ -86,14 +87,14 @@ private func ids(_ records: [PrayerRequestRecord]) -> [Int64] { records.map(\.id
     @Test func overdueOrdersOldestLatestFirst() throws {
         try withDatabase("long-upgraded.db") { database in
             try PrayerInteractionRecorder(database: database).recordPrayed(prayerId: 5, now: local(2025, 1, 10))
-            let r5 = try (ids(database.overduePrayers(now: local(2025, 3, 1))) == [7, 5])
+            let r5 = try (ids(database.overduePrayers(now: local(2025, 3, 1), isSessionUnlocked: true)) == [7, 5])
             #expect(r5)
         }
     }
 
     @Test func activeCardsAndUnanswered() throws {
         try withDatabase("long-upgraded.db") { database in
-            let metrics = try database.homeMetrics(now: local(2025, 2, 15))
+            let metrics = try database.homeMetrics(now: local(2025, 2, 15), isSessionUnlocked: true)
             #expect(metrics.activeCards == 3)
             #expect(metrics.unanswered == 6)
         }
@@ -108,18 +109,18 @@ private func ids(_ records: [PrayerRequestRecord]) -> [Int64] { records.map(\.id
 
     @Test func answeredOnThisDayMatchesEarlierYear() throws {
         try withDatabase("long-upgraded.db") { database in
-            let r7 = try (ids(database.answeredOnThisDay(now: local(2026, 1, 1, 9))) == [6])
+            let r7 = try (ids(database.answeredOnThisDay(now: local(2026, 1, 1, 9), isSessionUnlocked: true)) == [6])
             #expect(r7)
-            let r8 = try (database.answeredOnThisDay(now: local(2025, 1, 1, 9)).isEmpty)
+            let r8 = try (database.answeredOnThisDay(now: local(2025, 1, 1, 9), isSessionUnlocked: true).isEmpty)
             #expect(r8)
-            let r9 = try (database.answeredOnThisDay(now: local(2026, 1, 2, 9)).isEmpty)
+            let r9 = try (database.answeredOnThisDay(now: local(2026, 1, 2, 9), isSessionUnlocked: true).isEmpty)
             #expect(r9)
         }
     }
 
     @Test func emptyDatabaseReturnsZeros() throws {
         try withDatabase("fresh-install.db") { database in
-            let metrics = try database.homeMetrics(now: local(2026, 1, 1))
+            let metrics = try database.homeMetrics(now: local(2026, 1, 1), isSessionUnlocked: true)
             #expect(metrics == HomeMetrics(overdue: [], activeCards: 0, unanswered: 0, lastPrayed: nil, answeredOnThisDay: []))
             let r10 = try (database.interactionCount(prayerId: 1) == 0)
             #expect(r10)
@@ -129,8 +130,44 @@ private func ids(_ records: [PrayerRequestRecord]) -> [Int64] { records.map(\.id
     @Test func readFailureThrows() throws {
         try withDatabase("long-upgraded.db") { database in
             try database.dbQueue.write { db in try db.execute(sql: "DROP TABLE PrayerInteraction") }
-            #expect(throws: DatabaseError.self) { try database.homeMetrics(now: local(2026, 1, 1)) }
+            #expect(throws: DatabaseError.self) { try database.homeMetrics(now: local(2026, 1, 1), isSessionUnlocked: true) }
             #expect(throws: DatabaseError.self) { try database.interactionCount(prayerId: 1) }
+        }
+    }
+
+    private func protectCard(ofPrayer id: Int64, in database: PrayerDatabase) throws {
+        try database.dbQueue.write { db in
+            try db.execute(
+                sql: "UPDATE PrayerCard SET ProtectionMode = 1 WHERE Id = (SELECT PrayerCardId FROM PrayerRequest WHERE Id = ?)",
+                arguments: [id])
+        }
+    }
+
+    @Test func lockedAnsweredOnThisDayExcludesProtectedCard() throws {
+        try withDatabase("long-upgraded.db") { database in
+            try protectCard(ofPrayer: 6, in: database)
+            let now = local(2026, 1, 1, 9)
+            #expect(try ids(database.answeredOnThisDay(now: now, isSessionUnlocked: false)).isEmpty)
+            #expect(try ids(database.answeredOnThisDay(now: now, isSessionUnlocked: true)) == [6])
+        }
+    }
+
+    @Test func lockedOverdueExcludesProtectedCard() throws {
+        try withDatabase("long-upgraded.db") { database in
+            try protectCard(ofPrayer: 5, in: database)
+            let now = local(2025, 2, 15, 12)
+            #expect(try !ids(database.overduePrayers(now: now, isSessionUnlocked: false)).contains(5))
+            #expect(try ids(database.overduePrayers(now: now, isSessionUnlocked: true)) == [5, 7])
+        }
+    }
+
+    @Test func lockedHomeMetricsExcludeProtectedPrayers() throws {
+        try withDatabase("long-upgraded.db") { database in
+            try protectCard(ofPrayer: 5, in: database)
+            let locked = try database.homeMetrics(now: local(2025, 2, 15, 12), isSessionUnlocked: false)
+            let unlocked = try database.homeMetrics(now: local(2025, 2, 15, 12), isSessionUnlocked: true)
+            #expect(!ids(locked.overdue).contains(5))
+            #expect(locked.unanswered < unlocked.unanswered)
         }
     }
 }

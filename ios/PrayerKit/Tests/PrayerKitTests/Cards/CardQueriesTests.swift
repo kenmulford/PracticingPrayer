@@ -28,7 +28,7 @@ private func list(
     try database.dbQueue.write { db in
         for statement in sql { try db.execute(sql: statement) }
     }
-    return try database.cardList(filter: filter)
+    return try database.cardList(filter: filter, isSessionUnlocked: true)
 }
 
 private func boxIds(_ list: CardList) -> [Int64] { list.sections.map(\.boxId) }

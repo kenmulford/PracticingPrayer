@@ -184,4 +184,43 @@ private func repoRoot() -> URL {
 
         #expect(try Rows.read(destination.path) == rows)
     }
+
+    @Test func scrubbedCopyLeavesNoConfidentialTextInFreePages() throws {
+        let dir = try scratchDirectory()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let source = dir.appendingPathComponent("source.db")
+        let destination = dir.appendingPathComponent("scrubbed.db")
+        try FileManager.default.copyItem(at: repoRoot().appendingPathComponent("contracts/db/long-upgraded.db"), to: source)
+
+        // Enough bulk that the deletes free whole pages, which keep their bytes unless the scrub clears them.
+        let seeded = try PrayerDatabase(path: source.path)
+        let store = PrayerStore(database: seeded)
+        let confidentialCardId = try Rows.read(source.path).cards[0].id
+        for index in 0..<300 {
+            _ = try store.create(
+                PrayerDraft(
+                    prayerCardId: confidentialCardId, title: "LEAKTITLE-\(index)",
+                    details: String(repeating: "leakdetail-\(index) ", count: 20)),
+                now: Date(timeIntervalSince1970: 1_700_000_000))
+        }
+        try seeded.close()
+
+        let rows = try Rows.read(source.path)
+        var cards = rows.cards
+        cards[0].protectionMode = .hidden
+        let result = split(
+            cards: cards, boxes: rows.boxes, prayers: rows.prayers,
+            interactions: rows.interactions, junctions: rows.junctions)
+        let remainingTitles = result.remainingCards.map(\.title) + result.remainingPrayers.map(\.title)
+        let needles = (result.confidentialCards.map(\.title) + result.confidentialPrayers.map(\.title))
+            .filter { needle in !remainingTitles.contains { $0.contains(needle) } }
+        #expect(!needles.isEmpty)
+        let before = try Data(contentsOf: source)
+        for needle in needles { #expect(before.range(of: Data(needle.utf8)) != nil) }
+
+        try ScrubbedDatabase.write(from: source, to: destination, removing: result)
+
+        let after = try Data(contentsOf: destination)
+        for needle in needles { #expect(after.range(of: Data(needle.utf8)) == nil, "\(needle) survived the scrub") }
+    }
 }

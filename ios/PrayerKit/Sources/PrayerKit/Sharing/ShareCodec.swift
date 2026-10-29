@@ -1,3 +1,4 @@
+import Compression
 import Foundation
 
 public struct SharedPrayer: Equatable, Sendable {
@@ -251,11 +252,43 @@ enum Gzip {
         try (data as NSData).compressed(using: .zlib) as Data
     }
 
-    /// Throws once the output exceeds `maxOutputBytes`, so a hostile archive cannot inflate without bound.
+    /// Streams the inflate and throws as soon as the output passes `maxOutputBytes`, so a hostile
+    /// archive or link cannot grow memory past the cap. Truncated or corrupt input throws too.
     static func rawInflate(_ data: Data, maxOutputBytes: Int) throws -> Data {
-        let inflated = try (data as NSData).decompressed(using: .zlib) as Data
-        guard inflated.count <= maxOutputBytes else { throw GzipError.invalid }
-        return inflated
+        let chunkSize = 64 * 1024
+        let scratch = UnsafeMutablePointer<UInt8>.allocate(capacity: chunkSize)
+        defer { scratch.deallocate() }
+        var stream = compression_stream(dst_ptr: scratch, dst_size: 0, src_ptr: scratch, src_size: 0, state: nil)
+        guard compression_stream_init(&stream, COMPRESSION_STREAM_DECODE, COMPRESSION_ZLIB) != COMPRESSION_STATUS_ERROR else {
+            throw GzipError.invalid
+        }
+        defer { compression_stream_destroy(&stream) }
+
+        var output = Data()
+        return try data.withUnsafeBytes { (input: UnsafeRawBufferPointer) -> Data in
+            stream.src_ptr = input.bindMemory(to: UInt8.self).baseAddress ?? UnsafePointer(scratch)
+            stream.src_size = input.count
+            while true {
+                // One byte past the cap is enough to prove the output is over it.
+                let remaining = maxOutputBytes - output.count
+                let room = remaining >= chunkSize ? chunkSize : remaining + 1
+                stream.dst_ptr = scratch
+                stream.dst_size = room
+                let status = compression_stream_process(&stream, Int32(COMPRESSION_STREAM_FINALIZE.rawValue))
+                let produced = room - stream.dst_size
+                output.append(scratch, count: produced)
+                guard output.count <= maxOutputBytes else { throw GzipError.invalid }
+                switch status {
+                case COMPRESSION_STATUS_END:
+                    return output
+                case COMPRESSION_STATUS_OK:
+                    // No output and no input left means the stream ended early.
+                    if produced == 0 && stream.src_size == 0 { throw GzipError.invalid }
+                default:
+                    throw GzipError.invalid
+                }
+            }
+        }
     }
 
     static func compress(_ data: Data) throws -> Data {
@@ -267,7 +300,12 @@ enum Gzip {
         return out
     }
 
-    static func decompress(_ data: Data) throws -> Data {
+    /// 1 MB. The 1.7.2 share path caps only the link length (`DeepLinkService.MaxUrlLength`, 1800),
+    /// so this bound is native-side.
+    static let maxShareBytes = 1_048_576
+
+    static func decompress(_ data: Data, maxOutputBytes: Int = maxShareBytes) throws -> Data {
+        guard data.count <= maxOutputBytes else { throw GzipError.invalid }
         let bytes = [UInt8](data)
         guard bytes.count >= 18, bytes[0] == 0x1F, bytes[1] == 0x8B, bytes[2] == 0x08 else {
             throw GzipError.invalid
@@ -286,7 +324,7 @@ enum Gzip {
         if flags & 0x02 != 0 { index += 2 }
         guard index <= end else { throw GzipError.invalid }
 
-        let inflated = try rawInflate(Data(bytes[index..<end]), maxOutputBytes: .max)
+        let inflated = try rawInflate(Data(bytes[index..<end]), maxOutputBytes: maxOutputBytes)
         let trailer = Array(bytes[end...])
         guard Array(trailer[0..<4]) == littleEndian(crc32(inflated)),
               Array(trailer[4..<8]) == littleEndian(UInt32(truncatingIfNeeded: inflated.count))

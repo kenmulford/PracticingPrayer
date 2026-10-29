@@ -34,7 +34,7 @@ private func ordered(_ lhs: String, _ rhs: String) -> ComparisonResult {
 }
 
 public extension PrayerDatabase {
-    func cardList(filter: CardListFilter = CardListFilter(), isSessionUnlocked: Bool = true) throws -> CardList {
+    func cardList(filter: CardListFilter = CardListFilter(), isSessionUnlocked: Bool) throws -> CardList {
         let (boxes, cards, requests, tagRows) = try dbQueue.read { db in
             (
                 try CardBoxRecord.fetchAll(db),
