@@ -40,7 +40,7 @@ This project follows a Gitflow-style model. **`master` and `dev` are protected**
 2. Branch from `dev` — name it `feature/<short-desc>` or `fix/<short-desc>`.
 3. Make your changes; keep commits focused and reviewable. One concern per branch.
 4. Run the test suite locally — see [Build and run](README.md#build-and-run) and the test layout below.
-5. Open the PR against `dev`. Link the issue with `Closes #<n>` if one exists. The `Unit Tests` check must pass before merge.
+5. Open the PR against `dev`. Link the issue with `Closes #<n>` if one exists. The `Unit Tests` check must pass before merge. The `Swift Tests` check runs `swift test --package-path ios/PrayerKit` on PRs that touch `ios/` or `contracts/`, and it is not a required check.
 
 PRs are squash-merged into `dev`, so your in-branch commit history is for review readability — the final history is one squashed commit per PR.
 
@@ -48,7 +48,7 @@ PRs are squash-merged into `dev`, so your in-branch commit history is for review
 
 | Surface | Command |
 |---|---|
-| Unit tests | `dotnet test PrayerApp.Tests/PrayerApp.Tests.csproj` |
+| Unit tests | `bash scripts/unit-tests.sh` (runs `dotnet test PrayerApp.Tests/PrayerApp.Tests.csproj`, then `swift test --package-path ios/PrayerKit`; the Swift suite needs macOS + Xcode) |
 | Build | `dotnet build PrayerApp/PrayerApp.csproj` for both `net10.0-android` and `net10.0-ios` (iOS requires macOS + Xcode). For an iOS-**simulator** Debug build, add `-r iossimulator-arm64` — it selects the simulator native-lib slice; without it the link step fails (see issue #150). |
 | UI tests | `PrayerApp.UITests/` — Appium-based, requires emulator/sim and `appium` running locally. Optional for small PRs; required for changes touching navigation, list virtualization, or share/import flows. |
 

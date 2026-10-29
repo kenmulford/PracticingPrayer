@@ -2,6 +2,37 @@
 
 Release notes for Practicing Prayer, newest first.
 
+## 2.0.0 Spike - upgrade in place
+
+**Theme:** The native iOS app opens the 1.7.2 database and Keychain PIN in place after an App Store update, proven on Test iPad. Lands on `ios-2.0-refactor`, not a release.
+
+### ✨ Features / enhancements
+
+| Issue | PR | What |
+|---|---|---|
+| #372 Scaffold the native iOS project and the PrayerKit package under ios/ | #442 | `ios/PrayerApp.xcodeproj` keeps the bundle ID and App Group, and `ios/PrayerKit` is a local Swift package for data and domain code |
+| #373 Create the shared contracts/ fixture folder and move the pending-import golden into it | #442 | `contracts/` holds fixtures both apps read; the pending-import golden moved there |
+| #374 Point the driver profile and standing docs at the native app | #442 | The driver profile and `.project/` docs cover `ios/**` and the Swift test suite |
+| #375 Add a macOS swift test CI job with per-tree path filters | #442 | CI runs the PrayerKit suite on macOS when `ios/**` or `contracts/**` changes |
+| #376 Capture the fresh-install and long-upgraded 1.7.2 database fixtures | #442 | `contracts/db/fresh-install.db` and `long-upgraded.db` (1.0.0 upgraded to 1.7.2) with pinned row counts |
+| #377 Read and verify the existing Keychain PIN record natively | #442 | `PinHasher` and `PinRecord` read the MAUI Keychain item and verify PBKDF2-SHA256 hashes both apps produce |
+| #378 Open the existing prayer_app.db in place with GRDB and a TicksDate codec | #442 | GRDB 7.11.1 opens the MAUI file in place; `TicksDate` reads .NET ticks stored as INTEGER or digit TEXT |
+| #379 Map the seven tables to Codable records and prove round trips against both fixture DBs | #442 | Seven GRDB records round-trip both fixtures byte-exact, and the MAUI suite reads `native-written.db` |
+| #380 Add local-only device backup read tests that skip when the backup is absent | #442 | `PP_DEVICE_BACKUP_DB` points both suites at a local backup, opened read-only; absent, the tests skip |
+| #381 Pass the spike upgrade-in-place gate for data and PIN on Test iPad | #442 | `ios/scripts/upgrade-gate.sh` installs 1.7.2, seeds it, installs native over it, and checks counts and PIN. `LegacySceneDelegate` restores the 1.7.2 scene session, which left upgraded installs on a black screen |
+
+### Consumer notes
+
+- iOS work lands on `ios-2.0-refactor`. The MAUI app still ships iOS and Android from `dev`.
+- **No schema changes** to the app database.
+
+### ⚖️ Post-run audit trail
+
+Judgment-call PRs: none.
+
+- `long-upgraded.db` starts from 1.0.0 with a scene patch, because 1.0.0 does not launch on iOS 27 unpatched.
+- The upgrade gate runs by hand on Test iPad; CI does not run it.
+
 ## v1.7.2 - Android Play Console fixes and iPad rotation
 
 **Theme:** Android builds now shrink and optimize their code with R8. On Android 15 and later, Material Components no longer reach the deprecated bar-color APIs Play Console flags. Pages keep content clear of the system bars, keyboard, and display cutouts. Tablets request rotation and phones stay portrait.

@@ -23,7 +23,7 @@ The full branch model and contribution process are in [CONTRIBUTING.md](CONTRIBU
 
 - Read the file you're changing plus its direct callers/callees before editing.
 - New behavior lands with tests; pure refactors are fine under existing green coverage.
-- Run `dotnet test PrayerApp.Tests/PrayerApp.Tests.csproj` before opening a PR.
+- Run `bash scripts/unit-tests.sh` before opening a PR. It runs the .NET suite, then the `PrayerKit` Swift suite, and fails if either fails.
 - Architecture and naming conventions: [ARCHITECTURE.md](ARCHITECTURE.md).
 - Domain knowledge lives in **project skills** under [`.claude/skills/`](.claude/skills/) (`prayer-app-*`: database, viewmodels, views, services, navigation, theming, accessibility, ui-testing, unit-testing, platform, models). They auto-discover in Claude Code — consult the relevant one before working in that area.
 - Source files are UTF-8 **without a BOM**. Some agent/editor file-write tooling injects a UTF-8 BOM into `.cs` files — byte-check changed files and strip any leading BOM before committing (the build and tests pass with a stray BOM, so nothing else catches it).
@@ -56,11 +56,11 @@ This Mac keeps exactly five iOS simulators, shared with the ios-budget-app repo.
 
 This repo is a [milestone-driver](https://github.com/kenmulford/milestone-driver) consumer; its profile is `.milestone-config/driver.json` (with `.milestone-config/feeder.json` and the standing project docs under `.project/`, provisioned by milestone-bootstrapper). Drive one issue with `/solve-issue <n>`, or a whole milestone in dependency order with `/solve-milestone <name>` (order comes from the milestone description's Wave list).
 
-Per issue the orchestrator — never authoring code itself — reads the issue → finds the root cause or **STOPs and comments** → dispatches the `implementer` subagent (TDD red→green, least-code, citations posted on the issue) → runs `dotnet test PrayerApp.Tests/…` → runs the E2E gate (`run-uitests.ps1`) for UI-touching changes → `/code-review` → opens a PR `--base dev` → auto-merges on the `Unit Tests` check green → closes the issue. Architecture is locked at plan-approval time; one-way-door decisions STOP and ask rather than drift.
+Per issue the orchestrator — never authoring code itself — reads the issue → finds the root cause or **STOPs and comments** → dispatches the `implementer` subagent (TDD red→green, least-code, citations posted on the issue) → runs `bash scripts/unit-tests.sh` → runs the E2E gate (`run-uitests.ps1`) for UI-touching changes → `/code-review` → opens a PR `--base dev` → auto-merges on the `Unit Tests` check green → closes the issue. Architecture is locked at plan-approval time; one-way-door decisions STOP and ask rather than drift.
 
 **Mechanical gates** (active once the plugin is installed and Claude Code is restarted):
 - `force-subagent` — main-thread edits to `PrayerApp/**`, `PrayerApp.Tests/**`, `PrayerApp.UITests/**` are blocked; dispatch the implementer instead (escape: `CLAUDE_HOOK_DISABLE_FORCE_SUBAGENT=1`).
 - `tests-green` — source commits run the unit suite; red blocks the commit.
 - `no-push` / `no-pr-to-protected` — pushing or opening a PR to `master` is blocked locally; GitHub branch protection is the server-side backstop.
 
-Non-negotiables: MAUI .NET 10 + Community Toolkit; built with Xcode 27 / iOS 27 SDK (minimum iOS 16.0); Android API 36.
+Non-negotiables: MAUI .NET 10 + Community Toolkit for the Android app (the iOS app is native Swift under `ios/`); built with Xcode 27 / iOS 27 SDK (minimum iOS 16.0); Android API 36.
