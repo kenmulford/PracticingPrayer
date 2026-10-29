@@ -22,6 +22,7 @@ final class PrayerSession: Identifiable {
 
     @ObservationIgnored private let recordPrayed: (Int64) throws -> Void
     @ObservationIgnored private let markAnsweredWrite: (Int64) throws -> Void
+    @ObservationIgnored private let clearRecentlyNotified: (Int64) throws -> Void
 
     var isComplete: Bool { currentIndex >= items.count }
     var isFirst: Bool { currentIndex == 0 }
@@ -29,21 +30,25 @@ final class PrayerSession: Identifiable {
     init?(
         items: [PrayerListItem],
         recordPrayed: @escaping (Int64) throws -> Void,
-        markAnswered: @escaping (Int64) throws -> Void
+        markAnswered: @escaping (Int64) throws -> Void,
+        clearRecentlyNotified: @escaping (Int64) throws -> Void = { _ in }
     ) {
         guard !items.isEmpty else { return nil }
         self.items = items
         self.recordPrayed = recordPrayed
         self.markAnsweredWrite = markAnswered
+        self.clearRecentlyNotified = clearRecentlyNotified
     }
 
     convenience init?(items: [PrayerListItem], database: PrayerDatabase, now: @escaping () -> Date = { .now }) {
         let recorder = PrayerInteractionRecorder(database: database)
         let store = PrayerStore(database: database)
+        let tags = TagStore(database: database)
         self.init(
             items: items,
             recordPrayed: { _ = try recorder.recordPrayed(prayerId: $0, now: now()) },
-            markAnswered: { try store.markAnswered(id: $0, now: now()) })
+            markAnswered: { try store.markAnswered(id: $0, now: now()) },
+            clearRecentlyNotified: { try tags.removeRecentlyNotified(prayerId: $0) })
     }
 
     func isAnswered(_ item: PrayerListItem) -> Bool {
@@ -52,7 +57,11 @@ final class PrayerSession: Identifiable {
 
     func next() {
         guard !isComplete else { return }
-        try? recordPrayed(items[currentIndex].record.id)
+        let id = items[currentIndex].record.id
+        do {
+            try recordPrayed(id)
+            try clearRecentlyNotified(id)
+        } catch {}
         currentIndex += 1
         announce()
     }

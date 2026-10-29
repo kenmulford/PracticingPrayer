@@ -9,6 +9,7 @@ struct AppShell: View {
     @State private var prayersPath: [PrayersRoute] = []
     @State private var tagsPath: [TagsRoute] = []
     @State private var settingsPath: [SettingsRoute] = []
+    @State private var showsPrayerTimeAlert = false
 
     var body: some View {
         Group {
@@ -38,6 +39,21 @@ struct AppShell: View {
                 services.prayerSession = PrayerSession(items: Array(items.prefix(3)), database: services.database)
             }
             #endif
+        }
+        .onChange(of: services.phase == .open && NotificationTapHandler.shared.hasPendingTap, initial: true) { _, ready in
+            guard ready else { return }
+            NotificationTapHandler.shared.hasPendingTap = false
+            showsPrayerTimeAlert = !NotificationTapHandler.recentlyNotifiedPrayers(database: services.database).isEmpty
+        }
+        .alert("Prayer Time", isPresented: $showsPrayerTimeAlert) {
+            Button("Cancel", role: .cancel) {}
+            Button("Pray Now") {
+                services.prayerSession = PrayerSession(
+                    items: NotificationTapHandler.recentlyNotifiedPrayers(database: services.database),
+                    database: services.database)
+            }
+        } message: {
+            Text("Would you like to pray for your recently notified prayer requests now?")
         }
     }
 

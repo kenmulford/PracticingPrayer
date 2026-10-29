@@ -673,6 +673,9 @@
     "Pray" : {
 
     },
+    "Pray Now" : {
+
+    },
     "Prayed" : {
 
     },
@@ -909,6 +912,9 @@
 
     },
     "Yes. All your data stays on your device. There are no accounts, no cloud sync, and no way for anyone else to see your prayers. Backups are files you control." : {
+
+    },
+    "Would you like to pray for your recently notified prayer requests now?" : {
 
     },
     "Yes. From the home screen, tap \"Prayer Time\" and choose \"By Tags.\" Select one or more tags, then tap Start to pray through only those tagged prayers." : {
