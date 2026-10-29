@@ -73,6 +73,16 @@ public struct TicksDate: DatabaseValueConvertible, Sendable, Equatable {
     /// INTEGER and base-10 TEXT decode; `AnsweredAt` is created `TEXT`, so SQLite stores its
     /// integer ticks as text.
     public static func decode(_ dbValue: DatabaseValue, column: String) throws(TicksDateError) -> Date? {
+        guard let ticks = try decodeTicks(dbValue, column: column) else { return nil }
+        do {
+            return try Date(ticks: ticks)
+        } catch {
+            throw TicksDateError.columnOutOfRange(column: column, ticks: ticks)
+        }
+    }
+
+    /// Validated raw ticks, for records that must write back the exact stored value.
+    public static func decodeTicks(_ dbValue: DatabaseValue, column: String) throws(TicksDateError) -> Int64? {
         let ticks: Int64
         switch dbValue.storage {
         case .null:
@@ -90,11 +100,7 @@ public struct TicksDate: DatabaseValueConvertible, Sendable, Equatable {
         guard validTicks.contains(ticks) else {
             throw TicksDateError.columnOutOfRange(column: column, ticks: ticks)
         }
-        do {
-            return try Date(ticks: ticks)
-        } catch {
-            throw TicksDateError.columnOutOfRange(column: column, ticks: ticks)
-        }
+        return ticks
     }
 
     public static func encode(_ date: Date?) -> DatabaseValue {

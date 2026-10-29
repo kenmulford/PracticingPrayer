@@ -14,6 +14,7 @@ public class ContractDbFixtureTests : IDisposable
 {
     private const string FreshInstallPath = "contracts/db/fresh-install.db";
     private const string LongUpgradedPath = "contracts/db/long-upgraded.db";
+    private const string NativeWrittenPath = "contracts/db/native-written.db";
 
     private readonly List<string> _tempPaths = new();
 
@@ -95,6 +96,20 @@ public class ContractDbFixtureTests : IDisposable
     }
 
     [Fact]
+    public async Task NativeWritten_ReadsEveryRow_WithCapturedCounts()
+    {
+        var counts = await ReadAllTablesAsync(NativeWrittenPath);
+
+        Assert.Equal(4, counts["PrayerCard"]);
+        Assert.Equal(7, counts["PrayerRequest"]);
+        Assert.Equal(6, counts["PrayerTag"]);
+        Assert.Equal(2, counts["PrayerCardTag"]);
+        Assert.Equal(3, counts["PrayerInteraction"]);
+        Assert.Equal(8, counts["UserColor"]);
+        Assert.Equal(2, counts["CardBox"]);
+    }
+
+    [Fact]
     public void MissingFixture_FailsNamingExpectedPath()
     {
         var ex = Assert.Throws<FileNotFoundException>(() => RequireFixture("contracts/db/absent.db"));
@@ -105,7 +120,7 @@ public class ContractDbFixtureTests : IDisposable
     [Fact]
     public void Fixtures_HaveNoSidecarFiles()
     {
-        foreach (var fixture in new[] { FreshInstallPath, LongUpgradedPath })
+        foreach (var fixture in new[] { FreshInstallPath, LongUpgradedPath, NativeWrittenPath })
             foreach (var suffix in new[] { "-wal", "-shm", "-journal" })
                 Assert.False(File.Exists(Path.GetFullPath(fixture) + suffix), $"{fixture}{suffix} must not exist");
     }
