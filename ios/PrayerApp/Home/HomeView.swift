@@ -45,7 +45,9 @@ struct HomeView: View {
                     ToolbarItem(placement: .topBarTrailing) { quickAddButton }
                 }
             }
-            .sheet(isPresented: $showingQuickAdd, onDismiss: reload) { QuickAddPlaceholder() }
+            .sheet(isPresented: $showingQuickAdd, onDismiss: reload) {
+                QuickAddView(database: services.database)
+            }
             .onAppear(perform: reload)
     }
 
@@ -131,16 +133,6 @@ struct HomeView: View {
                 try database.homeMetrics(
                     now: .now, overdueDayThreshold: threshold, isSessionUnlocked: false)
             }
-        }
-    }
-}
-
-private struct QuickAddPlaceholder: View {
-    var body: some View {
-        NavigationStack {
-            ContentUnavailableView("Quick Add", systemImage: "plus")
-                .navigationTitle("Quick Add")
-                .navigationBarTitleDisplayMode(.inline)
         }
     }
 }
