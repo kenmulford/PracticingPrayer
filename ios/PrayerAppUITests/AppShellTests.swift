@@ -31,7 +31,7 @@ final class AppShellTests: XCTestCase {
     }
 
     private func tabButton(_ app: XCUIApplication, _ name: String) -> XCUIElement {
-        app.tabBars.buttons[name].exists ? app.tabBars.buttons[name] : app.buttons[name]
+        app.tabBars.buttons[name].exists ? app.tabBars.buttons[name] : app.buttons[name].firstMatch
     }
 
     func testTabsShowInOrderWithHomeSelected() throws {
