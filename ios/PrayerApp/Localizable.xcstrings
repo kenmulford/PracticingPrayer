@@ -99,10 +99,16 @@
     "Answered on This Day" : {
 
     },
+    "Anyone using this iPhone can see this card." : {
+
+    },
     "App Settings" : {
 
     },
     "Archive" : {
+
+    },
+    "Archive Card" : {
 
     },
     "Archive Card?" : {
@@ -145,6 +151,9 @@
 
     },
     "Card" : {
+
+    },
+    "Card saved" : {
 
     },
     "Card Title" : {
@@ -378,6 +387,9 @@
     "Notifications are turned off in Settings." : {
 
     },
+    "Off" : {
+
+    },
     "OK" : {
 
     },
@@ -469,6 +481,9 @@
     "Save" : {
 
     },
+    "Save and Add Another" : {
+
+    },
     "Search Cards" : {
 
     },
@@ -508,6 +523,12 @@
     "Tap the Prayer Cards tab, then tap \"Add Card\" in the top right. Give your card a name \u2014 a person, topic, or place \u2014 then tap Save, or Save + to save it and start another card in the same collection." : {
 
     },
+    "The card shows as “Protected” until you unlock with Face ID or your passcode." : {
+
+    },
+    "The card is hidden from every list until you choose Show Confidential." : {
+
+    },
     "The star marks a card as a favorite. Swipe a card to the right in the Cards list, or touch and hold the card and choose Favorite. Favorited cards sort to the top of their collection so they're always easy to find." : {
 
     },
@@ -515,6 +536,9 @@
 
     },
     "This also deletes its 1 prayer request." : {
+
+    },
+    "This card has no prayer requests." : {
 
     },
     "This is the Quick Add card, so it can't be edited, favorited, archived, or deleted." : {
@@ -536,6 +560,9 @@
 
     },
     "Unarchive" : {
+
+    },
+    "Unarchive Card" : {
 
     },
     "Unassign Cards" : {

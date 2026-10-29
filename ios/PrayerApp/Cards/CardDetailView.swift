@@ -30,6 +30,7 @@ private struct CardDetailContent: View {
     let onChange: () -> Void
     let onClose: () -> Void
 
+    @Environment(AppServices.self) private var services
     @State private var isMoving = false
     @State private var isEditing = false
     @State private var isAddingPrayer = false
@@ -73,7 +74,9 @@ private struct CardDetailContent: View {
             NavigationStack { Color.clear.navigationTitle("New Prayer") }
         }
         .sheet(isPresented: $isEditing, onDismiss: refresh) {
-            NavigationStack { Color.clear.navigationTitle("Edit Card") }
+            CardEditorView(card: model.card, database: services.database, preferences: services.preferences) { outcome in
+                if outcome == .deleted || outcome == .archived { onClose() }
+            }
         }
         .sheet(isPresented: $isMoving) {
             MoveToCollectionSheet(

@@ -41,8 +41,8 @@ struct CardsView: View {
                         manageCollections: { selection = .manageCollections }
                     )
                 }
-                .sheet(isPresented: $isAddingCard) {
-                    NavigationStack { Color.clear.navigationTitle("Add Card") }
+                .sheet(isPresented: $isAddingCard, onDismiss: reload) {
+                    CardEditorView(card: nil, database: services.database, preferences: services.preferences) { _ in }
                 }
         } detail: {
             NavigationStack(path: $path) {
