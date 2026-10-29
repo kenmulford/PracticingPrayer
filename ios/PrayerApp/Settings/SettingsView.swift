@@ -27,6 +27,8 @@ struct SettingsView: View {
             switch route {
             case .appSettings:
                 AppSettingsView(preferences: services.preferences)
+            case .help:
+                HelpView()
             case .about:
                 AboutView()
             default:
