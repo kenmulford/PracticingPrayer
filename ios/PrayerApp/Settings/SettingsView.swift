@@ -27,6 +27,8 @@ struct SettingsView: View {
             switch route {
             case .appSettings:
                 AppSettingsView(preferences: services.preferences)
+            case .about:
+                AboutView()
             default:
                 ContentUnavailableView {
                     Text(route.title)

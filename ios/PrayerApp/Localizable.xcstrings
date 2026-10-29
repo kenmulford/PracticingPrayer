@@ -4,6 +4,9 @@
     "%lld prayers saved" : {
 
     },
+    "A personal worship tool for organizing your prayer life. Create prayer cards, track requests, set reminders, and spend focused time in prayer." : {
+
+    },
     "About" : {
 
     },
@@ -88,6 +91,9 @@
     "Developer" : {
 
     },
+    "Diagnostic Log" : {
+
+    },
     "Discard Changes" : {
 
     },
@@ -161,6 +167,9 @@
         }
       }
     },
+    "Practicing Prayer" : {
+
+    },
     "Prayer %lld" : {
 
     },
@@ -179,6 +188,9 @@
     "Prayers not prayed within this many days appear in your overdue list on the home page." : {
 
     },
+    "Privacy Policy" : {
+
+    },
     "Quick Add" : {
 
     },
@@ -195,6 +207,9 @@
 
     },
     "Select Card" : {
+
+    },
+    "Send Diagnostic Info" : {
 
     },
     "Settings" : {
@@ -216,6 +231,12 @@
 
     },
     "Unanswered" : {
+
+    },
+    "Version %@ (%@)" : {
+
+    },
+    "Website" : {
 
     }
   },
