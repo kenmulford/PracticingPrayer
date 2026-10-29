@@ -37,6 +37,7 @@ enum HomeRoute: Hashable { case overdue, unanswered, activeCards }
 enum CardsRoute: Hashable {
     case card(id: Int64)
     case manageCollections
+    case prayer(id: Int64)
 }
 enum PrayersRoute: Hashable {}
 enum TagsRoute: Hashable {}

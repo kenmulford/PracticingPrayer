@@ -169,16 +169,17 @@ struct CardsView: View {
     private func destination(_ route: CardsRoute) -> some View {
         switch route {
         case .card(let id):
-            ContentUnavailableView(cardTitle(id), systemImage: "rectangle.stack")
-                .navigationTitle(cardTitle(id))
+            CardDetailView(cardId: id, onChange: reload, onClose: closeDetail)
+        case .prayer:
+            ContentUnavailableView("Prayer", systemImage: "hands.and.sparkles")
         case .manageCollections:
             CollectionsView()
         }
     }
 
-    private func cardTitle(_ id: Int64) -> String {
-        guard case .success(let list) = load else { return "" }
-        return list.sections.lazy.flatMap(\.cards).first { $0.card.id == id }?.card.title ?? ""
+    private func closeDetail() {
+        if path.isEmpty { selection = nil } else { path.removeLast() }
+        reload()
     }
 
     private func reload() {

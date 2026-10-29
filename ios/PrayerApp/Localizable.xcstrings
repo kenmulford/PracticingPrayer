@@ -75,6 +75,9 @@
     "Add To" : {
 
     },
+    "Add a prayer to this card." : {
+
+    },
     "All Prayed For" : {
 
     },
@@ -84,10 +87,22 @@
     "Allow Notifications" : {
 
     },
+    "Answered" : {
+
+    },
     "Answered on This Day" : {
 
     },
     "App Settings" : {
+
+    },
+    "Archive" : {
+
+    },
+    "Archive Card?" : {
+
+    },
+    "Are you sure you want to Archive this card? You can find it in your Archived Cards collection." : {
 
     },
     "Auto-mode automatically advances to the next prayer after a set interval (30s, 60s, or 120s). Tap the timer display to cycle through intervals. Tap pause to stop auto-advance." : {
@@ -156,6 +171,9 @@
     "Couldn't Save" : {
 
     },
+    "Couldn't Update Card" : {
+
+    },
     "Couldn't create the tag." : {
 
     },
@@ -177,7 +195,13 @@
     "Delete All Cards & Requests" : {
 
     },
+    "Delete Card" : {
+
+    },
     "Delete Collection" : {
+
+    },
+    "Delete Prayer" : {
 
     },
     "Delete “%@”?" : {
@@ -199,6 +223,9 @@
 
     },
     "Edit" : {
+
+    },
+    "Edit Card" : {
 
     },
     "Edit Collection" : {
@@ -264,7 +291,19 @@
     "Manage Collections" : {
 
     },
+    "Mark Active" : {
+
+    },
+    "Mark Answered" : {
+
+    },
     "More" : {
+
+    },
+    "Move To" : {
+
+    },
+    "Move To…" : {
 
     },
     "Name" : {
@@ -274,6 +313,9 @@
 
     },
     "New Collection" : {
+
+    },
+    "New Prayer" : {
 
     },
     "New reminders start at this time." : {
@@ -286,6 +328,9 @@
 
     },
     "No Prayer Cards" : {
+
+    },
+    "No Prayers" : {
 
     },
     "No Tags" : {
@@ -346,6 +391,9 @@
     "Practicing Prayer" : {
 
     },
+    "Prayer" : {
+
+    },
     "Prayer %lld" : {
 
     },
@@ -394,6 +442,9 @@
     "Search Cards" : {
 
     },
+    "Search Prayers" : {
+
+    },
     "Search or Create Tags" : {
 
     },
@@ -424,6 +475,15 @@
     "The star marks a card as a favorite. Swipe a card to the right in the Cards list, or touch and hold the card and choose Favorite. Favorited cards sort to the top of their collection so they're always easy to find." : {
 
     },
+    "This also deletes its %lld prayer requests." : {
+
+    },
+    "This also deletes its 1 prayer request." : {
+
+    },
+    "This is the Quick Add card, so it can't be edited, favorited, archived, or deleted." : {
+
+    },
     "Title" : {
 
     },
@@ -439,7 +499,13 @@
     "Unanswered" : {
 
     },
+    "Unarchive" : {
+
+    },
     "Unassign Cards" : {
+
+    },
+    "Unfavorite" : {
 
     },
     "Version %@ (%@)" : {
