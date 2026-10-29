@@ -112,4 +112,9 @@ private struct WriteFailure: Error {}
         session.markAnswered()
         #expect(session.currentIndex == 2)
     }
+
+    @Test func autoIntervalNormalizes() {
+        for value in [30, 60, 120] { #expect(PrayerSession.autoInterval(stored: value) == value) }
+        for value in [0, 45, 300] { #expect(PrayerSession.autoInterval(stored: value) == 30) }
+    }
 }

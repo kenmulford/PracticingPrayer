@@ -7,7 +7,14 @@ import SwiftUI
 final class PrayerSession: Identifiable {
     #if DEBUG
     static let debugArgument = "-prayerSession"
+    static let debugAutoArgument = "-prayerSessionAuto"
     #endif
+
+    static let autoIntervals = [30, 60, 120]
+
+    static func autoInterval(stored: Int) -> Int {
+        autoIntervals.contains(stored) ? stored : 30
+    }
 
     let items: [PrayerListItem]
     private(set) var currentIndex = 0

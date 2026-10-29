@@ -63,7 +63,16 @@
     "%lld times since %@" : {
 
     },
+    "1 Minute" : {
+
+    },
     "1 time since %@" : {
+
+    },
+    "2 Minutes" : {
+
+    },
+    "30 Seconds" : {
 
     },
     "A collection named '%@' already exists. Please choose a different name." : {
@@ -186,6 +195,12 @@
       }
     },
     "Are you sure you want to Archive this card? You can find it in your Archived Cards collection." : {
+
+    },
+    "Auto Advance" : {
+
+    },
+    "Auto-advance started" : {
 
     },
     "Auto-mode automatically advances to the next prayer after a set interval (30s, 60s, or 120s). Tap the timer display to cycle through intervals. Tap pause to stop auto-advance." : {
@@ -463,6 +478,9 @@
     "Imported" : {
 
     },
+    "Interval" : {
+
+    },
     "Is my data private?" : {
 
     },
@@ -643,6 +661,12 @@
         }
       }
     },
+    "Pause" : {
+
+    },
+    "Paused" : {
+
+    },
     "Practicing Prayer" : {
 
     },
@@ -713,6 +737,12 @@
 
     },
     "Quick Add lets you jot down a prayer request from the home screen without choosing a card. It saves to a special \"Quick Add\" card that you can reorganize later." : {
+
+    },
+    "Resume" : {
+
+    },
+    "Resumed" : {
 
     },
     "Retry" : {
