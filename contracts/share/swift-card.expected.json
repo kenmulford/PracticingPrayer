@@ -1,0 +1,15 @@
+{
+  "result": "payload",
+  "kind": "card",
+  "title": "Church family",
+  "requests": [
+    {
+      "title": "Pastor's sabbatical",
+      "notes": null
+    },
+    {
+      "title": "New roof",
+      "notes": "Estimate due \"soon\""
+    }
+  ]
+}

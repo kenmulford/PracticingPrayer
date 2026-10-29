@@ -1,0 +1,15 @@
+{
+  "result": "payload",
+  "kind": "card",
+  "title": "Family",
+  "requests": [
+    {
+      "title": "Aunt Sue",
+      "notes": "Hip surgery"
+    },
+    {
+      "title": "Uncle Bob",
+      "notes": null
+    }
+  ]
+}

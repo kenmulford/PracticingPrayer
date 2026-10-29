@@ -1,4 +1,6 @@
 using System.IO.Compression;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Microsoft.Maui.Controls;
 using NSubstitute;
@@ -34,6 +36,96 @@ public class DeepLinkServiceTests : IDisposable
     {
         if (Directory.Exists(_tempDir))
             Directory.Delete(_tempDir, recursive: true);
+    }
+
+    // ── Cross-platform share fixtures (contracts/share) ─────────────────────
+
+    [Theory]
+    [InlineData("request.url")]
+    [InlineData("card.url")]
+    [InlineData("oversize.prayercard")]
+    [InlineData("swift-request.url")]
+    [InlineData("swift-card.url")]
+    [InlineData("legacy-request.url")]
+    [InlineData("legacy-card.url")]
+    [InlineData("uncompressed.url")]
+    [InlineData("trailing-junk.url")]
+    [InlineData("v3.url")]
+    public async Task ShareFixture_DecodesToExpected(string name)
+    {
+        var stem = Path.GetFileNameWithoutExtension(name);
+        using var expected = JsonDocument.Parse(File.ReadAllText($"contracts/share/{stem}.expected.json"));
+        var root = expected.RootElement;
+
+        if (name.EndsWith(".prayercard", StringComparison.Ordinal))
+        {
+            await using var file = File.OpenRead($"contracts/share/{name}");
+            await _service.HandleFileAsync(file);
+        }
+        else
+        {
+            await _service.HandleAsync(File.ReadAllText($"contracts/share/{name}").Trim());
+        }
+
+        if (root.GetProperty("result").GetString() == "newerVersion")
+        {
+            await _nav.Received(1).DisplayAlertAsync("Update Required", Arg.Any<string>(), "OK");
+            _payloadService.DidNotReceive().StageStructured(Arg.Any<ParseResult>());
+            return;
+        }
+
+        var prayers = root.GetProperty("requests").EnumerateArray()
+            .Select(r => new ParsedPrayer(
+                r.GetProperty("title").GetString()!,
+                r.GetProperty("notes").GetString()))
+            .ToArray();
+        var cardTitle = root.GetProperty("kind").GetString() == "request"
+            ? prayers[0].Title
+            : root.GetProperty("title").GetString()!;
+
+        _payloadService.Received(1).StageStructured(Arg.Is<ParseResult>(r =>
+            r.SuggestedCardTitle == cardTitle && r.Prayers.SequenceEqual(prayers)));
+    }
+
+    [ShareFixtureWriterFact]
+    public async Task WriteMauiShareFixtures()
+    {
+        var dir = Environment.GetEnvironmentVariable(ShareFixtureWriterFactAttribute.VariableName)!;
+
+        string? text = null;
+        _ = _shareService.ShareTextAsync(Arg.Any<string>(), Arg.Do<string>(t => text = t));
+
+        await _service.ShareRequestAsync(new Prayer
+        {
+            Title = "Heal my friend’s knee",
+            Details = "Surgery next week; pray for “steady hands”",
+        });
+        await WriteUrlAsync(dir, "request.url", text);
+
+        text = null;
+        await _service.ShareCardAsync(
+            new PrayerCard { Title = "Family" },
+            new[]
+            {
+                new Prayer { Title = "Aunt Sue’s hip", Details = "Recovery at home" },
+                new Prayer { Title = "Uncle Bob", Details = null },
+                new Prayer { Title = "Cousin “Jo” exams", Details = "Finals this week" },
+            });
+        await WriteUrlAsync(dir, "card.url", text);
+
+        var varied = Enumerable.Range(0, 100).Select(i =>
+        {
+            var hex = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(i.ToString()))).ToLowerInvariant();
+            return new Prayer { Title = $"Request {i}: {hex[..32]}", Details = hex };
+        }).ToArray();
+        await _service.ShareCardAsync(new PrayerCard { Title = "Oversize" }, varied);
+        File.Copy(Directory.GetFiles(_tempDir, "*.prayercard").Single(), Path.Combine(dir, "oversize.prayercard"), overwrite: true);
+    }
+
+    private static async Task WriteUrlAsync(string dir, string fileName, string? shareText)
+    {
+        Assert.True(DeepLinkService.TryExtractShareUrl(shareText, out var url));
+        await File.WriteAllTextAsync(Path.Combine(dir, fileName), url + "\n");
     }
 
     // ── Helper: build a compressed URL the same way the service does ────────
@@ -638,5 +730,18 @@ public class DeepLinkServiceTests : IDisposable
             gzip.Write(bytes);
         }
         return new MemoryStream(output.ToArray());
+    }
+}
+
+/// <summary>Skips unless PP_WRITE_SHARE_FIXTURES names an existing directory, so CI never rewrites the fixtures.</summary>
+public sealed class ShareFixtureWriterFactAttribute : FactAttribute
+{
+    public const string VariableName = "PP_WRITE_SHARE_FIXTURES";
+
+    public ShareFixtureWriterFactAttribute()
+    {
+        var path = Environment.GetEnvironmentVariable(VariableName);
+        if (string.IsNullOrEmpty(path) || !Directory.Exists(path))
+            Skip = $"{VariableName} is unset or does not name an existing directory";
     }
 }

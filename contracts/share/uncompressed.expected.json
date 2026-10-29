@@ -1,0 +1,11 @@
+{
+  "result": "payload",
+  "kind": "request",
+  "title": "Plain payload",
+  "requests": [
+    {
+      "title": "Plain payload",
+      "notes": "No gzip"
+    }
+  ]
+}
