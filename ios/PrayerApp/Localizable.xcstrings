@@ -1,7 +1,30 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Can't Open Your Prayers" : {
 
+    },
+    "Cards" : {
+
+    },
+    "Home" : {
+
+    },
+    "Prayer Cards" : {
+
+    },
+    "Prayers" : {
+
+    },
+    "Settings" : {
+
+    },
+    "Tags" : {
+
+    },
+    "Try Again" : {
+
+    }
   },
   "version" : "1.0"
 }
