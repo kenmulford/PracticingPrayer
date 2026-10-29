@@ -16,6 +16,7 @@ public struct AppPreferences {
         case archivedFolderId = "ArchivedFolderId"
         case expandedSectionIds = "ExpandedSectionIds"
         case shareHandoffPrompted = "ShareHandoffPrompted"
+        case nativeRemindersMigrated = "NativeRemindersMigrated"
     }
 
     private let defaults: UserDefaults
@@ -95,5 +96,11 @@ public struct AppPreferences {
     public var shareHandoffPrompted: Bool {
         get { bool(.shareHandoffPrompted, false) }
         nonmutating set { defaults.set(newValue, forKey: Key.shareHandoffPrompted.rawValue) }
+    }
+
+    /// Set once the first native launch has cleared the MAUI-era pending notifications.
+    public var nativeRemindersMigrated: Bool {
+        get { bool(.nativeRemindersMigrated, false) }
+        nonmutating set { defaults.set(newValue, forKey: Key.nativeRemindersMigrated.rawValue) }
     }
 }
