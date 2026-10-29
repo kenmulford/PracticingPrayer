@@ -129,10 +129,12 @@ private func withEditor(_ body: (PrayerDatabase) async throws -> Void) async thr
         try await withEditor { database in
             let store = PrayerStore(database: database)
             let id = try store.create(PrayerDraft(prayerCardId: 2, title: "deleteRemovesPrayer"), now: .now)
+            let reconciler = RecordingReconciler()
             let model = PrayerEditorModel(prayerId: id, cardId: nil, cardTitle: nil,
-                database: database, preferences: testPreferences, reminders: RecordingReconciler())
+                database: database, preferences: testPreferences, reminders: reconciler)
             model.load()
-            #expect(model.delete())
+            #expect(await model.delete())
+            #expect(reconciler.count == 1)
             #expect(try store.prayers(cardId: 2).first { $0.record.id == id } == nil)
         }
     }

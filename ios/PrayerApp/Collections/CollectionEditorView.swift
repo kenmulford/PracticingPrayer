@@ -4,6 +4,7 @@ import SwiftUI
 struct CollectionEditorView: View {
     @State private var model: CollectionEditorModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppServices.self) private var services
     @State private var showingDiscard = false
     @State private var showingDelete = false
     @State private var failureTitle: LocalizedStringKey = "Couldn't Save"
@@ -68,7 +69,10 @@ struct CollectionEditorView: View {
         }
         .deleteCollectionDialog(isPresented: $showingDelete, name: name) { option in
             failureTitle = "Couldn't Delete"
-            if model.delete(option: option) { finish() }
+            if model.delete(option: option) {
+                services.reconcileReminders()
+                finish()
+            }
         }
         .alert(alertTitle, isPresented: alertBinding) {
             Button("OK") {}

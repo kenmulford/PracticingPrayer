@@ -252,10 +252,11 @@ final class PrayerEditorModel {
         }
     }
 
-    func delete() -> Bool {
+    func delete(now: Date = .now) async -> Bool {
         guard let prayerId else { return false }
-        return perform {
+        return await performAsync {
             try PrayerStore(database: database).delete(id: prayerId)
+            try await reminders.reconcile(now: now)
             announce("Prayer deleted")
         }
     }

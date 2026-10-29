@@ -91,7 +91,10 @@ struct HomeListView: View {
         .deletePrayerDialog(
             isPresented: Binding(get: { model.pendingDelete != nil }, set: { if !$0 { model.pendingDelete = nil } }),
             title: model.pendingDelete?.record.title ?? ""
-        ) { model.confirmDelete() }
+        ) {
+            model.confirmDelete()
+            services.reconcileReminders()
+        }
         .alert(
             "Couldn't Update Prayer",
             isPresented: Binding(get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })

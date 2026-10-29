@@ -100,7 +100,10 @@ private struct CardDetailContent: View {
             Text("Delete “\(model.card?.title ?? "")”?"), isPresented: $confirmDelete, titleVisibility: .visible
         ) {
             Button("Delete Card", role: .destructive) {
-                if model.delete() { onClose() }
+                if model.delete() {
+                    services.reconcileReminders()
+                    onClose()
+                }
             }
             Button("Cancel", role: .cancel) {}
         } message: {
@@ -111,7 +114,10 @@ private struct CardDetailContent: View {
             }
         }
         .deletePrayerDialog(isPresented: prayerDeleteBinding, title: prayerToDelete?.title ?? "") {
-            if let prayer = prayerToDelete { perform { model.deletePrayer(id: prayer.id) } }
+            if let prayer = prayerToDelete { perform {
+                    model.deletePrayer(id: prayer.id)
+                    services.reconcileReminders()
+                } }
         }
         .alert("Couldn't Update Card", isPresented: errorBinding) {
             Button("OK") {}

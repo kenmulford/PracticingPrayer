@@ -114,6 +114,7 @@ struct CardsView: View {
                         rowError = CardRowActionModel.perform(
                             .delete, cardId: card.card.id, database: services.database,
                             preferences: services.preferences)
+                        if rowError == nil { services.reconcileReminders() }
                         reload()
                     }
                 )
@@ -398,6 +399,7 @@ struct CardsView: View {
 
     private func deleteSelected() {
         finish(bulk.delete(Set(mutableItems.map(\.card.id)))) { String(localized: "Deleted \($0) cards") }
+        services.reconcileReminders()
     }
 
     private func finish(_ result: CardBulkResult, announcement: (Int) -> String) {

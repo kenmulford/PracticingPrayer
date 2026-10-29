@@ -125,7 +125,9 @@ struct PrayerEditorView: View {
             Button("Discard Changes", role: .destructive) { finish(.saved) }
             Button("Keep Editing", role: .cancel) {}
         }
-        .deletePrayerDialog(isPresented: $showingDelete, title: model.title) { run(.deleted) { model.delete() } }
+        .deletePrayerDialog(isPresented: $showingDelete, title: model.title) {
+            Task { if await model.delete() { finish(.deleted) } }
+        }
         .alert("Couldn't Save", isPresented: alertBinding) {
             Button("OK") {}
         } message: {
@@ -155,10 +157,6 @@ struct PrayerEditorView: View {
             }
             .accessibilityElement(children: .combine)
         }
-    }
-
-    private func run(_ outcome: PrayerEditorModel.Outcome, _ work: () -> Bool) {
-        if work() { finish(outcome) }
     }
 
     private func finish(_ outcome: PrayerEditorModel.Outcome) {

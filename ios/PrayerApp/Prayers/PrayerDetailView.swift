@@ -127,9 +127,11 @@ struct PrayerDetailView<CardLink: Hashable>: View {
             PrayerEditorView(prayerId: prayer.id, database: services.database) { if $0 == .deleted { onClose() } }
         }
         .deletePrayerDialog(isPresented: $confirmDelete, title: prayer.title) {
-            if model.delete() {
-                onChange()
-                onClose()
+            Task {
+                if await model.delete() {
+                    onChange()
+                    onClose()
+                }
             }
         }
         .alert(

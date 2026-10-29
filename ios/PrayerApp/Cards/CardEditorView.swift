@@ -4,6 +4,7 @@ import SwiftUI
 struct CardEditorView: View {
     @State private var model: CardEditorModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppServices.self) private var services
     @FocusState private var titleFocused: Bool
     @State private var showingDiscard = false
     @State private var showingDelete = false
@@ -96,7 +97,12 @@ struct CardEditorView: View {
         .confirmationDialog(
             Text("Delete “\(cardTitle)”?"), isPresented: $showingDelete, titleVisibility: .visible
         ) {
-            Button("Delete Card", role: .destructive) { run(.deleted) { model.delete() } }
+            Button("Delete Card", role: .destructive) {
+                if model.delete() {
+                    services.reconcileReminders()
+                    finish(.deleted)
+                }
+            }
             Button("Cancel", role: .cancel) {}
         } message: {
             switch model.prayerCount {

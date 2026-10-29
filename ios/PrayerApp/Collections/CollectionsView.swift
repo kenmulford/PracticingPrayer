@@ -38,6 +38,7 @@ struct CollectionsView: View {
                 guard let target = deleteTarget else { return }
                 do {
                     try CollectionStore(database: services.database).delete(id: target.id, option: option)
+                    services.reconcileReminders()
                     reload()
                 } catch {
                     deleteError = error.localizedDescription

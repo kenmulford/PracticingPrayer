@@ -112,8 +112,8 @@ final class PrayerDetailModel {
         }
     }
 
-    func delete() -> Bool {
-        mutate { try store.delete(id: prayerId) }
+    func delete(now: Date = .now) async -> Bool {
+        await mutateAndReconcile({ try store.delete(id: prayerId) }, now: now)
     }
 
     /// True when black text has the higher contrast on the tag color: the two tie at relative luminance 0.179.

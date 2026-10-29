@@ -130,8 +130,9 @@ private func withModel(
     }
 
     @Test func deleteRemovesPrayer() async throws {
-        try await withModel(title: "deleteRemovesPrayer") { model, _, _, _ in
-            #expect(model.delete())
+        try await withModel(title: "deleteRemovesPrayer") { model, _, _, reconciler in
+            #expect(await model.delete())
+            #expect(reconciler.count == 1)
             model.load()
             #expect(model.phase == .notFound)
         }

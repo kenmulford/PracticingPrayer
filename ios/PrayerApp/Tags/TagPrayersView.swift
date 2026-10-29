@@ -157,6 +157,7 @@ struct TagPrayersView: View {
     private func perform(_ change: () throws -> Void) {
         do {
             try change()
+            services.reconcileReminders()
         } catch {
             errorMessage = error.localizedDescription
         }

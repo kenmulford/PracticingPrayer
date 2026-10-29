@@ -57,7 +57,12 @@ struct PrayersView: View {
                     PrayerEditorView(prayerId: target.prayerId, database: services.database)
                 }
                 .deletePrayerDialog(isPresented: deleteBinding, title: pendingDelete?.record.title ?? "") {
-                    if let item = pendingDelete { perform { try store.delete(id: item.record.id) } }
+                    if let item = pendingDelete {
+                        perform {
+                            try store.delete(id: item.record.id)
+                            services.reconcileReminders()
+                        }
+                    }
                 }
                 .alert("Couldn't Update Prayer", isPresented: errorBinding) {
                     Button("OK") {}
