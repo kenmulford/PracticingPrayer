@@ -10,6 +10,9 @@ struct AppShell: View {
     @State private var tagsPath: [TagsRoute] = []
     @State private var settingsPath: [SettingsRoute] = []
     @State private var showsPrayerTimeAlert = false
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var coverWindow = PrivacyCoverWindow()
+    @State private var isCovered = false
 
     var body: some View {
         Group {
@@ -40,6 +43,18 @@ struct AppShell: View {
                     .onChange(of: services.onboarding.stage, initial: true) { services.onboarding.syncTips() }
                     .task(id: services.onboarding.run) { await services.onboarding.watchTips() }
             }
+        }
+        .accessibilityHidden(isCovered)
+        .onChange(of: scenePhase, initial: true) { _, phase in
+            if phase == .active {
+                isCovered = false
+                coverWindow.hide()
+                return
+            }
+            let hasProtected = services.phase == .open
+                ? PrivacyCoverPolicy.hasProtectedCards(in: services.database) : true
+            isCovered = PrivacyCoverPolicy.isCovered(isSceneActive: false, hasProtectedCards: hasProtected)
+            if isCovered { coverWindow.show() } else { coverWindow.hide() }
         }
         .task {
             await services.open()
