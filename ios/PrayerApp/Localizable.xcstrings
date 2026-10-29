@@ -26,7 +26,32 @@
         }
       }
     },
+    "%lld cards" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld card"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld cards"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld prayers saved" : {
+
+    },
+    "A collection named '%@' already exists. Please choose a different name." : {
 
     },
     "A personal worship tool for organizing your prayer life. Create prayer cards, track requests, set reminders, and spend focused time in prayer." : {
@@ -39,6 +64,9 @@
 
     },
     "Add Card" : {
+
+    },
+    "Add Collection" : {
 
     },
     "Add Prayer" : {
@@ -77,6 +105,9 @@
     "Can't Load Cards" : {
 
     },
+    "Can't Load Collections" : {
+
+    },
     "Can't Load Prayer Cards" : {
 
     },
@@ -98,16 +129,25 @@
     "Cards" : {
 
     },
+    "Cards with no protection of their own take the collection's setting." : {
+
+    },
     "Check that notifications are enabled in App Settings and that your device's system settings allow notifications for this app. On iOS, also check Focus mode settings." : {
 
     },
     "Collection" : {
 
     },
+    "Collection saved" : {
+
+    },
     "Collections" : {
 
     },
     "Collections help you organize your cards." : {
+
+    },
+    "Couldn't Delete" : {
 
     },
     "Couldn't Save" : {
@@ -131,6 +171,15 @@
     "Delete" : {
 
     },
+    "Delete All Cards & Requests" : {
+
+    },
+    "Delete Collection" : {
+
+    },
+    "Delete “%@”?" : {
+
+    },
     "Details" : {
 
     },
@@ -143,6 +192,15 @@
     "Discard Changes" : {
 
     },
+    "Duplicate Collection Name" : {
+
+    },
+    "Edit" : {
+
+    },
+    "Edit Collection" : {
+
+    },
     "Existing Card" : {
 
     },
@@ -153,6 +211,9 @@
 
     },
     "Help" : {
+
+    },
+    "Hidden" : {
 
     },
     "Home" : {
@@ -185,16 +246,31 @@
     "Last Prayed" : {
 
     },
+    "Locked" : {
+
+    },
     "Loose Cards" : {
 
     },
     "Manage Collections" : {
 
     },
+    "More" : {
+
+    },
+    "Name" : {
+
+    },
     "New Card" : {
 
     },
+    "New Collection" : {
+
+    },
     "New reminders start at this time." : {
+
+    },
+    "No Collections Yet" : {
 
     },
     "No Prayer Cards" : {
@@ -279,7 +355,13 @@
     "Privacy Policy" : {
 
     },
+    "Protect All Cards" : {
+
+    },
     "Protected" : {
+
+    },
+    "Protection" : {
 
     },
     "Quick Add" : {
@@ -312,6 +394,9 @@
     "Settings" : {
 
     },
+    "System" : {
+
+    },
     "Tags" : {
 
     },
@@ -337,6 +422,9 @@
 
     },
     "Unanswered" : {
+
+    },
+    "Unassign Cards" : {
 
     },
     "Version %@ (%@)" : {

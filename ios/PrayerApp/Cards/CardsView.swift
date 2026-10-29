@@ -27,7 +27,9 @@ struct CardsView: View {
                 .navigationTitle(Text(AppTab.cards.title))
                 .navigationBarTitleDisplayMode(.large)
                 .searchable(text: $searchText, prompt: Text("Search Cards"))
-                .toolbar { CardsToolbar { isAddingCard = true } }
+                .toolbar {
+                    CardsToolbar(addCard: { isAddingCard = true }, manageCollections: { selection = .manageCollections })
+                }
                 .sheet(isPresented: $isAddingCard) {
                     NavigationStack { Color.clear.navigationTitle("Add Card") }
                 }
@@ -145,8 +147,7 @@ struct CardsView: View {
             ContentUnavailableView(cardTitle(id), systemImage: "rectangle.stack")
                 .navigationTitle(cardTitle(id))
         case .manageCollections:
-            ContentUnavailableView("Collections", systemImage: "folder")
-                .navigationTitle("Collections")
+            CollectionsView()
         }
     }
 

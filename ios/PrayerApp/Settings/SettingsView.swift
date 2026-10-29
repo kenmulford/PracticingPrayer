@@ -31,6 +31,8 @@ struct SettingsView: View {
                 HelpView()
             case .about:
                 AboutView()
+            case .collections:
+                CollectionsView()
             default:
                 ContentUnavailableView {
                     Text(route.title)
