@@ -28,6 +28,11 @@ struct CardsView: View {
     @State private var confirmArchive = false
     @State private var confirmDelete = false
     @State private var moveTargets: [CardBoxRecord] = []
+    @State private var cardToDelete: CardListItem?
+    @State private var rowCard: CardListItem?
+    @State private var isEditingRow = false
+    @State private var isMovingRow = false
+    @State private var rowError: String?
 
     private var isSearching: Bool {
         !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -98,6 +103,30 @@ struct CardsView: View {
                 }
                 .sheet(isPresented: $isAddingCard, onDismiss: reload) {
                     CardEditorView(card: nil, database: services.database, preferences: services.preferences) { _ in }
+                }
+                .modifier(
+                    CardDeleteConfirmation(
+                        item: $cardToDelete, archivedFolderId: Int64(services.preferences.archivedFolderId)
+                    ) { card in
+                        rowError = CardRowActionModel.perform(
+                            .delete, cardId: card.card.id, database: services.database,
+                            preferences: services.preferences)
+                        reload()
+                    }
+                )
+                .sheet(isPresented: $isEditingRow, onDismiss: reload) {
+                    CardEditorView(
+                        card: rowCard?.card, database: services.database, preferences: services.preferences
+                    ) { _ in }
+                }
+                .sheet(isPresented: $isMovingRow) {
+                    MoveToCollectionSheet(
+                        collections: moveTargets, currentBoxId: rowCard?.card.boxId ?? 0, select: moveRowCard)
+                }
+                .alert("Couldn't Update Card", isPresented: rowErrorBinding) {
+                    Button("OK") {}
+                } message: {
+                    Text(rowError ?? "")
                 }
         } detail: {
             NavigationStack(path: $path) {
@@ -212,6 +241,10 @@ struct CardsView: View {
                             NavigationLink(value: CardsRoute.card(id: item.card.id)) {
                                 CardRow(item: item)
                             }
+                            .modifier(
+                                CardRowActions(
+                                    item: item, archivedFolderId: Int64(services.preferences.archivedFolderId)
+                                ) { rowAction($0, item) })
                         }
                     }
                 } header: {
@@ -307,10 +340,45 @@ struct CardsView: View {
     }
 
     private func startMove() {
+        loadMoveTargets()
+        isMoving = true
+    }
+
+    private func loadMoveTargets() {
         moveTargets = (try? CollectionStore(database: services.database).collections()
             .filter { !$0.isSystem }
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }) ?? []
-        isMoving = true
+    }
+
+    // MARK: - Row actions
+
+    private var rowErrorBinding: Binding<Bool> {
+        Binding(get: { rowError != nil }, set: { if !$0 { rowError = nil } })
+    }
+
+    private func rowAction(_ action: CardRowAction, _ item: CardListItem) {
+        switch action {
+        case .edit:
+            rowCard = item
+            isEditingRow = true
+        case .moveTo:
+            rowCard = item
+            loadMoveTargets()
+            isMovingRow = true
+        case .delete:
+            cardToDelete = item
+        case .favorite, .unfavorite, .archive, .unarchive:
+            rowError = CardRowActionModel.perform(
+                action, cardId: item.card.id, database: services.database, preferences: services.preferences)
+            reload()
+        }
+    }
+
+    private func moveRowCard(toBox boxId: Int64) {
+        guard let card = rowCard else { return }
+        rowError = CardRowActionModel.move(
+            cardId: card.card.id, toBox: boxId, database: services.database, preferences: services.preferences)
+        reload()
     }
 
     private func moveSelected(toBox boxId: Int64) {

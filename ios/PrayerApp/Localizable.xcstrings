@@ -303,6 +303,15 @@
         }
       }
     },
+    "Delete \"%@\"?" : {
+
+    },
+    "Delete \"%@\" and its 1 prayer request?" : {
+
+    },
+    "Delete \"%@\" and its %lld prayer requests?" : {
+
+    },
     "Delete All Cards & Requests" : {
 
     },
