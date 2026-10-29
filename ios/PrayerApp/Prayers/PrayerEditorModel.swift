@@ -14,11 +14,25 @@ final class PrayerEditorModel {
         var isAnswered: Bool
         var answeredOn: Date
         var tagIds: Set<Int64>
+        var reminder: ReminderState
+    }
+
+    private struct ReminderState: Equatable {
+        var remindMe: Bool
+        var frequency: PrayerFrequency
+        var time: Date
+        var date: Date
+        var dayOfWeek: Int
+        var dayOfMonth: Int
     }
 
     @ObservationIgnored private let database: PrayerDatabase
     @ObservationIgnored private let prayerId: Int64?
     @ObservationIgnored private let defaultAnsweredOn: Date
+    @ObservationIgnored private let preferences: AppPreferences
+    @ObservationIgnored private let reminders: any ReminderReconciling
+    @ObservationIgnored private let authorization: ReminderAuthorization
+    @ObservationIgnored private let calendar = Calendar.current
     @ObservationIgnored private var snapshot: Snapshot
     @ObservationIgnored private var originalAnswered = false
     @ObservationIgnored private var createdId: Int64?
@@ -29,25 +43,52 @@ final class PrayerEditorModel {
     var answeredOn: Date
     var tagIds: Set<Int64>
     var alert: String?
+    var remindMe = false
+    var frequency: PrayerFrequency = .oneTime
+    var reminderTime: Date
+    var reminderDate: Date
+    var dayOfWeek: Int
+    var dayOfMonth: Int
 
     private(set) var cardId: Int64?
     private(set) var cardTitle: String
     private(set) var allTags: [PrayerTagRecord] = []
     private(set) var isSaving = false
+    private(set) var minimumReminderDate: Date
+    private(set) var isAuthorizing = false
+    private(set) var authorizationDenied = false
 
-    init(prayerId: Int64?, cardId: Int64?, cardTitle: String?, database: PrayerDatabase, today: Date = .now) {
+    init(
+        prayerId: Int64?, cardId: Int64?, cardTitle: String?, database: PrayerDatabase,
+        preferences: AppPreferences, reminders: any ReminderReconciling,
+        authorization: ReminderAuthorization = .system, today: Date = .now
+    ) {
         self.database = database
         self.prayerId = prayerId
-        self.defaultAnsweredOn = Calendar.current.startOfDay(for: today)
+        self.preferences = preferences
+        self.reminders = reminders
+        self.authorization = authorization
+        let start = Calendar.current.startOfDay(for: today)
+        let weekday = Calendar.current.component(.weekday, from: today) - 1
+        let day = Calendar.current.component(.day, from: today)
+        let time = preferences.defaultReminderTime
+        self.defaultAnsweredOn = start
+        self.minimumReminderDate = start
+        self.reminderTime = time
+        self.reminderDate = start
+        self.dayOfWeek = weekday
+        self.dayOfMonth = day
         self.cardId = cardId
         self.cardTitle = cardTitle ?? ""
         self.title = ""
         self.details = ""
         self.isAnswered = false
-        self.answeredOn = defaultAnsweredOn
+        self.answeredOn = start
         self.tagIds = []
         self.snapshot = Snapshot(
-            cardId: cardId, title: "", details: "", isAnswered: false, answeredOn: defaultAnsweredOn, tagIds: [])
+            cardId: cardId, title: "", details: "", isAnswered: false, answeredOn: start, tagIds: [],
+            reminder: ReminderState(
+                remindMe: false, frequency: .oneTime, time: time, date: start, dayOfWeek: weekday, dayOfMonth: day))
     }
 
     var isNew: Bool { prayerId == nil }
@@ -63,7 +104,33 @@ final class PrayerEditorModel {
     private var current: Snapshot {
         Snapshot(
             cardId: cardId, title: title, details: details, isAnswered: isAnswered, answeredOn: answeredOn,
-            tagIds: tagIds)
+            tagIds: tagIds, reminder: reminderState)
+    }
+
+    private var reminderState: ReminderState {
+        ReminderState(
+            remindMe: remindMe, frequency: frequency, time: reminderTime, date: reminderDate, dayOfWeek: dayOfWeek,
+            dayOfMonth: dayOfMonth)
+    }
+
+    private var reminderDraft: PrayerReminder {
+        let time = calendar.dateComponents([.hour, .minute], from: reminderTime)
+        let usesDate = frequency == .oneTime || frequency == .yearly
+        return PrayerReminder(
+            canNotify: remindMe, frequency: frequency, hour: time.hour ?? 9, minute: time.minute ?? 0,
+            dayOfWeek: frequency == .weekly ? dayOfWeek : nil,
+            dayOfMonth: frequency == .monthly ? dayOfMonth : nil,
+            dateTicks: usesDate ? calendar.startOfDay(for: reminderDate).ticks : nil)
+    }
+
+    private func resetReminder() {
+        remindMe = false
+        frequency = .oneTime
+        reminderTime = preferences.defaultReminderTime
+        reminderDate = defaultAnsweredOn
+        dayOfWeek = calendar.component(.weekday, from: defaultAnsweredOn) - 1
+        dayOfMonth = calendar.component(.day, from: defaultAnsweredOn)
+        minimumReminderDate = defaultAnsweredOn
     }
 
     private var draft: PrayerDraft? {
@@ -71,7 +138,7 @@ final class PrayerEditorModel {
         let trimmedDetails = details.trimmingCharacters(in: .whitespacesAndNewlines)
         return PrayerDraft(
             prayerCardId: cardId, title: trimmedTitle, details: trimmedDetails.isEmpty ? nil : details,
-            tagIds: tagIds.sorted())
+            tagIds: tagIds.sorted(), reminder: reminderDraft)
     }
 
     func load() {
@@ -91,12 +158,59 @@ final class PrayerEditorModel {
                         answeredOn = date
                     }
                     tagIds = Set(item.tagIds)
+                    loadReminder(record)
                 }
             }
             snapshot = current
         } catch {
             alert = error.localizedDescription
         }
+    }
+
+    private func loadReminder(_ record: PrayerRequestRecord) {
+        guard record.canNotify else { return }
+        remindMe = true
+        frequency = record.prayerFrequency
+        if let hour = record.notifyHour, let minute = record.notifyMinute,
+            let time = calendar.date(bySettingHour: hour, minute: minute, second: 0, of: defaultAnsweredOn)
+        {
+            reminderTime = time
+        }
+        if let day = record.notifyDayOfWeek, (0...6).contains(day) { dayOfWeek = day }
+        if let day = record.notifyDayOfMonth, (1...31).contains(day) { dayOfMonth = day }
+        if let ticks = record.notifyDateTicks, let stored = try? Date(ticks: ticks) {
+            reminderDate = calendar.startOfDay(for: stored)
+            if record.prayerFrequency == .oneTime, reminderDate < minimumReminderDate {
+                minimumReminderDate = reminderDate
+            }
+        }
+    }
+
+    func setRemindMe(_ on: Bool) async {
+        guard on else {
+            remindMe = false
+            await refreshAuthorization()
+            return
+        }
+        if preferences.allowNotifications {
+            switch await authorization.status() {
+            case .notDetermined:
+                isAuthorizing = true
+                remindMe = await authorization.request()
+                isAuthorizing = false
+            case .denied:
+                remindMe = false
+            default:
+                remindMe = true
+            }
+        } else {
+            remindMe = true
+        }
+        await refreshAuthorization()
+    }
+
+    func refreshAuthorization() async {
+        authorizationDenied = await authorization.status() == .denied
     }
 
     func loadTags() {
@@ -112,25 +226,28 @@ final class PrayerEditorModel {
         cardTitle = title
     }
 
-    func save(now: Date = .now) -> Bool {
+    func save(now: Date = .now) async -> Bool {
         guard canSave else { return false }
-        return perform {
-            try write(now: now)
-            announce("Prayer saved")
+        let reminderChanged = reminderState != snapshot.reminder
+        return await performAsync {
+            try await write(now: now)
+            announceSaved(reminderChanged: reminderChanged)
         }
     }
 
-    func saveAndAddAnother(now: Date = .now) -> Bool {
+    func saveAndAddAnother(now: Date = .now) async -> Bool {
         guard isNew, canSave else { return false }
-        return perform {
-            try write(now: now)
-            announce("Prayer saved")
+        let reminderChanged = reminderState != snapshot.reminder
+        return await performAsync {
+            try await write(now: now)
+            announceSaved(reminderChanged: reminderChanged)
             createdId = nil
             title = ""
             details = ""
             isAnswered = false
             answeredOn = defaultAnsweredOn
             tagIds = []
+            resetReminder()
             snapshot = current
         }
     }
@@ -143,7 +260,7 @@ final class PrayerEditorModel {
         }
     }
 
-    private func write(now: Date) throws {
+    private func write(now: Date) async throws {
         guard let draft else { return }
         let store = PrayerStore(database: database)
         if let prayerId {
@@ -158,10 +275,33 @@ final class PrayerEditorModel {
             createdId = id
             if isAnswered { try store.markAnswered(id: id, on: answeredOn, now: now) }
         }
+        try await reminders.reconcile(now: now)
+    }
+
+    private func announceSaved(reminderChanged: Bool) {
+        if !reminderChanged {
+            announce("Prayer saved")
+        } else if remindMe {
+            announce("Prayer saved. Reminder on.")
+        } else {
+            announce("Prayer saved. Reminder off.")
+        }
     }
 
     private func announce(_ message: String.LocalizationValue) {
         AccessibilityNotification.Announcement(String(localized: message)).post()
+    }
+
+    private func performAsync(_ work: () async throws -> Void) async -> Bool {
+        isSaving = true
+        defer { isSaving = false }
+        do {
+            try await work()
+            return true
+        } catch {
+            alert = error.localizedDescription
+            return false
+        }
     }
 
     private func perform(_ work: () throws -> Void) -> Bool {

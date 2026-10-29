@@ -1,6 +1,9 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%@ %lld of %lld" : {
+
+    },
     "%@ marked as answered" : {
 
     },
@@ -79,6 +82,9 @@
 
     },
     "A personal worship tool for organizing your prayer life. Create prayer cards, track requests, set reminders, and spend focused time in prayer." : {
+
+    },
+    "A tag named '%@' already exists. Please choose a different name." : {
 
     },
     "About" : {
@@ -209,6 +215,15 @@
     "Backup & Restore" : {
 
     },
+    "Black" : {
+
+    },
+    "Blue" : {
+
+    },
+    "Brown" : {
+
+    },
     "By Collection" : {
 
     },
@@ -293,6 +308,9 @@
     "Collections help you organize your cards." : {
 
     },
+    "Color" : {
+
+    },
     "Couldn't Delete" : {
 
     },
@@ -323,6 +341,30 @@
     "Created tag %@" : {
 
     },
+    "Custom" : {
+
+    },
+    "Daily" : {
+
+    },
+    "Daily at %@" : {
+
+    },
+    "Dark %@" : {
+
+    },
+    "Dark gray" : {
+
+    },
+    "Date" : {
+
+    },
+    "Day" : {
+
+    },
+    "Day of Month" : {
+
+    },
     "Default Reminder Time" : {
 
     },
@@ -351,12 +393,6 @@
         }
       }
     },
-    "Delete “%@” and its 1 prayer request?" : {
-
-    },
-    "Delete “%@” and its %lld prayer requests?" : {
-
-    },
     "Delete All Cards & Requests" : {
 
     },
@@ -369,10 +405,19 @@
     "Delete Collection" : {
 
     },
+    "Delete Color" : {
+
+    },
     "Delete Prayer" : {
 
     },
     "Delete Tag" : {
+
+    },
+    "Delete “%@” and its %lld prayer requests?" : {
+
+    },
+    "Delete “%@” and its 1 prayer request?" : {
 
     },
     "Delete “%@”?" : {
@@ -418,6 +463,9 @@
     "Duplicate Collection Name" : {
 
     },
+    "Duplicate Tag Name" : {
+
+    },
     "Edit" : {
 
     },
@@ -446,6 +494,12 @@
 
     },
     "Go to Settings → Backup & Restore → Back Up Now. This creates a file you can save or share. To restore, use \"Restore from Backup\" on the same screen." : {
+
+    },
+    "Gray" : {
+
+    },
+    "Green" : {
 
     },
     "Help" : {
@@ -493,6 +547,12 @@
     "Last Prayed" : {
 
     },
+    "Light %@" : {
+
+    },
+    "Light gray" : {
+
+    },
     "Locked" : {
 
     },
@@ -506,6 +566,12 @@
 
     },
     "Mark Answered" : {
+
+    },
+    "Monthly" : {
+
+    },
+    "Monthly on the %@ at %@" : {
 
     },
     "More" : {
@@ -550,6 +616,9 @@
       }
     },
     "Name" : {
+
+    },
+    "Never" : {
 
     },
     "New Card" : {
@@ -627,6 +696,9 @@
     "Off" : {
 
     },
+    "Once on %@ at %@" : {
+
+    },
     "Open Settings" : {
 
     },
@@ -634,6 +706,9 @@
 
     },
     "Open a prayer request and choose a reminder frequency: Never, Daily, Weekly, Monthly, or Yearly. Choose a time, and optionally a day of the week. The app will send a notification at your chosen time." : {
+
+    },
+    "Orange" : {
 
     },
     "Overdue" : {
@@ -661,10 +736,16 @@
         }
       }
     },
+    "Pastel %@" : {
+
+    },
     "Pause" : {
 
     },
     "Paused" : {
+
+    },
+    "Pink" : {
 
     },
     "Practicing Prayer" : {
@@ -691,9 +772,6 @@
     "Prayer Cards" : {
 
     },
-    "Prayer deleted" : {
-
-    },
     "Prayer Not Found" : {
 
     },
@@ -703,6 +781,9 @@
     "Prayer Time presents your prayers one at a time in a focused view. Swipe or tap the arrows to move between prayers. When you're done, tap \"I'm Done\" to end the session. By default, Prayer Time launches in landscape mode. You can change this in settings." : {
 
     },
+    "Prayer deleted" : {
+
+    },
     "Prayer marked as active" : {
 
     },
@@ -710,6 +791,12 @@
 
     },
     "Prayer saved" : {
+
+    },
+    "Prayer saved. Reminder off." : {
+
+    },
+    "Prayer saved. Reminder on." : {
 
     },
     "Prayer session complete" : {
@@ -736,10 +823,25 @@
     "Protection" : {
 
     },
+    "Purple" : {
+
+    },
     "Quick Add" : {
 
     },
     "Quick Add lets you jot down a prayer request from the home screen without choosing a card. It saves to a special \"Quick Add\" card that you can reorganize later." : {
+
+    },
+    "Red" : {
+
+    },
+    "Remind Me" : {
+
+    },
+    "Reminder" : {
+
+    },
+    "Repeat" : {
 
     },
     "Resume" : {
@@ -811,6 +913,9 @@
     "Tag deleted" : {
 
     },
+    "Tag saved" : {
+
+    },
     "Tags" : {
 
     },
@@ -818,6 +923,9 @@
 
     },
     "Tap the Prayer Cards tab, then tap \"Add Card\" in the top right. Give your card a name \u2014 a person, topic, or place \u2014 then tap Save, or Save + to save it and start another card in the same collection." : {
+
+    },
+    "Teal" : {
 
     },
     "The card is hidden from every list until you choose Show Confidential." : {
@@ -863,6 +971,9 @@
     "This is the Quick Add card, so it can't be edited, favorited, archived, or deleted." : {
 
     },
+    "Time" : {
+
+    },
     "Title" : {
 
     },
@@ -899,6 +1010,12 @@
     "Website" : {
 
     },
+    "Weekly" : {
+
+    },
+    "Weekly on %@ at %@" : {
+
+    },
     "What does the star icon do?" : {
 
     },
@@ -908,13 +1025,25 @@
     "What is auto-mode in Prayer Time?" : {
 
     },
+    "White" : {
+
+    },
     "Why am I not receiving notifications?" : {
 
     },
-    "Yes. All your data stays on your device. There are no accounts, no cloud sync, and no way for anyone else to see your prayers. Backups are files you control." : {
+    "Would you like to pray for your recently notified prayer requests now?" : {
 
     },
-    "Would you like to pray for your recently notified prayer requests now?" : {
+    "Yearly" : {
+
+    },
+    "Yearly on %@ at %@" : {
+
+    },
+    "Yellow" : {
+
+    },
+    "Yes. All your data stays on your device. There are no accounts, no cloud sync, and no way for anyone else to see your prayers. Backups are files you control." : {
 
     },
     "Yes. From the home screen, tap \"Prayer Time\" and choose \"By Tags.\" Select one or more tags, then tap Start to pray through only those tagged prayers." : {
@@ -924,78 +1053,6 @@
 
     },
     "You've prayed through all your requests!" : {
-
-    },
-    "Red" : {
-
-    },
-    "Orange" : {
-
-    },
-    "Brown" : {
-
-    },
-    "Teal" : {
-
-    },
-    "Blue" : {
-
-    },
-    "Purple" : {
-
-    },
-    "Pink" : {
-
-    },
-    "Gray" : {
-
-    },
-    "Black" : {
-
-    },
-    "White" : {
-
-    },
-    "Light gray" : {
-
-    },
-    "Dark gray" : {
-
-    },
-    "Yellow" : {
-
-    },
-    "Green" : {
-
-    },
-    "Custom" : {
-
-    },
-    "Dark %@" : {
-
-    },
-    "Pastel %@" : {
-
-    },
-    "Light %@" : {
-
-    },
-    "%@ %lld of %lld" : {
-
-    },
-    "Tag saved" : {
-
-    },
-    "Color" : {
-
-    },
-    "Delete Color" : {
-
-    },
-    "Duplicate Tag Name" : {
-
-    },
-    "A tag named '%@' already exists. Please choose a different name." : {
 
     }
   },

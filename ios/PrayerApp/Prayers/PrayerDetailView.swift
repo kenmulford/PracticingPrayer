@@ -21,7 +21,8 @@ struct PrayerDetailView<CardLink: Hashable>: View {
             }
         }
         .task(id: prayerId) {
-            let loaded = PrayerDetailModel(prayerId: prayerId, database: services.database)
+            let loaded = PrayerDetailModel(
+                prayerId: prayerId, database: services.database, reminders: services.reminders)
             loaded.load()
             model = loaded
         }
@@ -57,6 +58,9 @@ struct PrayerDetailView<CardLink: Hashable>: View {
                 .accessibilityElement(children: .combine)
                 LabeledContent("Started", value: date(prayer.createdAtTicks))
                     .accessibilityElement(children: .combine)
+                LabeledContent("Reminder", value: PrayerDetailModel.reminderSummary(prayer))
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("PrayerDetail_Reminder")
                 if prayer.isAnswered, let answered = prayer.answeredAtTicks {
                     LabeledContent("Answered", value: date(answered))
                         .accessibilityElement(children: .combine)
@@ -90,11 +94,11 @@ struct PrayerDetailView<CardLink: Hashable>: View {
             Section {
                 if prayer.isAnswered {
                     Button("Mark Active", systemImage: "arrow.uturn.backward.circle") {
-                        perform { model.markActive() }
+                        perform { await model.markActive() }
                     }
                 } else {
                     Button("Mark Answered", systemImage: "checkmark.circle") {
-                        perform { model.markAnswered() }
+                        perform { await model.markAnswered() }
                     }
                 }
                 Button("Delete Prayer", role: .destructive) { confirmDelete = true }
@@ -139,9 +143,11 @@ struct PrayerDetailView<CardLink: Hashable>: View {
         }
     }
 
-    private func perform(_ action: () -> Void) {
-        action()
-        if model?.errorMessage == nil { onChange() }
+    private func perform(_ action: @escaping () async -> Void) {
+        Task {
+            await action()
+            if model?.errorMessage == nil { onChange() }
+        }
     }
 
     private func date(_ ticks: Int64) -> String {

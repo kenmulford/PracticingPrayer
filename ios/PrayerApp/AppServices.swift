@@ -2,6 +2,12 @@ import Foundation
 import Observation
 import PrayerKit
 
+protocol ReminderReconciling {
+    func reconcile(now: Date) async throws
+}
+
+extension ReminderScheduler: ReminderReconciling {}
+
 @Observable
 final class AppServices {
     enum Phase: Equatable { case opening, open, failed }
@@ -42,6 +48,21 @@ final class AppServices {
         }
         #endif
         return URL.libraryDirectory.appendingPathComponent("prayer_app.db").path
+    }
+
+    var reminders: any ReminderReconciling {
+        ReminderScheduler(database: database, preferences: preferences, center: SystemReminderCenter())
+    }
+
+    func reconcileReminders() {
+        let reminders = reminders
+        Task {
+            do {
+                try await reminders.reconcile(now: .now)
+            } catch {
+                ReminderScheduler.logError("Reminder reconcile failed: \(error.localizedDescription)")
+            }
+        }
     }
 
     func open() async {

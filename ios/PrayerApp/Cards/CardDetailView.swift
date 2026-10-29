@@ -178,11 +178,17 @@ private struct CardDetailContent: View {
     private func statusButton(_ prayer: PrayerRequestRecord) -> some View {
         if prayer.isAnswered {
             Button("Mark Active", systemImage: "arrow.uturn.backward") {
-                perform { model.markActive(prayerId: prayer.id) }
+                perform {
+                    model.markActive(prayerId: prayer.id)
+                    services.reconcileReminders()
+                }
             }
         } else {
             Button("Mark Answered", systemImage: "checkmark.circle") {
-                perform { model.markAnswered(prayerId: prayer.id) }
+                perform {
+                    model.markAnswered(prayerId: prayer.id)
+                    services.reconcileReminders()
+                }
             }
             .tint(.green)
         }

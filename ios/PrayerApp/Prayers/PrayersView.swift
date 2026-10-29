@@ -137,6 +137,7 @@ struct PrayersView: View {
                                 } else {
                                     try store.markActive(id: item.record.id, now: .now)
                                 }
+                                services.reconcileReminders()
                             }
                         },
                         pray: { prayingPrayerID = item.record.id },

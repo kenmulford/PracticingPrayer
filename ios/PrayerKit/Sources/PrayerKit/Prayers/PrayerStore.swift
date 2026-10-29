@@ -9,22 +9,48 @@ public enum PrayerStoreError: Error, Equatable {
     case prayerNotFound(Int64)
 }
 
+public struct PrayerReminder: Sendable, Equatable {
+    public var canNotify: Bool
+    public var frequency: PrayerFrequency
+    public var hour: Int
+    public var minute: Int
+    public var dayOfWeek: Int?
+    public var dayOfMonth: Int?
+    public var dateTicks: Int64?
+
+    public init(
+        canNotify: Bool, frequency: PrayerFrequency, hour: Int, minute: Int, dayOfWeek: Int? = nil,
+        dayOfMonth: Int? = nil, dateTicks: Int64? = nil
+    ) {
+        self.canNotify = canNotify
+        self.frequency = frequency
+        self.hour = hour
+        self.minute = minute
+        self.dayOfWeek = dayOfWeek
+        self.dayOfMonth = dayOfMonth
+        self.dateTicks = dateTicks
+    }
+}
+
 public struct PrayerDraft: Sendable, Equatable {
     public var prayerCardId: Int64
     public var title: String
     public var details: String?
     public var tagIds: [Int64]
     public var isImported: Bool?
+    /// Nil leaves the reminder columns alone on update and writes the defaults on create.
+    public var reminder: PrayerReminder?
 
     public init(
         prayerCardId: Int64, title: String, details: String? = nil, tagIds: [Int64] = [],
-        isImported: Bool? = nil
+        isImported: Bool? = nil, reminder: PrayerReminder? = nil
     ) {
         self.prayerCardId = prayerCardId
         self.title = title
         self.details = details
         self.tagIds = tagIds
         self.isImported = isImported
+        self.reminder = reminder
     }
 }
 
@@ -50,16 +76,19 @@ public struct PrayerStore: Sendable {
     }
 
     static func insertRow(_ draft: PrayerDraft, ticks: Int64, _ db: Database) throws -> Int64 {
+        let reminder = draft.reminder
         // Raw insert: the record's encode always writes Id, which would pin it to 0.
         try db.execute(
             sql: """
                 INSERT INTO PrayerRequest (PrayerCardId, Title, Details, CanNotify, PrayerFrequency,
                     NotifyHour, NotifyMinute, NotifyDayOfWeek, NotifyDayOfMonth, NotifyDate,
                     IsImported, IsAnswered, AnsweredAt, CreatedAt, UpdatedAt)
-                VALUES (?, ?, ?, 0, ?, 9, 0, -1, -1, NULL, ?, 0, NULL, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?)
                 """,
             arguments: [
-                draft.prayerCardId, draft.title, draft.details, PrayerFrequency.weekly.rawValue,
+                draft.prayerCardId, draft.title, draft.details, reminder?.canNotify ?? false,
+                (reminder?.frequency ?? .weekly).rawValue, reminder?.hour ?? 9, reminder?.minute ?? 0,
+                reminder?.dayOfWeek ?? -1, reminder?.dayOfMonth ?? -1, reminder?.dateTicks,
                 draft.isImported ?? false, ticks, ticks,
             ])
         let id = db.lastInsertedRowID
@@ -75,6 +104,15 @@ public struct PrayerStore: Sendable {
             record.title = draft.title
             record.details = draft.details
             record.prayerCardId = draft.prayerCardId
+            if let reminder = draft.reminder {
+                record.canNotify = reminder.canNotify
+                record.prayerFrequency = reminder.frequency
+                record.notifyHour = reminder.hour
+                record.notifyMinute = reminder.minute
+                if let day = reminder.dayOfWeek { record.notifyDayOfWeek = day }
+                if let day = reminder.dayOfMonth { record.notifyDayOfMonth = day }
+                if let ticks = reminder.dateTicks { record.notifyDateTicks = ticks }
+            }
             record.updatedAtTicks = now.ticks
             try record.update(db)
             try Self.replaceTags(id, draft.tagIds, now.ticks, db)

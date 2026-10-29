@@ -9,6 +9,7 @@ final class PrayerDetailModel {
 
     @ObservationIgnored private let prayerId: Int64
     @ObservationIgnored private let database: PrayerDatabase
+    @ObservationIgnored private let reminders: any ReminderReconciling
 
     private(set) var phase: Phase = .loading
     private(set) var prayer: PrayerRequestRecord?
@@ -26,9 +27,10 @@ final class PrayerDetailModel {
             : String(localized: "\(prayedCount) times since \(date)")
     }
 
-    init(prayerId: Int64, database: PrayerDatabase) {
+    init(prayerId: Int64, database: PrayerDatabase, reminders: any ReminderReconciling) {
         self.prayerId = prayerId
         self.database = database
+        self.reminders = reminders
     }
 
     private var store: PrayerStore { PrayerStore(database: database) }
@@ -54,15 +56,59 @@ final class PrayerDetailModel {
         }
     }
 
-    func markAnswered(now: Date = .now) {
-        if mutate({ try store.markAnswered(id: prayerId, now: now) }) {
+    func markAnswered(now: Date = .now) async {
+        if await mutateAndReconcile({ try store.markAnswered(id: prayerId, now: now) }, now: now) {
             AccessibilityNotification.Announcement(String(localized: "Prayer marked as answered")).post()
         }
     }
 
-    func markActive(now: Date = .now) {
-        if mutate({ try store.markActive(id: prayerId, now: now) }) {
+    func markActive(now: Date = .now) async {
+        if await mutateAndReconcile({ try store.markActive(id: prayerId, now: now) }, now: now) {
             AccessibilityNotification.Announcement(String(localized: "Prayer marked as active")).post()
+        }
+    }
+
+    static func reminderSummary(
+        _ record: PrayerRequestRecord, calendar: Calendar = .current, locale: Locale = .current
+    ) -> String {
+        guard record.canNotify else { return String(localized: "Off") }
+        let clock = calendar.date(
+            bySettingHour: record.notifyHour ?? 9, minute: record.notifyMinute ?? 0, second: 0, of: .now) ?? .now
+        let time = clock.formatted(Date.FormatStyle(date: .omitted, time: .shortened, locale: locale, calendar: calendar, timeZone: calendar.timeZone))
+        let stored = record.notifyDateTicks.flatMap { try? Date(ticks: $0) }
+        func monthDay(_ date: Date) -> String {
+            date.formatted(
+                Date.VerbatimFormatStyle(
+                    format: "\(day: .defaultDigits) \(month: .abbreviated)", locale: locale,
+                    timeZone: calendar.timeZone, calendar: calendar))
+        }
+        switch record.prayerFrequency {
+        case .daily:
+            return String(localized: "Daily at \(time)")
+        case .weekly:
+            var localized = calendar
+            localized.locale = locale
+            let symbols = localized.weekdaySymbols
+            let index = record.notifyDayOfWeek ?? 0
+            let name = symbols.indices.contains(index) ? symbols[index] : ""
+            return String(localized: "Weekly on \(name) at \(time)")
+        case .monthly:
+            let ordinal = NumberFormatter()
+            ordinal.numberStyle = .ordinal
+            ordinal.locale = locale
+            let day = ordinal.string(from: NSNumber(value: record.notifyDayOfMonth ?? 1)) ?? ""
+            return String(localized: "Monthly on the \(day) at \(time)")
+        case .yearly:
+            let date = stored.map(monthDay) ?? ""
+            return String(localized: "Yearly on \(date) at \(time)")
+        case .oneTime:
+            let date = stored.map {
+                $0.formatted(
+                    Date.VerbatimFormatStyle(
+                        format: "\(day: .defaultDigits) \(month: .abbreviated) \(year: .defaultDigits)",
+                        locale: locale, timeZone: calendar.timeZone, calendar: calendar))
+            } ?? ""
+            return String(localized: "Once on \(date) at \(time)")
         }
     }
 
@@ -90,6 +136,17 @@ final class PrayerDetailModel {
         return (
             Double((value >> 16) & 0xFF) / 255, Double((value >> 8) & 0xFF) / 255, Double(value & 0xFF) / 255
         )
+    }
+
+    private func mutateAndReconcile(_ work: () throws -> Void, now: Date) async -> Bool {
+        guard mutate(work) else { return false }
+        do {
+            try await reminders.reconcile(now: now)
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
     }
 
     @discardableResult

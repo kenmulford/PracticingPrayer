@@ -8,6 +8,9 @@ private let fixtureURL = URL(fileURLWithPath: #filePath)
     .appendingPathComponent("contracts/db/long-upgraded.db")
 
 @MainActor
+private let testPreferences = AppPreferences(defaults: UserDefaults(suiteName: "PrayerEditorModelTests") ?? .standard)
+
+@MainActor
 private func withEditor(_ body: (PrayerDatabase) async throws -> Void) async throws {
     let copy = FileManager.default.temporaryDirectory
         .appendingPathComponent("PrayerEditorModelTests-\(UUID().uuidString).db")
@@ -26,7 +29,8 @@ private func withEditor(_ body: (PrayerDatabase) async throws -> Void) async thr
 @Suite struct PrayerEditorModelTests {
     @Test func newWithoutCardCannotSave() async throws {
         try await withEditor { database in
-            let model = PrayerEditorModel(prayerId: nil, cardId: nil, cardTitle: nil, database: database)
+            let model = PrayerEditorModel(prayerId: nil, cardId: nil, cardTitle: nil,
+                database: database, preferences: testPreferences, reminders: RecordingReconciler())
             model.load()
             model.title = "newWithoutCardCannotSave"
             #expect(model.isNew)
@@ -36,7 +40,8 @@ private func withEditor(_ body: (PrayerDatabase) async throws -> Void) async thr
 
     @Test func preselectedCardIsNotDirty() async throws {
         try await withEditor { database in
-            let model = PrayerEditorModel(prayerId: nil, cardId: 2, cardTitle: "Card", database: database)
+            let model = PrayerEditorModel(prayerId: nil, cardId: 2, cardTitle: "Card",
+                database: database, preferences: testPreferences, reminders: RecordingReconciler())
             model.load()
             #expect(!model.isDirty)
             model.title = "x"
@@ -48,7 +53,8 @@ private func withEditor(_ body: (PrayerDatabase) async throws -> Void) async thr
     @Test func createAnsweredStoresDateOnly() async throws {
         try await withEditor { database in
             let tag = try TagStore(database: database).createTag(name: "createAnswered", color: "#336699", now: .now)
-            let model = PrayerEditorModel(prayerId: nil, cardId: 2, cardTitle: "Card", database: database)
+            let model = PrayerEditorModel(prayerId: nil, cardId: 2, cardTitle: "Card",
+                database: database, preferences: testPreferences, reminders: RecordingReconciler())
             model.load()
             let yesterday = Calendar.current.date(byAdding: .hour, value: 15, to: Calendar.current.date(
                 byAdding: .day, value: -1, to: Calendar.current.startOfDay(for: .now))!)!
@@ -56,7 +62,7 @@ private func withEditor(_ body: (PrayerDatabase) async throws -> Void) async thr
             model.isAnswered = true
             model.answeredOn = yesterday
             model.tagIds = [tag.id]
-            #expect(model.save())
+            #expect(await model.save())
             let item = try PrayerStore(database: database).prayers(cardId: 2)
                 .first { $0.record.title == "createAnsweredStoresDateOnly" }
             #expect(item?.record.isAnswered == true)
@@ -67,12 +73,13 @@ private func withEditor(_ body: (PrayerDatabase) async throws -> Void) async thr
 
     @Test func saveAndAddAnotherKeepsCard() async throws {
         try await withEditor { database in
-            let model = PrayerEditorModel(prayerId: nil, cardId: 2, cardTitle: "Card", database: database)
+            let model = PrayerEditorModel(prayerId: nil, cardId: 2, cardTitle: "Card",
+                database: database, preferences: testPreferences, reminders: RecordingReconciler())
             model.load()
             model.title = "saveAndAddAnotherKeepsCard"
             model.details = "notes"
             model.isAnswered = true
-            #expect(model.saveAndAddAnother())
+            #expect(await model.saveAndAddAnother())
             #expect(model.cardId == 2)
             #expect(model.title == "")
             #expect(model.details == "")
@@ -91,14 +98,15 @@ private func withEditor(_ body: (PrayerDatabase) async throws -> Void) async thr
             let id = try store.create(
                 PrayerDraft(prayerCardId: 2, title: "editLoadsThenMarksActive", tagIds: [tag.id]), now: .now)
             try store.markAnswered(id: id, now: .now)
-            let model = PrayerEditorModel(prayerId: id, cardId: nil, cardTitle: nil, database: database)
+            let model = PrayerEditorModel(prayerId: id, cardId: nil, cardTitle: nil,
+                database: database, preferences: testPreferences, reminders: RecordingReconciler())
             model.load()
             #expect(model.title == "editLoadsThenMarksActive")
             #expect(model.tagIds == [tag.id])
             #expect(model.isAnswered)
             #expect(!model.isDirty)
             model.isAnswered = false
-            #expect(model.save())
+            #expect(await model.save())
             let record = try store.prayers(cardId: 2).first { $0.record.id == id }?.record
             #expect(record?.isAnswered == false)
             #expect(record?.answeredAtTicks == nil)
@@ -107,10 +115,11 @@ private func withEditor(_ body: (PrayerDatabase) async throws -> Void) async thr
 
     @Test func failedSaveKeepsEntries() async throws {
         try await withEditor { database in
-            let model = PrayerEditorModel(prayerId: nil, cardId: 999_999, cardTitle: "Gone", database: database)
+            let model = PrayerEditorModel(prayerId: nil, cardId: 999_999, cardTitle: "Gone",
+                database: database, preferences: testPreferences, reminders: RecordingReconciler())
             model.load()
             model.title = "failedSaveKeepsEntries"
-            #expect(!model.save())
+            #expect(!(await model.save()))
             #expect(model.alert != nil)
             #expect(model.title == "failedSaveKeepsEntries")
         }
@@ -120,7 +129,8 @@ private func withEditor(_ body: (PrayerDatabase) async throws -> Void) async thr
         try await withEditor { database in
             let store = PrayerStore(database: database)
             let id = try store.create(PrayerDraft(prayerCardId: 2, title: "deleteRemovesPrayer"), now: .now)
-            let model = PrayerEditorModel(prayerId: id, cardId: nil, cardTitle: nil, database: database)
+            let model = PrayerEditorModel(prayerId: id, cardId: nil, cardTitle: nil,
+                database: database, preferences: testPreferences, reminders: RecordingReconciler())
             model.load()
             #expect(model.delete())
             #expect(try store.prayers(cardId: 2).first { $0.record.id == id } == nil)

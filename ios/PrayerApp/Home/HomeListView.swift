@@ -75,7 +75,10 @@ struct HomeListView: View {
                         }
                         .prayerRowActions(
                             item,
-                            setAnswered: { model.setAnswered(item, answered: $0) },
+                            setAnswered: {
+                                model.setAnswered(item, answered: $0)
+                                services.reconcileReminders()
+                            },
                             requestDelete: { model.pendingDelete = item })
                     }
                 } header: {
