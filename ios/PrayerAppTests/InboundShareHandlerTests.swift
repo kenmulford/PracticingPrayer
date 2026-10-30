@@ -128,4 +128,18 @@ private struct Unreadable: Error {}
             return
         }
     }
+
+    @Test func fileOverTheCapIsRejectedWithoutReadingItAll() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("cap-\(UUID().uuidString).prayercard")
+        try Data(count: ShareCodec.maxFileBytes + 1).write(to: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+        #expect(throws: (any Error).self) { try InboundShareHandler.readCapped(url) }
+        #expect(try InboundShareHandler.readCapped(shareDirectory.appendingPathComponent("oversize.prayercard")).count <= ShareCodec.maxFileBytes)
+    }
+
+    @Test func suggestedTitleTravelsWithThePayload() {
+        let handler = InboundShareHandler()
+        handler.enqueue(.card(title: "Imported May 3", requests: []), cardTitle: "Imported May 3")
+        #expect(handler.queue.first?.cardTitle == "Imported May 3")
+    }
 }

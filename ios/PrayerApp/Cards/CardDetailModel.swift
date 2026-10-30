@@ -46,7 +46,7 @@ final class CardDetailModel {
             }.first
             guard let (section, record) = found else { return }
             card = record
-            isProtected = ProtectionPolicy.effectiveMode(of: record, box: section.box) != .unprotected
+            isProtected = !ShareItemBuilder.isShareable(record, box: section.box)
             collectionName = section.box?.name ?? String(localized: "Loose Cards")
 
             let all = try PrayerStore(database: database).prayers(cardId: cardId).map(\.record)

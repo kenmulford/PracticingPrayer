@@ -33,6 +33,8 @@ public enum ShareEncoding: Equatable, Sendable {
 /// Port of the MAUI `DeepLinkService` wire format; `contracts/share` holds the cross-platform fixtures.
 public enum ShareCodec {
     public static let maxLinkLength = 1800
+    /// Largest `.prayercard` file `decode(file:)` accepts; callers check the size before reading it.
+    public static let maxFileBytes = Gzip.maxShareBytes
 
     private static let shareHost = "practicingprayerapp.com"
     private static let baseURL = "https://practicingprayerapp.com/share"

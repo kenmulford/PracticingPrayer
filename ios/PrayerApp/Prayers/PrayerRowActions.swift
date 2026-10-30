@@ -9,6 +9,7 @@ struct PrayerRowActions: ViewModifier {
     let requestDelete: () -> Void
 
     @Environment(AppServices.self) private var services
+    @State private var share = ShareItemBuilder.RowShare()
 
     private var isAnswered: Bool { item.record.isAnswered }
 
@@ -20,11 +21,10 @@ struct PrayerRowActions: ViewModifier {
             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                 deleteButton
             }
+            .task(id: item) { share = .prayer(item.record, database: services.database) }
             .contextMenu {
                 if let pray { Button("Pray", systemImage: "hands.and.sparkles", action: pray).disabled(isAnswered) }
-                if (try? ShareItemBuilder.isShareable(cardId: item.record.prayerCardId, database: services.database)) == true {
-                    ShareMenuItem(item: try? ShareItemBuilder.prayer(item.record))
-                }
+                if share.isShown { ShareMenuItem(item: share.item) }
                 statusButton
                 if let edit { Button("Edit", systemImage: "pencil", action: edit) }
                 deleteButton

@@ -2,7 +2,7 @@ import Foundation
 import PrayerKit
 
 /// Picks up the App Group hand-off file written by the share extension and `ImportTextIntent`.
-/// Token vocabulary and the log trim follow the App Group file contract (`AppGroupWriter`).
+/// Token vocabulary and the log trim follow the App Group file contract (`PendingImportWriter`, `ImportBreadcrumbLog`).
 nonisolated struct PendingImportReader {
     static let maxLogLines = 200
 
@@ -12,7 +12,7 @@ nonisolated struct PendingImportReader {
             return URL(fileURLWithPath: dir)
         }
         #endif
-        return FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: AppGroupWriter.appGroupID)
+        return FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: PendingImportWriter.appGroupID)
     }
 
     private let containerURL: @Sendable () -> URL?
@@ -30,36 +30,42 @@ nonisolated struct PendingImportReader {
     func takePending() -> String? {
         guard let container = containerURL() else { return nil }
         let fm = FileManager.default
-        let payloadURL = container.appendingPathComponent(AppGroupWriter.payloadFileName)
+        let payloadURL = container.appendingPathComponent(PendingImportWriter.fileName)
         guard fm.fileExists(atPath: payloadURL.path) else { return nil }
 
         trimLog(in: container)
+        let log = ImportBreadcrumbLog(containerURL: container)
 
-        var byteCount = -1
-        var token = "io-fail"
-        var raw: String?
-        if let data = try? Data(contentsOf: payloadURL) {
-            byteCount = data.count
-            if let wire = try? JSONDecoder().decode(Wire.self, from: data) {
-                if wire.raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    token = "empty"
-                } else {
-                    token = "ok"
-                    raw = wire.raw
-                }
-            } else {
-                token = "parse-fail"
-            }
+        // Claim the file by renaming it: an extension write landing mid-pickup then creates a fresh
+        // pending-import.json instead of being read half-way or deleted unread.
+        let claimedURL = container.appendingPathComponent("pending-import.\(UUID().uuidString).claimed")
+        do {
+            try fm.moveItem(at: payloadURL, to: claimedURL)
+        } catch {
+            log.append(.ioFail, byteCount: nil)
+            return nil
         }
-        try? fm.removeItem(at: payloadURL)
-        AppGroupWriter(containerURL: { container }).appendBreadcrumb(
-            containerURL: container, byteCount: byteCount, token: token)
-        return raw
+        defer { try? fm.removeItem(at: claimedURL) }
+
+        guard let data = try? Data(contentsOf: claimedURL) else {
+            log.append(.ioFail, byteCount: nil)
+            return nil
+        }
+        guard let wire = try? JSONDecoder().decode(Wire.self, from: data) else {
+            log.append(.parseFail, byteCount: data.count)
+            return nil
+        }
+        guard !wire.raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            log.append(.empty, byteCount: data.count)
+            return nil
+        }
+        log.append(.ok, byteCount: data.count)
+        return wire.raw
     }
 
     /// Keeps the newest `maxLogLines` lines so the append-only log cannot grow without bound.
     private func trimLog(in container: URL) {
-        let logURL = container.appendingPathComponent(AppGroupWriter.logFileName)
+        let logURL = container.appendingPathComponent(ImportBreadcrumbLog.fileName)
         guard let text = try? String(contentsOf: logURL, encoding: .utf8) else { return }
         let lines = text.split(separator: "\n", omittingEmptySubsequences: true)
         guard lines.count > Self.maxLogLines else { return }
@@ -68,8 +74,7 @@ nonisolated struct PendingImportReader {
     }
 }
 
-struct PendingImport: Identifiable {
-    let id: UUID
+struct PendingImport {
     let payload: SharePayload
     let cardTitle: String
 
@@ -80,7 +85,7 @@ struct PendingImport: Identifiable {
         let parsed = TextSelectionParser.parse(raw, now: now, locale: locale)
         guard !parsed.prayers.isEmpty else { return nil }
         return PendingImport(
-            id: UUID(), payload: .card(title: parsed.suggestedCardTitle, requests: parsed.prayers),
+            payload: .card(title: parsed.suggestedCardTitle, requests: parsed.prayers),
             cardTitle: parsed.suggestedCardTitle)
     }
 }

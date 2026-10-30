@@ -10,6 +10,10 @@ public enum ImportBreadcrumbToken: String, Sendable {
     case emptyText = "empty-text"
     case oversized
     case pipelineError = "pipeline-error"
+    // Host-app pickup outcomes.
+    case ok
+    case empty
+    case parseFail = "parse-fail"
 }
 
 /// Appends one line per share attempt to `import-log.txt` in the App Group container.

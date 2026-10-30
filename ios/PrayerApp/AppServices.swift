@@ -20,7 +20,6 @@ final class AppServices {
     let clipboardHandoff: ClipboardHandoffCoordinator
     let confidential: ConfidentialSession
     var prayerSession: PrayerSession?
-    var pendingImport: PendingImport?
 
     @ObservationIgnored private var openedDatabase: PrayerDatabase?
     @ObservationIgnored private let databasePath: String

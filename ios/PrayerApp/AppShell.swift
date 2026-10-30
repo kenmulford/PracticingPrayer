@@ -42,7 +42,7 @@ struct AppShell: View {
                     }
                     .sheet(item: importSheetBinding) { item in
                         if case .payload(let payload) = item.content {
-                            ConfirmImportView(database: services.database, payload: payload)
+                            ConfirmImportView(database: services.database, payload: payload, cardTitle: item.cardTitle)
                         }
                     }
                     .alert("Unable to Import", isPresented: failureBinding, presenting: failure) { _ in
@@ -117,25 +117,21 @@ struct AppShell: View {
             Text("Would you like to pray for your recently notified prayer requests now?")
         }
         .onChange(of: isReadyForPendingImport, initial: true) { _, ready in
-            if ready { services.pendingImport = PendingImport.pickUp() }
-        }
-        .sheet(item: Bindable(services).pendingImport) {
-            ConfirmImportView(database: services.database, payload: $0.payload, cardTitle: $0.cardTitle)
+            if ready, let pending = PendingImport.pickUp() {
+                services.inboundShare.enqueue(pending.payload, cardTitle: pending.cardTitle)
+            }
         }
     }
 
-    // Pick up only when a sheet can present, since pickup deletes the file. An empty link queue keeps
-    // the file in place while a link import or failure is pending, so two sheets never compete.
+    // The App Group pickup joins the same FIFO as links and files, so one sheet presents every import.
     private var isReadyForPendingImport: Bool {
-        scenePhase == .active && services.phase == .open && services.pendingImport == nil
-            && services.inboundShare.queue.isEmpty
-            && services.prayerSession == nil && services.onboarding.stage != .welcome && !showsPrayerTimeAlert
+        scenePhase == .active && services.phase == .open
     }
 
-    // The link queue head waits while the App Group import sheet is up (one sheet at a time).
+    // The queue head waits until nothing else covers the screen (one sheet at a time).
     private var importReady: Bool {
         services.phase == .open && services.prayerSession == nil && !showsPrayerTimeAlert
-            && !services.onboarding.showsWelcome && services.pendingImport == nil
+            && !services.onboarding.showsWelcome
     }
 
     private var importSheetBinding: Binding<InboundShareHandler.Item?> {

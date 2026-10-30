@@ -78,7 +78,7 @@ private let goldenURL = URL(fileURLWithPath: #filePath)
 
             #expect(try Data(contentsOf: payloadURL) == prior)
             let log = try String(contentsOf: dir.appendingPathComponent("import-log.txt"), encoding: .utf8)
-            #expect(log.hasSuffix(" - io-fail\n"))
+            #expect(log.hasSuffix(" - oversized\n"))
         }
     }
 
