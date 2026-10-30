@@ -23,6 +23,7 @@ final class AppServices {
 
     @ObservationIgnored private var openedDatabase: PrayerDatabase?
     @ObservationIgnored private let databasePath: String
+    @ObservationIgnored private let reminderCenter: any ReminderCenter
 
     var database: PrayerDatabase {
         guard phase == .open || phase == .restoring, let openedDatabase else {
@@ -32,7 +33,8 @@ final class AppServices {
     }
 
     init(preferences: AppPreferences = AppServices.defaultPreferences, databasePath: String = AppServices.defaultDatabasePath,
-         inboundShare: InboundShareHandler = .shared) {
+         inboundShare: InboundShareHandler = .shared, reminderCenter: any ReminderCenter = SystemReminderCenter()) {
+        self.reminderCenter = reminderCenter
         self.preferences = preferences
         self.inboundShare = inboundShare
         clipboardHandoff = ClipboardHandoffCoordinator(
@@ -110,12 +112,13 @@ final class AppServices {
     }
 
     var reminders: any ReminderReconciling {
-        ReminderScheduler(database: database, preferences: preferences, center: SystemReminderCenter())
+        ReminderScheduler(database: database, preferences: preferences, center: reminderCenter)
     }
 
-    func reconcileReminders() {
+    @discardableResult
+    func reconcileReminders() -> Task<Void, Never> {
         let reminders = reminders
-        Task {
+        return Task {
             do {
                 try await reminders.reconcile(now: .now)
             } catch {
@@ -138,11 +141,12 @@ final class AppServices {
         let (outcome, reopened) = await Task.detached {
             try? closing?.close()
             let outcome = Result { try swap(URL(fileURLWithPath: path)) }
-            return (outcome, Result { try PrayerDatabase(path: path) })
+            return (outcome, Result { try Self.openPrepared(path: path) })
         }.value
         switch reopened {
-        case .success(let database):
+        case .success(let (database, archivedBoxId)):
             openedDatabase = database
+            preferences.archivedFolderId = archivedBoxId
             phase = .open
         case .failure:
             openedDatabase = nil
@@ -155,11 +159,30 @@ final class AppServices {
         phase = .opening
         let path = databasePath
         do {
-            openedDatabase = try await Task.detached { try PrayerDatabase(path: path) }.value
+            let (database, archivedBoxId) = try await Task.detached { try Self.openPrepared(path: path) }.value
+            openedDatabase = database
+            preferences.archivedFolderId = archivedBoxId
             phase = .open
+            reconcileReminders()
         } catch {
             openedDatabase = nil
             phase = .failed
+        }
+    }
+
+    /// Opens (creating a missing file on a fresh install), runs the 1.7.2 schema upkeep, and returns the
+    /// Archived box id that `AppPreferences.archivedFolderId` mirrors. Blocking; call off the main thread.
+    nonisolated static func openPrepared(path: String) throws -> (PrayerDatabase, Int) {
+        let database = try PrayerDatabase.openOrCreate(path: path)
+        do {
+            try SchemaUpkeep.run(on: database)
+            let now = Date()
+            try TagStore(database: database).seedSystemTags(now: now)
+            try UserColorStore(database: database).seedDefaults(now: now)
+            return (database, Int(try SchemaUpkeep.archivedBoxId(on: database) ?? 0))
+        } catch {
+            try? database.close()
+            throw error
         }
     }
 }

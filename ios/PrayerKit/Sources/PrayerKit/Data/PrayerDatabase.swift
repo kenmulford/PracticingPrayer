@@ -24,6 +24,19 @@ public final class PrayerDatabase: Sendable {
         }
     }
 
+    private init(creating path: String) throws {
+        dbQueue = try DatabaseQueue(path: path, configuration: Configuration())
+    }
+
+    /// Opens the file, or creates an empty one when none exists (a fresh install). The caller runs
+    /// `SchemaUpkeep.run` next, which builds the 1.7.2 schema and seeds the System and Archived boxes.
+    public static func openOrCreate(path: String) throws -> PrayerDatabase {
+        if FileManager.default.fileExists(atPath: path) { return try PrayerDatabase(path: path) }
+        try FileManager.default.createDirectory(
+            at: URL(fileURLWithPath: path).deletingLastPathComponent(), withIntermediateDirectories: true)
+        return try PrayerDatabase(creating: path)
+    }
+
     public func close() throws {
         try dbQueue.close()
     }

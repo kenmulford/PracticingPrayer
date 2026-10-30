@@ -163,7 +163,7 @@ private struct PrayerTimeLauncherModifier: ViewModifier {
             do {
                 let items = try await launcher.items(for: scope, session: services.confidential)
                 services.prayerSession = PrayerSession(
-                    items: items, database: services.database, reconcile: services.reconcileReminders)
+                    items: items, database: services.database, reconcile: { services.reconcileReminders() })
             } catch {
                 errorMessage = error.localizedDescription
             }
@@ -213,7 +213,7 @@ private struct PrayerTimeStartModifier: ViewModifier {
                 let items = try await PrayerTimeLauncher(database: services.database)
                     .items(for: scope, session: services.confidential)
                 services.prayerSession = PrayerSession(
-                    items: items, database: services.database, reconcile: services.reconcileReminders)
+                    items: items, database: services.database, reconcile: { services.reconcileReminders() })
             } catch {
                 errorMessage = error.localizedDescription
             }

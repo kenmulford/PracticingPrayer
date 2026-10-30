@@ -112,7 +112,7 @@ struct AppShell: View {
             Button("Cancel", role: .cancel) {}
             Button("Pray Now") {
                 services.prayerSession = PrayerSession(
-                    items: notifiedPrayers, database: services.database, reconcile: services.reconcileReminders)
+                    items: notifiedPrayers, database: services.database, reconcile: { services.reconcileReminders() })
             }
         } message: {
             Text("Would you like to pray for your recently notified prayer requests now?")

@@ -82,6 +82,11 @@ public enum SchemaUpkeep {
         step("backfillDefaultColors", backfillDefaultColors)
     }
 
+    /// The id `AppPreferences.archivedFolderId` mirrors, as `DBService.EnsureCardBoxMigrationAsync` writes it.
+    public static func archivedBoxId(on database: PrayerDatabase) throws -> Int64? {
+        try database.dbQueue.read { try Int64.fetchOne($0, sql: "SELECT Id FROM CardBox WHERE SystemKey = 'archived'") }
+    }
+
     public static func logError(_ message: String) {
         Logger(subsystem: "PrayerKit", category: "SchemaUpkeep").error("\(message, privacy: .public)")
     }
