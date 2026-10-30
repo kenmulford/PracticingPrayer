@@ -2,6 +2,24 @@
 
 Release notes for Practicing Prayer, newest first.
 
+## 2.0.0 Confidential and backup
+
+**Theme:** Protected cards behind device-owner authentication, an app-switcher privacy cover, and backup and restore on the native screens. Lands on `ios-2.0-refactor`, not a release.
+
+### ✨ Features / enhancements
+
+| Issue | PR | What |
+|---|---|---|
+| #423 Unlock confidential cards with device-owner authentication | #446 | Show Confidential unlocks protected cards with Face ID, Touch ID or the passcode; lowering protection asks again |
+| #424 Cover the app-switcher snapshot when protected cards exist | #446 | The app icon and name hide card content in the app switcher |
+| #425 Back Up Now with the optional passphrase | #446 | Share a backup, with protected cards encrypted by a passphrase |
+| #426 Fall back to the app PIN with a persisted lockout | #446 | A 6-digit PIN unlocks protected cards when the device has no passcode |
+| #427 Restore from a backup | #446 | Replace all data from a backup, restoring protected cards with the passphrase |
+
+### ⚖️ Post-run audit trail
+
+- The UI suite was not run at milestone end; it runs once at the end of the 2.0.0 epic.
+
 ## 2.0.0 Prayer Time, reminders, and onboarding
 
 **Theme:** Prayer Time sessions, per-prayer reminders, and first-launch onboarding on the native screens. Lands on `ios-2.0-refactor`, not a release.
