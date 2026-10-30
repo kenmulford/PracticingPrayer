@@ -19,6 +19,9 @@ final class PrayerDetailModel {
     private(set) var prayedCount = 0
     private(set) var isMutating = false
     var errorMessage: String?
+    private(set) var shareItem: ShareItem?
+    private(set) var canShowShare = false
+    var shareError: String?
 
     var prayedSummary: String? {
         guard prayedCount > 0, let prayer, let started = try? Date(ticks: prayer.createdAtTicks) else { return nil }
@@ -52,6 +55,13 @@ final class PrayerDetailModel {
             prayer = item.record
             cardTitle = item.cardTitle
             phase = .loaded
+            do {
+                canShowShare = try ShareItemBuilder.isShareable(cardId: item.record.prayerCardId, database: database)
+                shareItem = canShowShare ? try ShareItemBuilder.prayer(item.record) : nil
+            } catch {
+                shareItem = nil
+                shareError = error.localizedDescription
+            }
         } catch {
             errorMessage = error.localizedDescription
             if prayer == nil { phase = .notFound }

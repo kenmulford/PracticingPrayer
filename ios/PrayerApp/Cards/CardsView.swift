@@ -396,6 +396,8 @@ struct CardsView: View {
             isMovingRow = true
         case .delete:
             cardToDelete = item
+        case .share:
+            break
         case .favorite, .unfavorite, .archive, .unarchive:
             rowError = CardRowActionModel.perform(
                 action, cardId: item.card.id, database: services.database, preferences: services.preferences)

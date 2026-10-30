@@ -8,6 +8,8 @@ struct PrayerRowActions: ViewModifier {
     let edit: (() -> Void)?
     let requestDelete: () -> Void
 
+    @Environment(AppServices.self) private var services
+
     private var isAnswered: Bool { item.record.isAnswered }
 
     func body(content: Content) -> some View {
@@ -20,8 +22,8 @@ struct PrayerRowActions: ViewModifier {
             }
             .contextMenu {
                 if let pray { Button("Pray", systemImage: "hands.and.sparkles", action: pray).disabled(isAnswered) }
-                if case .link(let link)? = try? ShareCodec.encode(request: item.record), let url = URL(string: link) {
-                    ShareLink(item: url) { Label("Share", systemImage: "square.and.arrow.up") }
+                if (try? ShareItemBuilder.isShareable(cardId: item.record.prayerCardId, database: services.database)) == true {
+                    ShareMenuItem(item: try? ShareItemBuilder.prayer(item.record))
                 }
                 statusButton
                 if let edit { Button("Edit", systemImage: "pencil", action: edit) }

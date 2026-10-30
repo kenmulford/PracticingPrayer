@@ -30,6 +30,10 @@ struct CardRowActions: ViewModifier {
                     ForEach(model.menuActions, id: \.self) { action in
                         if action == .delete {
                             Button(action.title, systemImage: action.systemImage, role: .destructive) { perform(action) }
+                        } else if action == .share {
+                            if (try? ShareItemBuilder.isShareable(cardId: item.card.id, database: services.database)) == true {
+                                ShareMenuItem(item: try? ShareItemBuilder.card(item.card, database: services.database))
+                            }
                         } else {
                             button(action).disabled(action == .pray && !model.canPray)
                         }
