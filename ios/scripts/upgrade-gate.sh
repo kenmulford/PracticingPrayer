@@ -7,7 +7,7 @@
 set -euo pipefail
 
 SIM="Test iPad"
-SIM_OS="27.0"
+SIM_OS="${IOS_VERSION:-27.2}"
 BUNDLE_ID="com.multithreadedllc.prayercards"
 OLD_TAG="v1.7.2"
 APPIUM_URL="http://127.0.0.1:4725"

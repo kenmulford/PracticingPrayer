@@ -120,7 +120,7 @@ noReset:     true (when env PRAYER_APK_PATH is not set)
 BundleId:              com.multithreadedllc.prayercards
 Automation:            XCUITest
 Device:                env IOS_SIMULATOR ?? "Test iPad"   (an iPad (A16))
-PlatformVersion:       env IOS_VERSION ?? "27.0"
+PlatformVersion:       env IOS_VERSION ?? "27.2"
 Udid:                  TestConfig.IOSUdid (env IOS_UDID, else resolved from Device + PlatformVersion)
 connectHardwareKeyboard: true
 noReset:               true
