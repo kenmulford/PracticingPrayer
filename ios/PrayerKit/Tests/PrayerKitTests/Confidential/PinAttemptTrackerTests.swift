@@ -28,11 +28,17 @@ private final class MemoryStore: SecItemStore, @unchecked Sendable {
 
 private final class Clock: @unchecked Sendable {
     var current = Date(timeIntervalSince1970: 1_800_000_000)
+    var uptime = 5_000.0
+
+    func advance(_ seconds: TimeInterval) {
+        current = current.addingTimeInterval(seconds)
+        uptime += seconds
+    }
 }
 
 @Suite struct PinAttemptTrackerTests {
     private func make(_ store: MemoryStore = MemoryStore(), _ clock: Clock = Clock()) -> PinAttemptTracker {
-        PinAttemptTracker(store: PinAttemptStore(store: store), now: { clock.current })
+        PinAttemptTracker(store: PinAttemptStore(store: store), now: { clock.current }, uptime: { clock.uptime })
     }
 
     @Test func missingItemReadsCleared() throws {
@@ -99,7 +105,61 @@ private final class Clock: @unchecked Sendable {
         let tracker = make(MemoryStore(), clock)
         var state = PinAttemptState.cleared
         for _ in 0..<5 { state = try tracker.recordFailure() }
-        clock.current = clock.current.addingTimeInterval(31)
+        clock.advance(31)
+        #expect(tracker.activeLockout(in: state) == nil)
+    }
+
+    private func locked(_ clock: Clock) throws -> (PinAttemptTracker, PinAttemptState) {
+        let tracker = make(MemoryStore(), clock)
+        var state = PinAttemptState.cleared
+        for _ in 0..<5 { state = try tracker.recordFailure() }
+        return (tracker, state)
+    }
+
+    @Test func clockMovedBackwardsKeepsLockoutForMonotonicDuration() throws {
+        let clock = Clock()
+        let (tracker, state) = try locked(clock)
+        clock.current = clock.current.addingTimeInterval(-3600)
+        clock.uptime += 31
+        #expect(tracker.activeLockout(in: state) != nil)
+    }
+
+    @Test func clockJumpedForwardPastLockoutKeepsItUntilUptimePasses() throws {
+        let clock = Clock()
+        let (tracker, state) = try locked(clock)
+        clock.current = clock.current.addingTimeInterval(3600)
+        clock.uptime += 10
+        #expect(tracker.activeLockout(in: state) == clock.current.addingTimeInterval(20))
+        clock.advance(21)
+        #expect(tracker.activeLockout(in: state) == nil)
+    }
+
+    @Test func rebootFallsBackToWallClock() throws {
+        let clock = Clock()
+        let (tracker, state) = try locked(clock)
+        clock.current = clock.current.addingTimeInterval(3600)
+        clock.uptime = 3
+        #expect(tracker.activeLockout(in: state) == nil)
+        clock.current = clock.current.addingTimeInterval(-3590)
+        #expect(tracker.activeLockout(in: state) == state.lockedUntil)
+    }
+
+    @Test func monotonicFieldsSurviveStoreRoundTrip() throws {
+        let store = MemoryStore()
+        let clock = Clock()
+        for _ in 0..<5 { try make(store, clock).recordFailure() }
+        clock.current = clock.current.addingTimeInterval(3600)
+        clock.uptime += 5
+        let tracker = make(store, clock)
+        #expect(tracker.activeLockout(in: try tracker.state()) != nil)
+    }
+
+    @Test func recordWithoutMonotonicFieldsUsesWallClockOnly() throws {
+        let clock = Clock()
+        let tracker = make(MemoryStore(), clock)
+        let state = PinAttemptState(failures: 5, lockedUntil: clock.current.addingTimeInterval(30))
+        #expect(tracker.activeLockout(in: state) == state.lockedUntil)
+        clock.advance(31)
         #expect(tracker.activeLockout(in: state) == nil)
     }
 }

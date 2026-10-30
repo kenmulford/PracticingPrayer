@@ -38,6 +38,20 @@ private struct WriteFailure: Error {}
 
 @MainActor
 @Suite struct PrayerSessionTests {
+    @Test func holdsProtectedPrayersOnlyForHiddenCards() async throws {
+        try await withSession(titles: ["holdsProtectedVisible"]) { visible, database, _ in
+            #expect(!visible.holdsProtectedPrayers(database: database))
+            let preferences = AppPreferences(defaults: UserDefaults(suiteName: "PrayerSessionTests-\(UUID().uuidString)")!)
+            let card = try CardMutations(database: database, preferences: preferences)
+                .create(CardDraft(title: "Hidden holdsProtected", protectionMode: .hidden), now: .now)
+            let store = PrayerStore(database: database)
+            _ = try store.create(PrayerDraft(prayerCardId: card.id, title: "holdsProtectedSecret"), now: .now)
+            let items = try store.prayers(segment: .active, isSessionUnlocked: true)
+            let mixed = try #require(PrayerSession(items: items, database: database))
+            #expect(mixed.holdsProtectedPrayers(database: database))
+        }
+    }
+
     @Test func emptyListIsNil() async throws {
         try await withSession(titles: ["emptyListIsNil"]) { _, database, _ in
             #expect(PrayerSession(items: [], database: database) == nil)

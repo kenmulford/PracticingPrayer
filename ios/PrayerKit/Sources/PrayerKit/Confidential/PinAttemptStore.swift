@@ -4,15 +4,20 @@ import Security
 public struct PinAttemptState: Codable, Equatable, Sendable {
     public var failures: Int
     public var lockedUntil: Date?
+    /// Lockout length and the boot-relative monotonic reading when it was armed; they outlast wall-clock changes.
+    public var lockSeconds: Double?
+    public var armedMonotonic: Double?
 
     public static let cleared = PinAttemptState(failures: 0, lockedUntil: nil)
 
-    public init(failures: Int, lockedUntil: Date?) {
+    public init(failures: Int, lockedUntil: Date?, lockSeconds: Double? = nil, armedMonotonic: Double? = nil) {
         self.failures = failures
         self.lockedUntil = lockedUntil
+        self.lockSeconds = lockSeconds
+        self.armedMonotonic = armedMonotonic
     }
 
-    private enum CodingKeys: String, CodingKey { case failures, lockedUntil }
+    private enum CodingKeys: String, CodingKey { case failures, lockedUntil, lockSeconds, armedMonotonic }
 
     // Synthesized encoding omits a nil key; the stored record always carries "lockedUntil".
     public func encode(to encoder: Encoder) throws {
@@ -23,6 +28,8 @@ public struct PinAttemptState: Codable, Equatable, Sendable {
         } else {
             try container.encodeNil(forKey: .lockedUntil)
         }
+        try container.encodeIfPresent(lockSeconds, forKey: .lockSeconds)
+        try container.encodeIfPresent(armedMonotonic, forKey: .armedMonotonic)
     }
 }
 

@@ -39,6 +39,24 @@ private func withModel(
 
 @MainActor
 @Suite struct PrayerDetailModelTests {
+    @Test func reloadAfterRelockHidesProtectedPrayer() async throws {
+        try await withModel(title: "reloadAfterRelockHidesProtectedPrayer") { _, database, _, reconciler in
+            let card = try CardMutations(database: database, preferences: AppPreferences(defaults: UserDefaults(suiteName: "PrayerDetailModelTests-\(UUID().uuidString)")!))
+                .create(CardDraft(title: "Hidden reloadAfterRelock", protectionMode: .hidden), now: .now)
+            let id = try PrayerStore(database: database)
+                .create(PrayerDraft(prayerCardId: card.id, title: "secret"), now: .now)
+            var unlocked = true
+            let model = PrayerDetailModel(
+                prayerId: id, database: database, reminders: reconciler, isSessionUnlocked: { unlocked })
+            model.load()
+            #expect(model.phase == .loaded)
+            unlocked = false
+            model.load()
+            #expect(model.phase == .notFound)
+            #expect(model.prayer == nil)
+        }
+    }
+
     @Test func loadShowsPrayer() async throws {
         try await withModel(title: "loadShowsPrayer") { model, database, _, _ in
             let cardTitle = try database.cardList(isSessionUnlocked: false).sections

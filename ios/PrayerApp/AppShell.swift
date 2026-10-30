@@ -14,6 +14,7 @@ struct AppShell: View {
     @State private var notifiedPrayers: [PrayerListItem] = []
     @State private var coverWindow = PrivacyCoverWindow()
     @State private var isCovered = false
+    @State private var relockGeneration = 0
 
     var body: some View {
         Group {
@@ -73,6 +74,7 @@ struct AppShell: View {
         }
         .accessibilityHidden(isCovered)
         .onChange(of: scenePhase, initial: true) { _, phase in
+            if phase == .background { services.confidential.relock() }
             if phase == .active {
                 isCovered = false
                 coverWindow.hide()
@@ -99,8 +101,8 @@ struct AppShell: View {
             }
             #endif
         }
-        .onChange(of: scenePhase) { _, phase in
-            if phase == .background { services.confidential.relock() }
+        .onChange(of: services.confidential.isUnlocked) { _, unlocked in
+            if !unlocked { closeProtectedContent() }
         }
         .onChange(of: services.phase == .open && NotificationTapHandler.shared.hasPendingTap, initial: true) { _, ready in
             guard ready else { return }
@@ -122,6 +124,20 @@ struct AppShell: View {
                 services.inboundShare.enqueue(pending.payload, cardTitle: pending.cardTitle)
             }
         }
+    }
+
+    // Rebuilding the tab tree closes every editor, sheet and detail screen that may show protected content;
+    // the paths reset with it so no pushed screen outlives the lock.
+    private func closeProtectedContent() {
+        if let session = services.prayerSession, session.holdsProtectedPrayers(database: services.database) {
+            services.prayerSession = nil
+        }
+        homePath = []
+        cardsPath = []
+        prayersPath = []
+        tagsPath = []
+        settingsPath = []
+        relockGeneration += 1
     }
 
     // The App Group pickup joins the same FIFO as links and files, so one sheet presents every import.
@@ -180,7 +196,7 @@ struct AppShell: View {
             }
         }
         .tabViewStyle(.sidebarAdaptable)
-        .id(services.databaseGeneration)
+        .id(TabsIdentity(database: services.databaseGeneration, relock: relockGeneration))
         .onChange(of: services.databaseGeneration) {
             homePath = []
             cardsPath = []
@@ -206,6 +222,11 @@ struct AppShell: View {
             NavigationStack(path: $settingsPath) { SettingsView() }
         }
     }
+}
+
+private struct TabsIdentity: Hashable {
+    let database: Int
+    let relock: Int
 }
 
 private struct ProminentLabel: ViewModifier {

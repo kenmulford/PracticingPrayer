@@ -122,7 +122,7 @@ struct CollectionsView: View {
     private func delete(_ target: CardBoxRecord, _ option: CollectionDeleteOption) async {
         var verified = false
         if CollectionEditorModel.requiresOwnerVerificationToDelete(target) {
-            guard await services.confidential.authenticate(reason: "Delete protected collection") else { return }
+            guard await services.confidential.verifyOwner(reason: "Delete protected collection") else { return }
             verified = true
         }
         do {

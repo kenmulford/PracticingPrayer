@@ -130,7 +130,7 @@ struct CardEditorView: View {
     private func save() async {
         var verified = false
         if model.requiresOwnerVerification {
-            guard await services.confidential.authenticate(reason: "Change card protection") else { return }
+            guard await services.confidential.verifyOwner(reason: "Change card protection") else { return }
             verified = true
         }
         run(.saved) { model.save(ownerVerified: verified) }

@@ -92,7 +92,9 @@ extension PrayerTimeLauncher {
         let visible = try items(for: scope, isSessionUnlocked: false)
         let unlocked = try items(for: scope, isSessionUnlocked: true)
         if Set(visible.map(\.record.id)) == Set(unlocked.map(\.record.id)) { return visible }
-        let allowed = await session.verifyOwner(reason: "Start Prayer Time with protected prayers")
+        let reason: LocalizedStringResource = "Start Prayer Time with protected prayers"
+        // Locked sessions unlock on success (the prompt doubles as the unlock); unlocked ones re-verify without changing state.
+        let allowed = session.isUnlocked ? await session.verifyOwner(reason: reason) : await session.authenticate(reason: reason)
         return allowed ? unlocked : visible
     }
 }

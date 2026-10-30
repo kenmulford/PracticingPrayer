@@ -59,6 +59,13 @@ final class PrayerSession: Identifiable {
             reconcile: reconcile)
     }
 
+    /// True when any prayer would be hidden by a locked session; a read failure counts as protected.
+    func holdsProtectedPrayers(database: PrayerDatabase) -> Bool {
+        let visible = (try? PrayerStore(database: database).prayers(segment: .all, isSessionUnlocked: false))
+            .map { Set($0.map(\.record.id)) } ?? []
+        return items.contains { !visible.contains($0.record.id) }
+    }
+
     func isAnswered(_ item: PrayerListItem) -> Bool {
         answeredIds.contains(item.record.id) || item.record.isAnswered
     }

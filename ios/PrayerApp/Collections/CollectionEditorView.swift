@@ -80,7 +80,7 @@ struct CollectionEditorView: View {
     private func save() async {
         var verified = false
         if model.requiresOwnerVerification {
-            guard await services.confidential.authenticate(reason: "Change collection protection") else { return }
+            guard await services.confidential.verifyOwner(reason: "Change collection protection") else { return }
             verified = true
         }
         if model.save(ownerVerified: verified) { finish() }
@@ -90,7 +90,7 @@ struct CollectionEditorView: View {
         failureTitle = "Couldn't Delete"
         var verified = false
         if model.requiresOwnerVerificationToDelete {
-            guard await services.confidential.authenticate(reason: "Delete protected collection") else { return }
+            guard await services.confidential.verifyOwner(reason: "Delete protected collection") else { return }
             verified = true
         }
         if model.delete(option: option, ownerVerified: verified) {

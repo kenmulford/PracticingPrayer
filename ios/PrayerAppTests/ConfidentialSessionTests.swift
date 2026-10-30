@@ -50,6 +50,23 @@ private final class CountingAuthenticator: DeviceOwnerAuthenticating {
         #expect(session.isUnlocked)
     }
 
+    @Test func verifyOwnerPromptsEvenWhenUnlocked() async {
+        let authenticator = CountingAuthenticator(.success)
+        let session = ConfidentialSession(authenticator: authenticator)
+        #expect(await session.authenticate(reason: "Open protected card"))
+        #expect(await session.verifyOwner(reason: "Change card protection"))
+        #expect(authenticator.calls == 2)
+    }
+
+    @Test func verifyOwnerUsesPinFallbackWithoutPasscode() async {
+        let session = ConfidentialSession(authenticator: CountingAuthenticator(.passcodeNotSet))
+        var asked = 0
+        session.pinFallback = { asked += 1; return true }
+        #expect(await session.verifyOwner(reason: "Change card protection"))
+        #expect(asked == 1)
+        #expect(!session.isUnlocked)
+    }
+
     @Test func relockClearsUnlock() async {
         let session = ConfidentialSession(authenticator: CountingAuthenticator(.success))
         #expect(await session.authenticate(reason: "Open protected card"))

@@ -23,11 +23,12 @@ struct PrayerDetailView<CardLink: Hashable>: View {
         .task(id: prayerId) {
             let loaded = PrayerDetailModel(
                 prayerId: prayerId, database: services.database, reminders: services.reminders,
-                isSessionUnlocked: services.confidential.isUnlocked)
+                isSessionUnlocked: { services.confidential.isUnlocked })
             loaded.load()
             model = loaded
         }
         .onAppear { model?.load() }
+        .onChange(of: services.confidential.isUnlocked) { model?.load() }
     }
 
     @ViewBuilder

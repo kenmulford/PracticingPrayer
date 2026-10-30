@@ -34,6 +34,23 @@ private func ids(_ model: HomeListModel) -> [Int64] {
 
 @MainActor
 @Suite struct HomeListModelTests {
+    @Test func reloadFollowsLiveUnlockState() async throws {
+        try await withModel(scope: .unanswered) { _, database in
+            let card = try CardMutations(database: database, preferences: AppPreferences(defaults: UserDefaults(suiteName: "HomeListModelTests-\(UUID().uuidString)")!))
+                .create(CardDraft(title: "Hidden reloadFollowsLiveUnlockState", protectionMode: .hidden), now: .now)
+            let id = try PrayerStore(database: database)
+                .create(PrayerDraft(prayerCardId: card.id, title: "reloadFollowsLiveUnlockState"), now: .now)
+            var unlocked = true
+            let model = HomeListModel(
+                scope: .unanswered, database: database, overdueDayThreshold: 30, isSessionUnlocked: { unlocked })
+            model.load()
+            #expect(ids(model).contains(id))
+            unlocked = false
+            model.load()
+            #expect(!ids(model).contains(id))
+        }
+    }
+
     @Test func overdueMatchesStoreOrder() async throws {
         try await withModel(scope: .overdue) { model, database in
             let expected = try database.overduePrayers(now: .now, overdueDayThreshold: 30, isSessionUnlocked: false)

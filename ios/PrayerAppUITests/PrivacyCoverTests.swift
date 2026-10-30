@@ -21,6 +21,6 @@ final class PrivacyCoverTests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.tabBars.buttons["Home"].waitForExistence(timeout: 15)
             || app.buttons["Home"].firstMatch.waitForExistence(timeout: 15))
-        XCTAssertFalse(app.otherElements["PrivacyCover"].exists)
+        XCTAssertFalse(app.otherElements["PrivacyCover_Root"].exists)
     }
 }
