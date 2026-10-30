@@ -54,8 +54,8 @@ public class UpgradeGateSeedTests
         }
         toggle.Click();
 
-        // A re-run on a simulator that kept the earlier grant shows no alert; 1.7.2 turns the toggle off on a denial,
-        // so the toggle staying on is the grant check in both cases.
+        // The system alert may already have been answered earlier in the session, so an alert is accepted when one
+        // shows; upgrade-gate.sh reads the authorization status from the simulator and fails when it is not granted.
         var deadline = DateTime.UtcNow.AddSeconds(10);
         while (!driver.IsAlertPresent() && DateTime.UtcNow < deadline) Thread.Sleep(TestConfig.DelayShortSettle);
         if (driver.IsAlertPresent())
@@ -63,6 +63,7 @@ public class UpgradeGateSeedTests
             driver.SwitchTo().Alert().Accept();
             Thread.Sleep(TestConfig.DelayAfterDismiss);
         }
+        Assert.False(driver.IsAlertPresent(), "notification permission alert is still showing after Accept");
         Assert.Equal("1", driver.FindByAutomationId("AppSettings_Switch_Notifications").GetAttribute("value"));
     }
 

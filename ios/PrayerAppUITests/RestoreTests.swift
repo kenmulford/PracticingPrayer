@@ -34,7 +34,7 @@ final class RestoreTests: XCTestCase {
         let app = try openBackup()
         app.buttons["backup.restore"].firstMatch.tap()
         XCTAssertTrue(app.alerts["Restore Backup?"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.alerts.buttons["Restore"].exists)
+        XCTAssertTrue(app.alerts.buttons["backup.restoreConfirm"].firstMatch.exists)
         app.alerts.buttons["Cancel"].tap()
         XCTAssertFalse(app.alerts["Restore Backup?"].exists)
     }
@@ -42,7 +42,7 @@ final class RestoreTests: XCTestCase {
     func testInvalidFileShowsRestoreFailed() throws {
         let app = try openBackup(importing: repoRoot.appendingPathComponent("ios/PrayerAppUITests/Fixtures/not-a-backup.pcrd"))
         app.buttons["backup.restore"].firstMatch.tap()
-        app.alerts.buttons["Restore"].tap()
+        app.alerts.buttons["backup.restoreConfirm"].firstMatch.tap()
         XCTAssertTrue(app.alerts["Restore Failed"].waitForExistence(timeout: 10))
         app.alerts.buttons["OK"].tap()
     }
@@ -50,7 +50,7 @@ final class RestoreTests: XCTestCase {
     func testRestoreLandsOnHome() throws {
         let app = try openBackup(importing: repoRoot.appendingPathComponent("contracts/backup/maui-made.pcrd"))
         app.buttons["backup.restore"].firstMatch.tap()
-        app.alerts.buttons["Restore"].tap()
+        app.alerts.buttons["backup.restoreConfirm"].firstMatch.tap()
         XCTAssertTrue(app.buttons["Home"].firstMatch.waitForExistence(timeout: 20))
         XCTAssertTrue(app.buttons["Home"].firstMatch.isSelected)
     }

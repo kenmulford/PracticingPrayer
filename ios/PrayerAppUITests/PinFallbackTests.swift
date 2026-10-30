@@ -38,7 +38,7 @@ final class PinFallbackTests: XCTestCase {
         field.tap()
         field.typeText(title)
         app.buttons["Locked"].firstMatch.tap()
-        app.buttons["CardEditor_Confirm"].tap()
+        app.buttons["CardEditor_Confirm"].firstMatch.tap()
         XCTAssertTrue(app.navigationBars["New Card"].waitForNonExistence(timeout: 10))
     }
 
@@ -63,7 +63,7 @@ final class PinFallbackTests: XCTestCase {
             field.tap()
             field.typeText("123456")
         }
-        app.buttons["SetPin_Save"].tap()
+        app.buttons["SetPin_Save"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts[title].waitForExistence(timeout: 10), "title not revealed after Set PIN")
 
         tapMoreItem(app, "Hide Confidential")

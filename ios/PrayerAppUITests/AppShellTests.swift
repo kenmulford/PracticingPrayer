@@ -59,7 +59,7 @@ final class AppShellTests: XCTestCase {
     func testOpenFailureShowsTryAgain() {
         let app = launch(databasePath: "/nonexistent/prayer_app.db")
         XCTAssertTrue(app.staticTexts["Can't Open Your Prayers"].waitForExistence(timeout: 15))
-        let retry = app.buttons["Try Again"]
+        let retry = app.buttons["Try Again"].firstMatch
         XCTAssertTrue(retry.exists)
         for name in Self.tabs {
             XCTAssertFalse(tabButton(app, name).exists, "\(name) tab button should not exist")

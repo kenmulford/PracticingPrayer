@@ -71,10 +71,7 @@ struct CardsView: View {
                     CardsToolbar(
                         tags: tags,
                         selectedTagIds: $selectedTagIds,
-                        addCard: {
-                            isAddingCard = true
-                            services.onboarding.advance(from: .addCard)
-                        },
+                        addCard: addCard,
                         manageCollections: { selection = .manageCollections },
                         isUnlocked: isSessionUnlocked,
                         toggleConfidential: services.confidential.toggle,
@@ -187,10 +184,13 @@ struct CardsView: View {
                         Button("Clear Filter") { selectedTagIds = [] }
                     }
                 } else {
-                    ContentUnavailableView {
-                        Label("No Prayer Cards", systemImage: "rectangle.stack")
-                    } actions: {
-                        Button("Add Card") { isAddingCard = true }
+                    VStack {
+                        addCardTipView.padding(.horizontal)
+                        ContentUnavailableView {
+                            Label("No Prayer Cards", systemImage: "rectangle.stack")
+                        } actions: {
+                            Button("Add Card", action: addCard)
+                        }
                     }
                 }
             case .success(let list):
@@ -235,8 +235,21 @@ struct CardsView: View {
         .environment(\.editMode, .constant(.active))
     }
 
+    private func addCard() {
+        isAddingCard = true
+        services.onboarding.advance(from: .addCard)
+    }
+
+    @ViewBuilder
+    private var addCardTipView: some View {
+        if let tip = services.onboarding.tips.currentTip as? AddCardTip {
+            TipView(tip, arrowEdge: .top)
+        }
+    }
+
     private func browsingList(_ list: CardList) -> some View {
         List(selection: $selection) {
+            addCardTipView.selectionDisabled()
             if !bannerDismissed {
                 TipView(tip) { action in
                     if action.id == "manage-collections" {

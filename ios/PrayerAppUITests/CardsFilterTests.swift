@@ -19,6 +19,9 @@ final class CardsFilterTests: XCTestCase {
             var message: UnsafeMutablePointer<CChar>?
             let result = sqlite3_exec(handle, statement, nil, nil, &message)
             XCTAssertEqual(result, SQLITE_OK, "\(statement): \(message.map { String(cString: $0) } ?? "")")
+            if statement.hasPrefix("UPDATE") {
+                XCTAssertGreaterThan(sqlite3_changes(handle), 0, "\(statement) changed no rows")
+            }
             sqlite3_free(message)
         }
     }
@@ -127,10 +130,12 @@ final class CardsFilterTests: XCTestCase {
 
     private func openMenu(_ app: XCUIApplication) -> XCUIElementQuery {
         XCTAssertTrue(filterButton(app).waitForExistence(timeout: 10), "Filter button missing")
+        let framesBefore = app.collectionViewFrames()
         filterButton(app).tap()
-        // The menu is the narrowest collection view (224 pt, against the 320 pt sidebar list).
-        let menu = app.collectionViews.allElementsBoundByIndex.min { $0.frame.width < $1.frame.width }!
-        XCTAssertTrue(menu.cells.firstMatch.waitForExistence(timeout: 5), "menu did not open")
+        guard let menu = app.openedMenuCollectionView(excluding: framesBefore) else {
+            XCTFail("menu did not open")
+            return app.collectionViews.matching(identifier: "menu.missing").cells
+        }
         return menu.cells
     }
 
@@ -186,18 +191,22 @@ final class CardsFilterTests: XCTestCase {
         XCTAssertTrue(element(app, labelStartingWith: "Alpha \(test)").waitForExistence(timeout: 10))
     }
 
-    func testNoTagsDisablesFilter() throws {
+    func testOnlySystemTagKeepsFilterEnabled() throws {
+        // Opening the database seeds the Recently Notified system tag, so the tag list is never empty.
         let app = launch(
             database: try prepareDatabase(["DELETE FROM PrayerCardTag", "DELETE FROM PrayerTag"]),
             arguments: standardArguments())
         waitForList(app)
         XCTAssertTrue(filterButton(app).waitForExistence(timeout: 10))
-        XCTAssertFalse(filterButton(app).isEnabled)
+        XCTAssertTrue(filterButton(app).isEnabled)
+        XCTAssertEqual(openMenu(app).count, 1, "the menu offers only Recently Notified")
     }
 
     func testTagLoadFailureDisablesFilterKeepsList() throws {
+        // Schema upkeep recreates a dropped table on open, so the fault is a row whose date cannot decode.
         let app = launch(
-            database: try prepareDatabase(["DR" + "OP TABLE PrayerTag"]), arguments: standardArguments())
+            database: try prepareDatabase(["UPDATE PrayerTag SET CreatedAt = NULL WHERE Name = 'Work'"]),
+            arguments: standardArguments())
         waitForList(app)
         XCTAssertTrue(filterButton(app).waitForExistence(timeout: 10))
         XCTAssertFalse(filterButton(app).isEnabled)

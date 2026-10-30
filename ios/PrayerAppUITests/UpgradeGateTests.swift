@@ -21,14 +21,14 @@ final class UpgradeGateTests: XCTestCase {
         app.launchEnvironment["CONFIDENTIAL_AUTH_STUB"] = "passcodeNotSet"
         app.launch()
 
-        let cancel = app.buttons["QuickAdd_Cancel"]
+        let cancel = app.buttons["QuickAdd_Cancel"].firstMatch
         XCTAssertTrue(cancel.waitForExistence(timeout: 30), "Confirm Import not shown")
         let imported = app.descendants(matching: .any).matching(
             NSPredicate(format: "label CONTAINS %@ OR value CONTAINS %@", importText, importText)).firstMatch
         XCTAssertTrue(imported.waitForExistence(timeout: 10), "import text not shown")
         XCTAssertFalse(app.staticTexts["Welcome to Practicing Prayer"].exists, "Welcome shown after upgrade")
         cancel.tap()
-        XCTAssertTrue(app.buttons["Home_PrayerTimeButton"].waitForExistence(timeout: 15), "Home missing")
+        XCTAssertTrue(app.buttons["Home_PrayerTimeButton"].firstMatch.waitForExistence(timeout: 15), "Home missing")
         assertNoTips(app, on: "Home")
         openCards(app)
         assertNoTips(app, on: "Cards")

@@ -1,6 +1,7 @@
 import Observation
 import PrayerKit
 import SwiftUI
+import TipKit
 
 @Observable
 final class HomeModel {
@@ -102,7 +103,7 @@ struct HomeView: View {
         .controlSize(.large)
         .disabled(model.metrics.unanswered == 0)
         .accessibilityIdentifier("Home_PrayerTimeButton")
-        .onboardingTip(.prayerTime)
+        .popoverTip(services.onboarding.tips.currentTip as? PrayerTimeTip)
         .prayerTimeLauncher(isPresented: $showingPrayerTime)
     }
 

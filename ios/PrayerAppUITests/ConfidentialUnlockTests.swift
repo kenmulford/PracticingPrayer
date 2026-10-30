@@ -37,7 +37,7 @@ final class ConfidentialUnlockTests: XCTestCase {
         field.tap()
         field.typeText(title)
         app.buttons["Locked"].firstMatch.tap()
-        app.buttons["CardEditor_Confirm"].tap()
+        app.buttons["CardEditor_Confirm"].firstMatch.tap()
         XCTAssertTrue(app.navigationBars["New Card"].waitForNonExistence(timeout: 10))
     }
 

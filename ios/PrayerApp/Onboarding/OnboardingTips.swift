@@ -31,22 +31,3 @@ struct PrayerTimeTip: Tip {
     var rules: [Rule] { #Rule(Self.$isActive) { $0 == true } }
 }
 
-private struct OnboardingTipModifier: ViewModifier {
-    @Environment(OnboardingCoordinator.self) private var onboarding
-    let stage: OnboardingStage
-
-    func body(content: Content) -> some View {
-        switch stage {
-        case .addCard: content.popoverTip(onboarding.tips.currentTip as? AddCardTip)
-        case .addPrayer: content.popoverTip(onboarding.tips.currentTip as? AddPrayerTip)
-        case .prayerTime: content.popoverTip(onboarding.tips.currentTip as? PrayerTimeTip)
-        case .welcome, .complete: content
-        }
-    }
-}
-
-extension View {
-    func onboardingTip(_ stage: OnboardingStage) -> some View {
-        modifier(OnboardingTipModifier(stage: stage))
-    }
-}

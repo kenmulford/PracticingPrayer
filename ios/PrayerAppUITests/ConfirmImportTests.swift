@@ -25,14 +25,14 @@ final class ConfirmImportTests: XCTestCase {
         XCTAssertTrue(existing.waitForExistence(timeout: 15))
         existing.tap()
         app.buttons["QuickAdd_CardRow"].tap()
-        let general = app.staticTexts["General"].firstMatch
+        let general = app.buttons["General"].firstMatch
         XCTAssertTrue(general.waitForExistence(timeout: 5))
         general.tap()
 
         XCTAssertTrue(app.staticTexts["Already on This Card (1)"].waitForExistence(timeout: 5))
         app.buttons["ConfirmImport_AddBack"].tap()
-        app.buttons["QuickAdd_Confirm"].tap()
-        let cancel = app.buttons["QuickAdd_Cancel"]
+        app.buttons["QuickAdd_Confirm"].firstMatch.tap()
+        let cancel = app.buttons["QuickAdd_Cancel"].firstMatch
         XCTAssertTrue(cancel.waitForNonExistence(timeout: 10))
     }
 }

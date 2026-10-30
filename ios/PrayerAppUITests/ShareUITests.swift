@@ -32,7 +32,7 @@ final class ShareUITests: XCTestCase {
     private func launch(database: URL, tab name: String) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchEnvironment["PRAYER_DB_PATH"] = database.path
-        app.launchArguments = ["-ResetTips", "-CollectionsBannerDismissed", "YES"]
+        app.launchArguments = ["-ResetTips", "-CollectionsBannerDismissed", "YES", "-ExpandedSectionIds", "0"]
         app.launch()
         let tab = app.tabBars.buttons[name].exists ? app.tabBars.buttons[name] : app.buttons[name].firstMatch
         XCTAssertTrue(tab.waitForExistence(timeout: 20), "\(name) tab missing")
@@ -79,7 +79,7 @@ final class ShareUITests: XCTestCase {
         let element = row(app, "Card ShareMore")
         XCTAssertTrue(element.waitForExistence(timeout: 20), "card row missing")
         element.tap()
-        let more = app.buttons["More"].firstMatch
+        let more = app.navigationBars["Card ShareMore"].buttons["More"]
         XCTAssertTrue(more.waitForExistence(timeout: 10), "More missing")
         more.tap()
         XCTAssertTrue(app.buttons["Share"].firstMatch.waitForExistence(timeout: 5), "Share missing in More")
@@ -90,7 +90,7 @@ final class ShareUITests: XCTestCase {
         let element = row(app, "Card ShareEmpty")
         XCTAssertTrue(element.waitForExistence(timeout: 20), "card row missing")
         element.tap()
-        let more = app.buttons["More"].firstMatch
+        let more = app.navigationBars["Card ShareEmpty"].buttons["More"]
         XCTAssertTrue(more.waitForExistence(timeout: 10), "More missing")
         more.tap()
         let share = app.buttons["Share"].firstMatch

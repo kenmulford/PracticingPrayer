@@ -132,7 +132,7 @@ final class CardEditorTests: XCTestCase {
         waitForList(app)
         app.buttons["Add Card"].firstMatch.tap()
         XCTAssertTrue(app.navigationBars["New Card"].waitForExistence(timeout: 10))
-        let save = app.buttons["CardEditor_Confirm"]
+        let save = app.buttons["CardEditor_Confirm"].firstMatch
         XCTAssertFalse(save.isEnabled, "Save must be disabled until a title is entered")
         let field = app.textFields["CardEditor_Title"]
         field.tap()
@@ -151,7 +151,7 @@ final class CardEditorTests: XCTestCase {
         let field = app.textFields["CardEditor_Title"]
         field.tap()
         field.typeText("EditorAnother")
-        app.buttons["CardEditor_SaveAndAdd"].tap()
+        app.buttons["CardEditor_SaveAndAdd"].firstMatch.tap()
         XCTAssertTrue(app.navigationBars["New Card"].exists, "sheet must stay open")
         let cleared = NSPredicate(format: "value == %@ OR value == %@", "", "Title")
         let wait = XCTNSPredicateExpectation(predicate: cleared, object: field)
@@ -188,7 +188,7 @@ final class CardEditorTests: XCTestCase {
             XCTAssertTrue(app.staticTexts[message].exists, "missing: \(message)")
             if index < cases.count - 1 {
                 dismissPopover(app)
-                app.buttons["CardEditor_Cancel"].tap()
+                app.buttons["CardEditor_Cancel"].firstMatch.tap()
                 XCTAssertTrue(app.navigationBars["Edit Card"].waitForNonExistence(timeout: 5))
             } else {
                 let confirm = app.buttons.matching(NSPredicate(format: "label == %@", "Delete Card")).allElementsBoundByIndex.last
@@ -205,7 +205,7 @@ final class CardEditorTests: XCTestCase {
         let field = app.textFields["CardEditor_Title"]
         field.tap()
         field.typeText("X")
-        app.buttons["CardEditor_Cancel"].tap()
+        app.buttons["CardEditor_Cancel"].firstMatch.tap()
         XCTAssertTrue(app.buttons["Discard Changes"].firstMatch.waitForExistence(timeout: 5))
     }
 }

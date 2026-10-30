@@ -76,7 +76,7 @@ final class TagEditorTests: XCTestCase {
     func testNewTagCreatesRow() throws {
         let app = launch(database: try prepareDatabase())
         clearAndTypeText("Tag EditorTestsNew", in: openNewTag(app))
-        app.buttons["TagEditor_Confirm"].tap()
+        app.buttons["TagEditor_Confirm"].firstMatch.tap()
         XCTAssertTrue(row(app, "Tag EditorTestsNew").waitForExistence(timeout: 10))
     }
 
@@ -95,7 +95,7 @@ final class TagEditorTests: XCTestCase {
         let field = app.textFields["TagEditor_Name"]
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         clearAndTypeText("Tag EditorTestsRenamed", in: field)
-        app.buttons["TagEditor_Confirm"].tap()
+        app.buttons["TagEditor_Confirm"].firstMatch.tap()
         XCTAssertTrue(row(app, "Tag EditorTestsRenamed").waitForExistence(timeout: 10))
     }
 

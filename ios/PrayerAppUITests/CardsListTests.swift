@@ -26,6 +26,9 @@ final class CardsListTests: XCTestCase {
             var message: UnsafeMutablePointer<CChar>?
             let result = sqlite3_exec(handle, statement, nil, nil, &message)
             XCTAssertEqual(result, SQLITE_OK, "\(statement): \(message.map { String(cString: $0) } ?? "")")
+            if statement.hasPrefix("UPDATE") {
+                XCTAssertGreaterThan(sqlite3_changes(handle), 0, "\(statement) changed no rows")
+            }
             sqlite3_free(message)
         }
         return copy
@@ -189,7 +192,8 @@ final class CardsListTests: XCTestCase {
     }
 
     func testLoadFailureShowsTryAgain() throws {
-        let database = try prepareDatabase(["DR" + "OP TABLE PrayerCardTag"])
+        // Schema upkeep recreates a dropped table on open, so the fault is a row whose date cannot decode.
+        let database = try prepareDatabase(["UPDATE PrayerCardTag SET CreatedAt = NULL"])
         let app = launch(database: database, arguments: standardArguments(expanded: "0"))
         XCTAssertTrue(app.staticTexts["Can't Load Prayer Cards"].waitForExistence(timeout: 20))
         XCTAssertTrue(app.buttons["Try Again"].exists)

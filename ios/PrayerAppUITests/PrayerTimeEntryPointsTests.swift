@@ -53,6 +53,7 @@ final class PrayerTimeEntryPointsTests: XCTestCase {
         let database = try prepareDatabase([insertCard(card), insertRequest(for: card, "Pray request")])
         let app = XCUIApplication()
         app.launchEnvironment["PRAYER_DB_PATH"] = database.path
+        app.launchArguments = ["-ExpandedSectionIds", "0"]
         app.launch()
         let tab = app.cardsTab
         XCTAssertTrue(tab.waitForExistence(timeout: 20), "Cards tab missing")

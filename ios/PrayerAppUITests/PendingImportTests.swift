@@ -31,7 +31,7 @@ final class PendingImportTests: XCTestCase {
         app.launchEnvironment["PENDING_IMPORT_DIR"] = dir.path
         app.launch()
 
-        let cancel = app.buttons["QuickAdd_Cancel"]
+        let cancel = app.buttons["QuickAdd_Cancel"].firstMatch
         XCTAssertTrue(cancel.waitForExistence(timeout: 15))
         XCTAssertFalse(FileManager.default.fileExists(atPath: payload.path))
         cancel.tap()
