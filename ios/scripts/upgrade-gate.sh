@@ -143,6 +143,14 @@ echo "recorded: $EXPECTED"
 if [ "$CARDS" = 0 ] && [ "$PRAYERS" = 0 ] && [ "$TAGS" = 0 ] && [ "$BOXES" = 0 ]; then
   fail "no prior install"
 fi
+REMINDERS="$(sqlite3 -separator ':' "$DB" "select Id, PrayerFrequency, ifnull(NotifyHour,''), ifnull(NotifyMinute,''), ifnull(NotifyDayOfWeek,''), ifnull(NotifyDayOfMonth,''), ifnull(NotifyDate,'') from PrayerRequest where Title like '% UpgradeGate' order by Id" | paste -sd ';' -)"
+[ "$(sqlite3 "$DB" "select count(*) from PrayerRequest where Title like '% UpgradeGate'")" = 5 ] || fail "seed missing reminder prayers"
+echo "recorded reminders: $REMINDERS"
+
+APP_GROUP="$(xcrun simctl get_app_container "$SIM" "$BUNDLE_ID" groups | awk -F'\t' '$1 == "group.com.multithreadedllc.prayercards" {print $2}')"
+[ -n "$APP_GROUP" ] || fail "app group container missing"
+cp "$ROOT/contracts/app-group/pending-import.golden.json" "$APP_GROUP/pending-import.json"
+IMPORT_TEXT="$(plutil -extract raw raw -o - "$APP_GROUP/pending-import.json" | head -n 1)"
 
 step "install native app over $OLD_TAG"
 xcrun simctl install "$SIM" "$NATIVE_APP"
@@ -153,7 +161,10 @@ xcrun simctl spawn "$SIM" log stream --level debug \
   --predicate 'process == "PrayerApp" OR subsystem == "com.multithreadedllc.prayercards"' >"$GATE_DIR/gate-app.log" 2>&1 &
 LOG_PID=$!
 # xcodebuild can hang after the suite result prints, so the log is polled and the process killed after a grace period.
-TEST_RUNNER_UPGRADE_GATE_EXPECTED="$EXPECTED" xcodebuild test-without-building \
+TEST_RUNNER_UPGRADE_GATE_EXPECTED="$EXPECTED" \
+TEST_RUNNER_UPGRADE_GATE_REMINDERS="$REMINDERS" \
+TEST_RUNNER_UPGRADE_GATE_IMPORT_TEXT="$IMPORT_TEXT" \
+xcodebuild test-without-building \
   -project "$ROOT/ios/PrayerApp.xcodeproj" -scheme PrayerApp -configuration Debug \
   -destination "platform=iOS Simulator,name=$SIM,OS=$SIM_OS" \
   -derivedDataPath "$DERIVED" \
@@ -190,7 +201,7 @@ if grep -q "Test Suite 'UpgradeGateTests' passed" "$XCODE_LOG"; then
 fi
 
 if grep -q "error:" "$XCODE_LOG"; then
-  grep -E "error:" "$XCODE_LOG" | cut -c1-600
+  grep -m1 -E "error:" "$XCODE_LOG" | cut -c1-600
 else
   tail -30 "$XCODE_LOG" >&2
 fi

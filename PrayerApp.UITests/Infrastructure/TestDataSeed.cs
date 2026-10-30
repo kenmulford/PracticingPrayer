@@ -115,6 +115,7 @@ internal static class TestDataSeed
         {
             await BuildSeedDbAsync(tempPath);
             await PushSeedToSimulatorAsync(tempPath);
+            if (IsUpgradeGate) await SeedUpgradeGatePreferencesAsync();
         }
         catch (Exception ex)
         {
@@ -150,6 +151,7 @@ internal static class TestDataSeed
 
         // Layer on UITest-specific baseline data.
         await SeedUITestContentAsync();
+        if (IsUpgradeGate) await SeedUpgradeGateContentAsync();
 
         await db.CloseAsync();
     }
@@ -297,6 +299,67 @@ internal static class TestDataSeed
         // Cards_SaveAndNew_CreatesTwoCardsInCollection: saves two new cards into this empty collection.
         var saveAndNewCol = new CardBox { Name = TestSeedFixtures.SaveAndNewCollection, IsSystem = false, SortOrder = 0, CreatedAt = now, UpdatedAt = now };
         await saveAndNewCol.SaveAsync();
+    }
+
+    // The shared suite must not see a PIN card, reminders, or non-default settings, so these run only for ios/scripts/upgrade-gate.sh.
+    private static bool IsUpgradeGate => Environment.GetEnvironmentVariable("UPGRADE_GATE") == "1";
+
+    private static async Task SeedUpgradeGateContentAsync()
+    {
+        var now = DateTime.Now;
+        var reminderCard = new PrayerCard { Title = "UpgradeGate Reminders", BoxId = 0, CreatedAt = now, UpdatedAt = now };
+        await reminderCard.SaveAsync();
+
+        foreach (var frequency in Enum.GetValues<PrayerFrequency>())
+        {
+            var prayer = new Prayer
+            {
+                PrayerCardId = reminderCard.Id,
+                Title = $"{frequency} UpgradeGate",
+                CanNotify = true,
+                PrayerFrequency = frequency,
+                NotifyHour = 7,
+                NotifyMinute = 30,
+                CreatedAt = now,
+                UpdatedAt = now,
+            };
+            if (frequency == PrayerFrequency.Weekly) prayer.NotifyDayOfWeek = 3;
+            if (frequency == PrayerFrequency.Monthly) prayer.NotifyDayOfMonth = 15;
+            if (frequency is PrayerFrequency.OneTime or PrayerFrequency.Yearly) prayer.NotifyDate = DateTime.Today.AddDays(30);
+            await prayer.SaveAsync();
+        }
+
+        var confidential = new PrayerCard
+        {
+            Title = "UpgradeGate Confidential",
+            BoxId = 0,
+            ProtectionMode = CardProtectionMode.LockedVisible,
+            CreatedAt = now,
+            UpdatedAt = now,
+        };
+        await confidential.SaveAsync();
+    }
+
+    // Keys and types mirror the MAUI Preferences the native AppPreferences reads (OnboardingComplete is set the same way in PreSeedOnboardingCompleteAsync).
+    private static async Task SeedUpgradeGatePreferencesAsync()
+    {
+        var udid = TestConfig.IOSUdid;
+        var bundleId = TestConfig.IOSBundleId;
+        foreach (var setting in new[]
+        {
+            "AutoModeIntervalSeconds -int 45",
+            "OverdueDayThreshold -int 14",
+            "DefaultNotifyHour -int 7",
+            "DefaultNotifyMinute -int 30",
+            "CollectionsBannerDismissed -bool YES",
+            "PrayerTimeLandscape -bool NO",
+            "ShareHandoffPrompted -bool YES",
+            "OnboardingComplete -bool YES",
+            "OnboardingStep -string Complete",
+        })
+        {
+            await RunSimctlAsync($"spawn {udid} defaults write {bundleId} {setting}");
+        }
     }
 
     private static async Task SeedCardWithPrayersAsync(int boxId, string cardTitle,
