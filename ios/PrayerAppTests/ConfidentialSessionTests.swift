@@ -56,4 +56,17 @@ private final class CountingAuthenticator: DeviceOwnerAuthenticating {
         session.relock()
         #expect(!session.isUnlocked)
     }
+
+    @Test func successAndFailedNeverCallPinFallback() async {
+        for outcome in [DeviceOwnerAuthOutcome.success, .failed] {
+            let session = ConfidentialSession(authenticator: CountingAuthenticator(outcome))
+            var fallbackCalls = 0
+            session.pinFallback = {
+                fallbackCalls += 1
+                return true
+            }
+            _ = await session.authenticate(reason: "Open protected card")
+            #expect(fallbackCalls == 0)
+        }
+    }
 }

@@ -60,6 +60,9 @@
     "%lld of %lld" : {
 
     },
+    "%lld of 6 digits entered" : {
+
+    },
     "%lld prayers saved" : {
 
     },
@@ -338,6 +341,9 @@
     "Confidential cards unlocked" : {
 
     },
+    "Confirm PIN" : {
+
+    },
     "Continue Unencrypted" : {
 
     },
@@ -363,6 +369,9 @@
 
     },
     "Couldn't create the tag." : {
+
+    },
+    "Couldn't verify PIN. Try again." : {
 
     },
     "Create %@" : {
@@ -520,6 +529,9 @@
     "Edit Tag" : {
 
     },
+    "Enter PIN" : {
+
+    },
     "Enter the backup passphrase" : {
 
     },
@@ -587,6 +599,9 @@
 
     },
     "Imported" : {
+
+    },
+    "Incorrect PIN. %lld attempts left." : {
 
     },
     "Interval" : {
@@ -799,6 +814,12 @@
         }
       }
     },
+    "PIN" : {
+
+    },
+    "PINs don't match." : {
+
+    },
     "Passphrase" : {
 
     },
@@ -934,10 +955,10 @@
     "Restore Backup?" : {
 
     },
-    "Restore complete" : {
+    "Restore Failed" : {
 
     },
-    "Restore Failed" : {
+    "Restore complete" : {
 
     },
     "Restore failed. Please restart the app." : {
@@ -992,6 +1013,9 @@
 
     },
     "Send Diagnostic Info" : {
+
+    },
+    "Set PIN" : {
 
     },
     "Settings" : {
@@ -1110,6 +1134,12 @@
 
     },
     "Title" : {
+
+    },
+    "Too many attempts. Try again in %@." : {
+
+    },
+    "Too many attempts. Try again later." : {
 
     },
     "Try Again" : {

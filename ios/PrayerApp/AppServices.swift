@@ -34,6 +34,21 @@ final class AppServices {
         onboarding = OnboardingCoordinator(preferences: preferences, isSuppressed: Self.suppressesOnboarding)
         self.databasePath = databasePath
         confidential = ConfidentialSession(authenticator: Self.defaultAuthenticator)
+        let pinStore = Self.defaultPinStore
+        let pinFlow = PinFallbackFlow(
+            record: PinRecord(store: pinStore),
+            tracker: PinAttemptTracker(store: PinAttemptStore(store: pinStore)),
+            presenter: PinSheetWindow())
+        confidential.pinFallback = { await pinFlow.run() }
+    }
+
+    static var defaultPinStore: any SecItemStore {
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["CONFIDENTIAL_PIN_STORE"] == "memory" {
+            return InMemorySecItemStore()
+        }
+        #endif
+        return SystemSecItemStore()
     }
 
     static var defaultAuthenticator: any DeviceOwnerAuthenticating {
