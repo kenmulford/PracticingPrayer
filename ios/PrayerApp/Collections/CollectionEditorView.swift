@@ -55,7 +55,7 @@ struct CollectionEditorView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save", role: .confirm) {
                         failureTitle = "Couldn't Save"
-                        if model.save() { finish() }
+                        Task { await save() }
                     }
                     .disabled(!model.canSave)
                     .accessibilityIdentifier("CollectionEditor_Confirm")
@@ -68,16 +68,34 @@ struct CollectionEditorView: View {
             Button("Keep Editing", role: .cancel) {}
         }
         .deleteCollectionDialog(isPresented: $showingDelete, name: name) { option in
-            failureTitle = "Couldn't Delete"
-            if model.delete(option: option) {
-                services.reconcileReminders()
-                finish()
-            }
+            Task { await delete(option) }
         }
         .alert(alertTitle, isPresented: alertBinding) {
             Button("OK") {}
         } message: {
             Text(alertMessage)
+        }
+    }
+
+    private func save() async {
+        var verified = false
+        if model.requiresOwnerVerification {
+            guard await services.confidential.authenticate(reason: "Change collection protection") else { return }
+            verified = true
+        }
+        if model.save(ownerVerified: verified) { finish() }
+    }
+
+    private func delete(_ option: CollectionDeleteOption) async {
+        failureTitle = "Couldn't Delete"
+        var verified = false
+        if model.requiresOwnerVerificationToDelete {
+            guard await services.confidential.authenticate(reason: "Delete protected collection") else { return }
+            verified = true
+        }
+        if model.delete(option: option, ownerVerified: verified) {
+            services.reconcileReminders()
+            finish()
         }
     }
 

@@ -6,7 +6,7 @@ struct TagPrayersView: View {
     @Binding var path: [TagsRoute]
     @Environment(AppServices.self) private var services
 
-    private let isSessionUnlocked = false
+    private var isSessionUnlocked: Bool { services.confidential.isUnlocked }
 
     @State private var model: TagsModel?
     @State private var segment: PrayerSegment = .active
@@ -53,7 +53,8 @@ struct TagPrayersView: View {
             }
             .prayerTimeStart($prayScope)
             .sheet(item: $editingPrayer, onDismiss: reload) { target in
-                PrayerEditorView(prayerId: target.prayerId, database: services.database)
+                PrayerEditorView(
+                    prayerId: target.prayerId, database: services.database, isSessionUnlocked: isSessionUnlocked)
             }
             .deletePrayerDialog(isPresented: deleteBinding, title: pendingDelete?.record.title ?? "") {
                 if let item = pendingDelete { perform { try store.delete(id: item.record.id) } }
@@ -80,10 +81,14 @@ struct TagPrayersView: View {
                 Text(model?.errorMessage ?? "")
             }
             .task {
-                if model == nil { model = TagsModel(database: services.database) }
+                if model == nil { model = TagsModel(database: services.database, isSessionUnlocked: { services.confidential.isUnlocked }) }
                 reloadTag()
             }
             .onAppear { reload() }
+            .onChange(of: services.confidential.isUnlocked) {
+                reload()
+                reloadTag()
+            }
             .task(id: Query(segment: segment, searchText: searchText)) { reload() }
     }
 

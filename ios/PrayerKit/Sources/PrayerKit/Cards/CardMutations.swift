@@ -61,11 +61,20 @@ public struct CardMutations {
         return db.lastInsertedRowID
     }
 
-    public func update(id: Int64, with draft: CardDraft, now: Date) throws {
+    public func update(id: Int64, with draft: CardDraft, now: Date, ownerVerified: Bool) throws {
         try validate(draft)
         try database.dbQueue.write { db in
             var record = try requireCard(id, db)
             try requireBox(draft.boxId, db)
+            let oldBox = try record.boxId.flatMap { try CardBoxRecord.fetchOne(db, key: $0) }
+            let newBox = try CardBoxRecord.fetchOne(db, key: draft.boxId)
+            var edited = record
+            edited.boxId = draft.boxId
+            edited.protectionMode = draft.protectionMode
+            let lowers = ProtectionPolicy.isLowering(
+                from: ProtectionPolicy.effectiveMode(of: record, box: oldBox),
+                to: ProtectionPolicy.effectiveMode(of: edited, box: newBox))
+            if lowers && !ownerVerified { throw ProtectionError.ownerVerificationRequired }
             record.title = draft.title
             record.boxId = draft.boxId
             record.protectionMode = draft.protectionMode

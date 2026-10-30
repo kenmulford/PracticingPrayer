@@ -18,12 +18,27 @@ public struct TagStore: Sendable {
         self.database = database
     }
 
-    public func tags() throws -> [TagSummary] {
+    /// A locked session counts only prayers a locked Cards list would show.
+    public func tags(isSessionUnlocked: Bool = false) throws -> [TagSummary] {
         let (records, counts) = try database.dbQueue.read { db in
             let records = try PrayerTagRecord.fetchAll(db)
+            var hiddenFilter = ""
+            if !isSessionUnlocked {
+                let boxes = Dictionary(
+                    try CardBoxRecord.fetchAll(db).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+                let hidden = try PrayerCardRecord.fetchAll(db).filter {
+                    ProtectionPolicy.isHiddenWhileLocked($0, box: boxes[$0.boxId ?? 0], isSessionUnlocked: false)
+                }.map { String($0.id) }
+                if !hidden.isEmpty {
+                    hiddenFilter = """
+                         AND PrayerRequestId NOT IN
+                        (SELECT Id FROM PrayerRequest WHERE PrayerCardId IN (\(hidden.joined(separator: ","))))
+                        """
+                }
+            }
             let rows = try Row.fetchAll(db, sql: """
                 SELECT PrayerTagId, COUNT(DISTINCT PrayerRequestId) AS N FROM PrayerCardTag
-                WHERE PrayerRequestId > 0 GROUP BY PrayerTagId
+                WHERE PrayerRequestId > 0\(hiddenFilter) GROUP BY PrayerTagId
                 """)
             let counts = Dictionary(uniqueKeysWithValues: rows.map { ($0["PrayerTagId"] as Int64, $0["N"] as Int) })
             return (records, counts)

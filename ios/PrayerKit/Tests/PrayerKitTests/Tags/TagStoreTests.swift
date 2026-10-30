@@ -45,7 +45,7 @@ private func allTags(_ database: PrayerDatabase) throws -> [PrayerTagRecord] {
                         """)
                 }
             }
-            let summaries = try TagStore(database: database).tags()
+            let summaries = try TagStore(database: database).tags(isSessionUnlocked: true)
             #expect(summaries.map(\.tag.name) == [
                 "Recently Notified", "Family", "Fixture Tag 1", "Fixture Tag 2", "Urgent", "Work",
             ])
@@ -54,10 +54,28 @@ private func allTags(_ database: PrayerDatabase) throws -> [PrayerTagRecord] {
         }
     }
 
+    @Test func lockedCountsExcludeHiddenCardPrayers() throws {
+        try withCopy("long-upgraded.db") { database in
+            try database.dbQueue.write { db in
+                try db.execute(sql: """
+                    INSERT INTO PrayerCardTag (PrayerCardId, PrayerTagId, PrayerRequestId, CreatedAt)
+                    VALUES (1, 1, 1, 638712864000000000)
+                    """)
+                try db.execute(sql: """
+                    UPDATE PrayerCard SET ProtectionMode = 2
+                    WHERE Id = (SELECT PrayerCardId FROM PrayerRequest WHERE Id = 1)
+                    """)
+            }
+            let store = TagStore(database: database)
+            #expect(try store.tags(isSessionUnlocked: false).first { $0.tag.id == 1 }?.prayerCount == 0)
+            #expect(try store.tags(isSessionUnlocked: true).first { $0.tag.id == 1 }?.prayerCount == 1)
+        }
+    }
+
     @Test func emptyTableListsEmpty() throws {
         try withCopy("long-upgraded.db") { database in
             try database.dbQueue.write { try $0.execute(sql: "DELETE FROM PrayerTag") }
-            #expect(try TagStore(database: database).tags().isEmpty)
+            #expect(try TagStore(database: database).tags(isSessionUnlocked: true).isEmpty)
         }
     }
 

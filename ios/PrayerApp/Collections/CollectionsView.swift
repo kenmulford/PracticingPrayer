@@ -36,13 +36,7 @@ struct CollectionsView: View {
             }
             .deleteCollectionDialog(isPresented: $showingDelete, name: deleteTarget?.name ?? "") { option in
                 guard let target = deleteTarget else { return }
-                do {
-                    try CollectionStore(database: services.database).delete(id: target.id, option: option)
-                    services.reconcileReminders()
-                    reload()
-                } catch {
-                    deleteError = error.localizedDescription
-                }
+                Task { await delete(target, option) }
             }
             .alert("Couldn't Delete", isPresented: errorBinding) {
                 Button("OK") {}
@@ -124,6 +118,22 @@ struct CollectionsView: View {
             set: { if !$0 { deleteError = nil } })
     }
 
+    private func delete(_ target: CardBoxRecord, _ option: CollectionDeleteOption) async {
+        var verified = false
+        if CollectionEditorModel.requiresOwnerVerificationToDelete(target) {
+            guard await services.confidential.authenticate(reason: "Delete protected collection") else { return }
+            verified = true
+        }
+        do {
+            try CollectionStore(database: services.database).delete(
+                id: target.id, option: option, ownerVerified: verified)
+            services.reconcileReminders()
+            reload()
+        } catch {
+            deleteError = error.localizedDescription
+        }
+    }
+
     private func confirmDelete(_ box: CardBoxRecord) {
         deleteTarget = box
         showingDelete = true
@@ -132,7 +142,7 @@ struct CollectionsView: View {
     private func reload() {
         load = Result {
             let collections = try CollectionStore(database: services.database).collections()
-            let sections = try services.database.cardList(isSessionUnlocked: true).sections
+            let sections = try services.database.cardList(isSessionUnlocked: services.confidential.isUnlocked).sections
             return Loaded(
                 collections: collections,
                 counts: Dictionary(sections.map { ($0.boxId, $0.cards.count) }, uniquingKeysWith: +))

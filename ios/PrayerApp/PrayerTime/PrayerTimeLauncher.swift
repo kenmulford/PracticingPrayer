@@ -22,30 +22,30 @@ nonisolated struct PrayerTimeLauncher: Sendable {
         self.database = database
     }
 
-    func items(for scope: PrayerTimeScope) throws -> [PrayerListItem] {
+    func items(for scope: PrayerTimeScope, isSessionUnlocked: Bool = false) throws -> [PrayerListItem] {
         let store = PrayerStore(database: database)
         switch scope {
         case .all:
-            return try store.prayers(segment: .active, isSessionUnlocked: false)
+            return try store.prayers(segment: .active, isSessionUnlocked: isSessionUnlocked)
         case .tags(let ids):
-            return try store.prayers(segment: .active, tagIds: ids, isSessionUnlocked: false)
+            return try store.prayers(segment: .active, tagIds: ids, isSessionUnlocked: isSessionUnlocked)
         case .cards(let ids):
-            let list = try database.cardList(filter: CardListFilter(searchText: ""), isSessionUnlocked: false)
+            let list = try database.cardList(filter: CardListFilter(searchText: ""), isSessionUnlocked: isSessionUnlocked)
             let cards = list.sections.flatMap(\.cards).filter { ids.contains($0.card.id) && !$0.isMasked }
             return try activePrayers(of: cards, store: store)
         case .prayers(let ids):
             let active = Dictionary(
-                try store.prayers(segment: .active, isSessionUnlocked: false).map { ($0.record.id, $0) },
+                try store.prayers(segment: .active, isSessionUnlocked: isSessionUnlocked).map { ($0.record.id, $0) },
                 uniquingKeysWith: { first, _ in first })
             return ids.compactMap { active[$0] }
         case .collection(let id):
-            let cards = try eligibleCards(search: "").filter { $0.boxId == id }.flatMap(\.cards)
+            let cards = try eligibleCards(search: "", isSessionUnlocked: isSessionUnlocked).filter { $0.boxId == id }.flatMap(\.cards)
             return try activePrayers(of: cards, store: store)
         }
     }
 
-    func eligibleCards(search: String) throws -> [PrayerTimeSection] {
-        let list = try database.cardList(filter: CardListFilter(searchText: search), isSessionUnlocked: false)
+    func eligibleCards(search: String, isSessionUnlocked: Bool = false) throws -> [PrayerTimeSection] {
+        let list = try database.cardList(filter: CardListFilter(searchText: search), isSessionUnlocked: isSessionUnlocked)
         return list.sections.compactMap { section in
             guard section.box?.systemKey != "archived" else { return nil }
             let cards = section.cards.filter {
@@ -74,6 +74,19 @@ nonisolated struct PrayerTimeLauncher: Sendable {
 
     private func activePrayers(of cards: [CardListItem], store: PrayerStore) throws -> [PrayerListItem] {
         try cards.flatMap { try store.prayers(cardId: $0.card.id).filter { !$0.record.isAnswered } }
+    }
+}
+
+extension PrayerTimeLauncher {
+    /// Protected prayers join a scoped session only after the device owner unlocks them.
+    @MainActor
+    func items(for scope: PrayerTimeScope, session: ConfidentialSession) async throws -> [PrayerListItem] {
+        if scope == .all { return try items(for: .all, isSessionUnlocked: session.isUnlocked) }
+        let visible = try items(for: scope, isSessionUnlocked: false)
+        let unlocked = try items(for: scope, isSessionUnlocked: true)
+        if Set(visible.map(\.record.id)) == Set(unlocked.map(\.record.id)) { return visible }
+        let allowed = await session.authenticate(reason: "Start Prayer Time with protected prayers")
+        return allowed ? unlocked : visible
     }
 }
 
@@ -129,8 +142,10 @@ private struct PrayerTimeLauncherModifier: ViewModifier {
     }
 
     private func start(_ scope: PrayerTimeScope) {
-        guard let items = try? launcher.items(for: scope) else { return }
-        services.prayerSession = PrayerSession(items: items, database: services.database)
+        Task {
+            guard let items = try? await launcher.items(for: scope, session: services.confidential) else { return }
+            services.prayerSession = PrayerSession(items: items, database: services.database)
+        }
     }
 
     private func refresh() {
@@ -169,11 +184,14 @@ private struct PrayerTimeStartModifier: ViewModifier {
     }
 
     private func start(_ scope: PrayerTimeScope) {
-        do {
-            let items = try PrayerTimeLauncher(database: services.database).items(for: scope)
-            services.prayerSession = PrayerSession(items: items, database: services.database)
-        } catch {
-            errorMessage = error.localizedDescription
+        Task {
+            do {
+                let items = try await PrayerTimeLauncher(database: services.database)
+                    .items(for: scope, session: services.confidential)
+                services.prayerSession = PrayerSession(items: items, database: services.database)
+            } catch {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 }

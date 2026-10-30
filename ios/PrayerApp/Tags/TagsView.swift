@@ -23,7 +23,7 @@ struct TagsView: View {
                 }
             }
             .task {
-                if model == nil { model = TagsModel(database: services.database) }
+                if model == nil { model = TagsModel(database: services.database, isSessionUnlocked: { services.confidential.isUnlocked }) }
                 model?.reload()
             }
             .onAppear { model?.reload() }

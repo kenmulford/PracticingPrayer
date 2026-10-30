@@ -115,7 +115,7 @@ private func box(_ database: PrayerDatabase, _ id: Int64) throws -> CardBoxRecor
             let created = try store.create(name: "Locked", now: now)
             try run(database, "UPDATE PrayerCard SET BoxId = \(created.id) WHERE Id IN (2, 3)")
             try run(database, "UPDATE PrayerCard SET ProtectionMode = 1 WHERE Id = 3")
-            try store.setProtection(id: created.id, protectAllCards: true, mode: .hidden, now: later)
+            try store.setProtection(id: created.id, protectAllCards: true, mode: .hidden, now: later, ownerVerified: false)
             let updated = try #require(try box(database, created.id))
             try #expect(ProtectionPolicy.effectiveMode(of: card(database, 2), box: updated) == .hidden)
             try #expect(ProtectionPolicy.effectiveMode(of: card(database, 3), box: updated) == .lockedVisible)
@@ -127,11 +127,35 @@ private func box(_ database: PrayerDatabase, _ id: Int64) throws -> CardBoxRecor
             let created = try store.create(name: "Locked", now: now)
             try run(database, "UPDATE PrayerCard SET BoxId = \(created.id) WHERE Id IN (2, 3)")
             let before = try card(database, 2)
-            try store.setProtection(id: created.id, protectAllCards: true, mode: .hidden, now: later)
-            try store.setProtection(id: created.id, protectAllCards: false, mode: .hidden, now: later)
+            try store.setProtection(id: created.id, protectAllCards: true, mode: .hidden, now: later, ownerVerified: false)
+            try store.setProtection(id: created.id, protectAllCards: false, mode: .hidden, now: later, ownerVerified: true)
             let updated = try #require(try box(database, created.id))
             try #expect(ProtectionPolicy.effectiveMode(of: card(database, 2), box: updated) == .unprotected)
             try #expect(card(database, 2) == before)
+        }
+    }
+
+    @Test func loweringProtectionAndDeletingProtectedNeedOwnerVerification() throws {
+        try withCopy("long-upgraded.db") { database, store in
+            let created = try store.create(name: "Locked", now: now)
+            try store.setProtection(id: created.id, protectAllCards: true, mode: .hidden, now: later, ownerVerified: false)
+            let before = try #require(try box(database, created.id))
+            #expect(throws: ProtectionError.ownerVerificationRequired) {
+                try store.setProtection(
+                    id: created.id, protectAllCards: false, mode: .hidden, now: later, ownerVerified: false)
+            }
+            #expect(throws: ProtectionError.ownerVerificationRequired) {
+                try store.setProtection(
+                    id: created.id, protectAllCards: true, mode: .lockedVisible, now: later, ownerVerified: false)
+            }
+            #expect(throws: ProtectionError.ownerVerificationRequired) {
+                try store.delete(id: created.id, option: .unassignCards, ownerVerified: false)
+            }
+            try #expect(box(database, created.id) == before)
+            try store.setProtection(
+                id: created.id, protectAllCards: true, mode: .hidden, now: later, ownerVerified: false)
+            try store.delete(id: created.id, option: .unassignCards, ownerVerified: true)
+            try #expect(box(database, created.id) == nil)
         }
     }
 
@@ -139,7 +163,7 @@ private func box(_ database: PrayerDatabase, _ id: Int64) throws -> CardBoxRecor
         try withCopy("long-upgraded.db") { database, store in
             let created = try store.create(name: "Temp", now: now)
             try run(database, "UPDATE PrayerCard SET BoxId = \(created.id) WHERE Id IN (2, 3)")
-            try store.delete(id: created.id, option: .unassignCards)
+            try store.delete(id: created.id, option: .unassignCards, ownerVerified: false)
             try #expect(card(database, 2).boxId == 0)
             try #expect(card(database, 3).boxId == 0)
             try #expect(count(database, "PrayerCard") == 4)
@@ -153,7 +177,7 @@ private func box(_ database: PrayerDatabase, _ id: Int64) throws -> CardBoxRecor
         try withCopy("long-upgraded.db") { database, store in
             let created = try store.create(name: "Temp", now: now)
             try run(database, "UPDATE PrayerCard SET BoxId = \(created.id) WHERE Id IN (2, 3)")
-            try store.delete(id: created.id, option: .deleteAll)
+            try store.delete(id: created.id, option: .deleteAll, ownerVerified: false)
             try #expect(count(database, "PrayerCard") == 2)
             try #expect(count(database, "PrayerRequest") == 4)
             try #expect(count(database, "PrayerInteraction") == 0)
@@ -165,8 +189,8 @@ private func box(_ database: PrayerDatabase, _ id: Int64) throws -> CardBoxRecor
         try withCopy("fresh-install.db") { database, store in
             let one = try store.create(name: "One", now: now)
             let two = try store.create(name: "Two", now: now)
-            try store.delete(id: one.id, option: .unassignCards)
-            try store.delete(id: two.id, option: .deleteAll)
+            try store.delete(id: one.id, option: .unassignCards, ownerVerified: false)
+            try store.delete(id: two.id, option: .deleteAll, ownerVerified: false)
             try #expect(count(database, "CardBox") == 2)
         }
     }
@@ -176,8 +200,8 @@ private func box(_ database: PrayerDatabase, _ id: Int64) throws -> CardBoxRecor
             for id: Int64 in [1, 2] {
                 let before = try #require(try box(database, id))
                 try store.rename(id: id, to: "Renamed", now: later)
-                try store.setProtection(id: id, protectAllCards: true, mode: .hidden, now: later)
-                try store.delete(id: id, option: .deleteAll)
+                try store.setProtection(id: id, protectAllCards: true, mode: .hidden, now: later, ownerVerified: false)
+                try store.delete(id: id, option: .deleteAll, ownerVerified: false)
                 try #expect(box(database, id) == before)
             }
         }
@@ -185,7 +209,7 @@ private func box(_ database: PrayerDatabase, _ id: Int64) throws -> CardBoxRecor
 
     @Test func missingIdIsNoOp() throws {
         try withCopy("fresh-install.db") { database, store in
-            try store.delete(id: 999, option: .deleteAll)
+            try store.delete(id: 999, option: .deleteAll, ownerVerified: false)
             try store.rename(id: 999, to: "Nope", now: later)
             try #expect(count(database, "CardBox") == 2)
         }

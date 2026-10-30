@@ -10,14 +10,19 @@ struct CardPickerView: View {
 
     let database: PrayerDatabase
     let selectedCardId: Int64?
+    let isSessionUnlocked: Bool
     let onSelect: (Int64, String) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var searchText = ""
     @State private var state = LoadState.loading
 
-    init(database: PrayerDatabase, selectedCardId: Int64?, onSelect: @escaping (Int64, String) -> Void) {
+    init(
+        database: PrayerDatabase, selectedCardId: Int64?, isSessionUnlocked: Bool = false,
+        onSelect: @escaping (Int64, String) -> Void
+    ) {
         self.database = database
+        self.isSessionUnlocked = isSessionUnlocked
         self.selectedCardId = selectedCardId
         self.onSelect = onSelect
     }
@@ -87,9 +92,10 @@ struct CardPickerView: View {
 
     private func load() async {
         let database = database
+        let isSessionUnlocked = isSessionUnlocked
         let filter = CardListFilter(searchText: searchText)
         let result = await Task.detached {
-            try? database.cardList(filter: filter, isSessionUnlocked: false)
+            try? database.cardList(filter: filter, isSessionUnlocked: isSessionUnlocked)
         }.value
         guard !Task.isCancelled else { return }
         state = result.map { .loaded($0.sections) } ?? .failed

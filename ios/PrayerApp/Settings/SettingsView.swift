@@ -33,6 +33,8 @@ struct SettingsView: View {
                 AboutView()
             case .collections:
                 CollectionsView()
+            case .backup:
+                BackupRestoreView()
             default:
                 ContentUnavailableView {
                     Text(route.title)

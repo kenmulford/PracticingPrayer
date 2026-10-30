@@ -54,9 +54,16 @@ public struct CollectionStore: Sendable {
         }
     }
 
-    public func setProtection(id: Int64, protectAllCards: Bool, mode: CardProtectionMode, now: Date) throws {
+    public func setProtection(
+        id: Int64, protectAllCards: Bool, mode: CardProtectionMode, now: Date, ownerVerified: Bool
+    ) throws {
         try database.dbQueue.write { db in
             guard var record = try CardBoxRecord.fetchOne(db, key: id), !record.isSystem else { return }
+            let old = record.protectAllCards ? record.cardProtectionMode : .unprotected
+            let new = protectAllCards ? mode : .unprotected
+            if ProtectionPolicy.isLowering(from: old, to: new) && !ownerVerified {
+                throw ProtectionError.ownerVerificationRequired
+            }
             record.protectAllCards = protectAllCards
             record.cardProtectionMode = mode
             record.updatedAtTicks = now.ticks
@@ -64,9 +71,12 @@ public struct CollectionStore: Sendable {
         }
     }
 
-    public func delete(id: Int64, option: CollectionDeleteOption) throws {
+    public func delete(id: Int64, option: CollectionDeleteOption, ownerVerified: Bool) throws {
         try database.dbQueue.write { db in
             guard let record = try CardBoxRecord.fetchOne(db, key: id), !record.isSystem else { return }
+            if record.protectAllCards && record.cardProtectionMode != .unprotected && !ownerVerified {
+                throw ProtectionError.ownerVerificationRequired
+            }
             switch option {
             case .unassignCards:
                 try db.execute(sql: "UPDATE PrayerCard SET BoxId = 0 WHERE BoxId = ?", arguments: [id])

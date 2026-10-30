@@ -19,7 +19,8 @@ struct HomeListView: View {
                 if model == nil {
                     model = HomeListModel(
                         scope: scope, database: services.database,
-                        overdueDayThreshold: services.preferences.overdueDayThreshold)
+                        overdueDayThreshold: services.preferences.overdueDayThreshold,
+                        isSessionUnlocked: services.confidential.isUnlocked)
                 }
                 model?.load()
             }

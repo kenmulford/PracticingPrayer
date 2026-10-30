@@ -19,6 +19,8 @@ struct CardsToolbar: ToolbarContent {
     @Binding var selectedTagIds: Set<Int64>
     let addCard: () -> Void
     let manageCollections: () -> Void
+    let isUnlocked: Bool
+    let toggleConfidential: () -> Void
     let select: CardsSelectState
 
     var body: some ToolbarContent {
@@ -73,6 +75,11 @@ struct CardsToolbar: ToolbarContent {
             Button("Select Cards", systemImage: "checkmark.circle", action: select.start)
                 .disabled(!select.canSelect)
             Button("Manage Collections", systemImage: "folder", action: manageCollections)
+            if isUnlocked {
+                Button("Hide Confidential", systemImage: "lock.open", action: toggleConfidential)
+            } else {
+                Button("Show Confidential", systemImage: "lock", action: toggleConfidential)
+            }
         }
     }
 

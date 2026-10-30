@@ -12,6 +12,7 @@ final class CardEditorModel {
     @ObservationIgnored private var original: PrayerCardRecord?
     @ObservationIgnored private var originalBoxId: Int64
     @ObservationIgnored private let originalMode: CardProtectionMode
+    @ObservationIgnored private var boxesById: [Int64: CardBoxRecord] = [:]
 
     var title: String
     var boxId: Int64
@@ -45,6 +46,17 @@ final class CardEditorModel {
         title != (original?.title ?? "") || boxId != originalBoxId || protectionMode != originalMode
     }
 
+    /// Saving that lowers the effective protection needs a fresh device-owner check.
+    var requiresOwnerVerification: Bool {
+        guard let original else { return false }
+        var edited = original
+        edited.boxId = boxId
+        edited.protectionMode = protectionMode
+        return ProtectionPolicy.isLowering(
+            from: ProtectionPolicy.effectiveMode(of: original, box: boxesById[originalBoxId]),
+            to: ProtectionPolicy.effectiveMode(of: edited, box: boxesById[boxId]))
+    }
+
     private var trimmedTitle: String { title.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     private var mutations: CardMutations { CardMutations(database: database, preferences: preferences) }
@@ -52,6 +64,7 @@ final class CardEditorModel {
     func load() {
         do {
             let all = try CollectionStore(database: database).collections()
+            boxesById = Dictionary(all.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
             collections = all
                 .filter { !$0.isSystem && $0.id != archivedFolderId }
                 .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
@@ -64,14 +77,15 @@ final class CardEditorModel {
         }
     }
 
-    func save(now: Date = .now) -> Bool {
+    func save(now: Date = .now, ownerVerified: Bool = false) -> Bool {
         guard canSave else { return false }
         return perform {
             if let original {
                 if isDirty {
                     try mutations.update(
                         id: original.id,
-                        with: CardDraft(title: trimmedTitle, boxId: boxId, protectionMode: protectionMode), now: now)
+                        with: CardDraft(title: trimmedTitle, boxId: boxId, protectionMode: protectionMode), now: now,
+                        ownerVerified: ownerVerified)
                 }
             } else {
                 _ = try mutations.create(

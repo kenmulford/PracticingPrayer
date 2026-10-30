@@ -27,6 +27,7 @@ final class PrayerEditorModel {
     }
 
     @ObservationIgnored private let database: PrayerDatabase
+    @ObservationIgnored private let isSessionUnlocked: Bool
     @ObservationIgnored private let prayerId: Int64?
     @ObservationIgnored private let defaultAnsweredOn: Date
     @ObservationIgnored private let preferences: AppPreferences
@@ -61,8 +62,9 @@ final class PrayerEditorModel {
     init(
         prayerId: Int64?, cardId: Int64?, cardTitle: String?, database: PrayerDatabase,
         preferences: AppPreferences, reminders: any ReminderReconciling,
-        authorization: ReminderAuthorization = .system, today: Date = .now
+        authorization: ReminderAuthorization = .system, today: Date = .now, isSessionUnlocked: Bool = false
     ) {
+        self.isSessionUnlocked = isSessionUnlocked
         self.database = database
         self.prayerId = prayerId
         self.preferences = preferences
@@ -143,9 +145,9 @@ final class PrayerEditorModel {
 
     func load() {
         do {
-            allTags = try TagStore(database: database).tags().map(\.tag)
+            allTags = try TagStore(database: database).tags(isSessionUnlocked: isSessionUnlocked).map(\.tag)
             if let prayerId {
-                let items = try PrayerStore(database: database).prayers(segment: .all, isSessionUnlocked: false)
+                let items = try PrayerStore(database: database).prayers(segment: .all, isSessionUnlocked: isSessionUnlocked)
                 if let item = items.first(where: { $0.record.id == prayerId }) {
                     let record = item.record
                     cardId = record.prayerCardId
@@ -215,7 +217,7 @@ final class PrayerEditorModel {
 
     func loadTags() {
         do {
-            allTags = try TagStore(database: database).tags().map(\.tag)
+            allTags = try TagStore(database: database).tags(isSessionUnlocked: isSessionUnlocked).map(\.tag)
         } catch {
             alert = error.localizedDescription
         }

@@ -3,6 +3,7 @@ import SwiftUI
 
 struct AppShell: View {
     @Environment(AppServices.self) private var services
+    @Environment(\.scenePhase) private var scenePhase
     @State private var selection: AppTab = .home
     @State private var homePath: [HomeRoute] = []
     @State private var cardsPath: [CardsRoute] = []
@@ -10,6 +11,8 @@ struct AppShell: View {
     @State private var tagsPath: [TagsRoute] = []
     @State private var settingsPath: [SettingsRoute] = []
     @State private var showsPrayerTimeAlert = false
+    @State private var coverWindow = PrivacyCoverWindow()
+    @State private var isCovered = false
 
     var body: some View {
         Group {
@@ -41,6 +44,18 @@ struct AppShell: View {
                     .task(id: services.onboarding.run) { await services.onboarding.watchTips() }
             }
         }
+        .accessibilityHidden(isCovered)
+        .onChange(of: scenePhase, initial: true) { _, phase in
+            if phase == .active {
+                isCovered = false
+                coverWindow.hide()
+                return
+            }
+            let hasProtected = services.phase == .open
+                ? PrivacyCoverPolicy.hasProtectedCards(in: services.database) : true
+            isCovered = PrivacyCoverPolicy.isCovered(isSceneActive: false, hasProtectedCards: hasProtected)
+            if isCovered { coverWindow.show() } else { coverWindow.hide() }
+        }
         .task {
             await services.open()
             #if DEBUG
@@ -50,6 +65,9 @@ struct AppShell: View {
                 services.prayerSession = PrayerSession(items: Array(items.prefix(3)), database: services.database)
             }
             #endif
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .background { services.confidential.relock() }
         }
         .onChange(of: services.phase == .open && NotificationTapHandler.shared.hasPendingTap, initial: true) { _, ready in
             guard ready else { return }
@@ -87,6 +105,15 @@ struct AppShell: View {
             }
         }
         .tabViewStyle(.sidebarAdaptable)
+        .id(services.databaseGeneration)
+        .onChange(of: services.databaseGeneration) {
+            homePath = []
+            cardsPath = []
+            prayersPath = []
+            tagsPath = []
+            settingsPath = []
+            selection = .home
+        }
     }
 
     @ViewBuilder

@@ -145,6 +145,31 @@ private struct ForcedFailure: Error {}
         #expect(!FileManager.default.fileExists(atPath: directory.appendingPathComponent("prayer_app_backup.tmp").path))
     }
 
+    @Test func inspectRejectsNonZip() throws {
+        let directory = try workDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("not-a-backup.pcrd")
+        try Data("not a backup".utf8).write(to: url)
+        #expect(throws: BackupArchiveError.invalidBackup) { try BackupArchive.inspect(archiveURL: url) }
+    }
+
+    @Test func inspectRejectsZipWithoutDatabaseEntry() throws {
+        let directory = try workDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("no-db.pcrd")
+        try BackupArchive.archive(entries: [("confidential.enc", Data("sealed".utf8))]).write(to: url)
+        #expect(throws: BackupArchiveError.invalidBackup) { try BackupArchive.inspect(archiveURL: url) }
+    }
+
+    @Test func inspectReturnsConfidentialPayload() throws {
+        let directory = try workDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let source = try fixtureCopy("long-upgraded.db", into: directory)
+        let payload = Data("sealed-bytes".utf8)
+        let url = try BackupArchive.export(databaseURL: source, confidential: payload, to: directory)
+        #expect(try BackupArchive.inspect(archiveURL: url).confidentialPayload == payload)
+    }
+
     @Test func restoreReturnsConfidentialPayload() throws {
         let directory = try workDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }

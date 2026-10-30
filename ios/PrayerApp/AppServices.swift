@@ -13,8 +13,10 @@ final class AppServices {
     enum Phase: Equatable { case opening, open, failed }
 
     private(set) var phase: Phase = .opening
+    private(set) var databaseGeneration = 0
     let preferences: AppPreferences
     let onboarding: OnboardingCoordinator
+    let confidential: ConfidentialSession
     var prayerSession: PrayerSession?
 
     @ObservationIgnored private var openedDatabase: PrayerDatabase?
@@ -31,6 +33,32 @@ final class AppServices {
         self.preferences = preferences
         onboarding = OnboardingCoordinator(preferences: preferences, isSuppressed: Self.suppressesOnboarding)
         self.databasePath = databasePath
+        confidential = ConfidentialSession(authenticator: Self.defaultAuthenticator)
+        let pinStore = Self.defaultPinStore
+        let pinFlow = PinFallbackFlow(
+            record: PinRecord(store: pinStore),
+            tracker: PinAttemptTracker(store: PinAttemptStore(store: pinStore)),
+            presenter: PinSheetWindow())
+        confidential.pinFallback = { await pinFlow.run() }
+    }
+
+    static var defaultPinStore: any SecItemStore {
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["CONFIDENTIAL_PIN_STORE"] == "memory" {
+            return InMemorySecItemStore()
+        }
+        #endif
+        return SystemSecItemStore()
+    }
+
+    static var defaultAuthenticator: any DeviceOwnerAuthenticating {
+        #if DEBUG
+        if let stub = StubDeviceOwnerAuthenticator(
+            environmentValue: ProcessInfo.processInfo.environment["CONFIDENTIAL_AUTH_STUB"]) {
+            return stub
+        }
+        #endif
+        return SystemDeviceOwnerAuthenticator()
     }
 
     static var defaultPreferences: AppPreferences {
@@ -76,6 +104,31 @@ final class AppServices {
                 ReminderScheduler.logError("Reminder reconcile failed: \(error.localizedDescription)")
             }
         }
+    }
+
+    func didReplaceDatabase() {
+        databaseGeneration += 1
+    }
+
+    /// Closes the live connection, runs `swap` on the database file, then reopens it. Never leaves `.opening`,
+    /// so the shell keeps its tabs (and the restore overlay) mounted until the caller rebuilds them.
+    func reopenDatabase<T: Sendable>(after swap: @escaping @Sendable (URL) throws -> T) async throws -> T {
+        let closing = openedDatabase
+        let path = databasePath
+        let (outcome, reopened) = await Task.detached {
+            try? closing?.close()
+            let outcome = Result { try swap(URL(fileURLWithPath: path)) }
+            return (outcome, Result { try PrayerDatabase(path: path) })
+        }.value
+        switch reopened {
+        case .success(let database):
+            openedDatabase = database
+            phase = .open
+        case .failure:
+            openedDatabase = nil
+            phase = .failed
+        }
+        return try outcome.get()
     }
 
     func open() async {

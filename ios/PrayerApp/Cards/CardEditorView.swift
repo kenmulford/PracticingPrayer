@@ -82,7 +82,7 @@ struct CardEditorView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save", systemImage: "checkmark", role: .confirm) {
-                        run(.saved) { model.save() }
+                        Task { await save() }
                     }
                     .disabled(!model.canSave)
                     .accessibilityIdentifier("CardEditor_Confirm")
@@ -125,6 +125,15 @@ struct CardEditorView: View {
         case .lockedVisible: "The card shows as “Protected” until you unlock with Face ID or your passcode."
         case .hidden: "The card is hidden from every list until you choose Show Confidential."
         }
+    }
+
+    private func save() async {
+        var verified = false
+        if model.requiresOwnerVerification {
+            guard await services.confidential.authenticate(reason: "Change card protection") else { return }
+            verified = true
+        }
+        run(.saved) { model.save(ownerVerified: verified) }
     }
 
     private func run(_ outcome: CardEditorModel.Outcome, _ work: () -> Bool) {

@@ -7,9 +7,11 @@ final class CardDetailModel {
     @ObservationIgnored private let cardId: Int64
     @ObservationIgnored private let database: PrayerDatabase
     @ObservationIgnored private let preferences: AppPreferences
+    @ObservationIgnored private let isSessionUnlocked: Bool
 
     private(set) var card: PrayerCardRecord?
     private(set) var collectionName = ""
+    private(set) var isProtected = false
     private(set) var isMutating = false
     var searchText = ""
     var errorMessage: String?
@@ -25,7 +27,8 @@ final class CardDetailModel {
     private(set) var answeredPrayers: [PrayerRequestRecord] = []
     private(set) var moveTargets: [CardBoxRecord] = []
 
-    init(cardId: Int64, database: PrayerDatabase, preferences: AppPreferences) {
+    init(cardId: Int64, database: PrayerDatabase, preferences: AppPreferences, isSessionUnlocked: Bool = false) {
+        self.isSessionUnlocked = isSessionUnlocked
         self.cardId = cardId
         self.database = database
         self.preferences = preferences
@@ -34,12 +37,13 @@ final class CardDetailModel {
     func load() {
         do {
             let id = cardId
-            let list = try database.cardList(isSessionUnlocked: false)
+            let list = try database.cardList(isSessionUnlocked: isSessionUnlocked)
             let found = list.sections.lazy.compactMap { section in
                 section.cards.first { $0.card.id == id }.map { (section, $0.card) }
             }.first
             guard let (section, record) = found else { return }
             card = record
+            isProtected = ProtectionPolicy.effectiveMode(of: record, box: section.box) != .unprotected
             collectionName = section.box?.name ?? String(localized: "Loose Cards")
 
             let all = try PrayerStore(database: database).prayers(cardId: cardId).map(\.record)

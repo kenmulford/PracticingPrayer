@@ -4,6 +4,7 @@ import SwiftUI
 struct CardRow: View {
     let item: CardListItem
     var isSelected = false
+    var isHidden = false
 
     private var count: Int { item.activePrayerCount ?? 0 }
 
@@ -16,6 +17,11 @@ struct CardRow: View {
                 Text("Protected")
             } else {
                 Text(verbatim: item.card.title)
+            }
+            if isHidden {
+                Image(systemName: "eye.slash")
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
             }
             if item.card.isFavorite {
                 Image(systemName: "star.fill").foregroundStyle(.yellow)
@@ -33,7 +39,8 @@ struct CardRow: View {
     }
 
     private var accessibilityText: String {
-        var parts = [item.isMasked ? String(localized: "Protected") : item.card.title]
+        var parts = [item.isMasked ? String(localized: "Protected, locked") : item.card.title]
+        if isHidden { parts.append(String(localized: "Hidden")) }
         if item.card.isFavorite { parts.append(String(localized: "Favorite")) }
         if count > 0 { parts.append(String(localized: "\(count) active prayers")) }
         return parts.joined(separator: ", ")
