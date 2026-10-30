@@ -2,6 +2,27 @@
 
 Release notes for Practicing Prayer, newest first.
 
+## 2.0.0 Share and import
+
+**Theme:** Sharing cards and prayers, and bringing them in from links, `.prayercard` files, the share extension, Shortcuts and the clipboard, all on the native screens. Lands on `ios-2.0-refactor`, not a release.
+
+### ✨ Features / enhancements
+
+| Issue | PR | What |
+|---|---|---|
+| #428 Build the Confirm Import sheet with duplicate handling | #447 | Review an import before saving, choose its card, and add back prayers already on that card |
+| #429 Rewrite the share extension in Swift | #447 | Share text from another app into Prayer App |
+| #430 Move the Save to Prayer App Intent and shortcuts into the app target | #447 | The Save to Prayer shortcut and Siri phrases keep working after the upgrade |
+| #431 Open Universal Links and .prayercard documents into Confirm Import | #447 | Share links and `.prayercard` files open Confirm Import, or "Unable to Import" when they can't be read |
+| #432 Pick up a pending App Group import when the app becomes active | #447 | Text shared from the extension opens in Confirm Import when the app comes forward |
+| #433 Share cards and prayers through ShareLink with the .prayercard fallback | #447 | Share from row menus, Card Detail and Prayer Detail; long cards share as a file; protected cards can't be shared |
+| #434 Offer the first-launch clipboard import before onboarding | #447 | A share link on the clipboard at first launch offers to import it |
+
+### ⚖️ Post-run audit trail
+
+- The UI suite was not run at milestone end; it runs once at the end of the 2.0.0 epic.
+- The share extension is checked by a hosted unit test; a hand check from another app runs at the end of the epic.
+
 ## 2.0.0 Confidential and backup
 
 **Theme:** Protected cards behind device-owner authentication, an app-switcher privacy cover, and backup and restore on the native screens. Lands on `ios-2.0-refactor`, not a release.
