@@ -119,6 +119,10 @@ struct AppShell: View {
         } message: {
             Text("Would you like to pray for your recently notified prayer requests now?")
         }
+        .task(id: isReadyForNotificationPrompt) {
+            guard isReadyForNotificationPrompt else { return }
+            await requestNotificationPermissionIfNeeded()
+        }
         .onChange(of: isReadyForPendingImport, initial: true) { _, ready in
             if ready, let pending = PendingImport.pickUp() {
                 services.inboundShare.enqueue(pending.payload, cardTitle: pending.cardTitle)
@@ -143,6 +147,26 @@ struct AppShell: View {
     // The App Group pickup joins the same FIFO as links and files, so one sheet presents every import.
     private var isReadyForPendingImport: Bool {
         scenePhase == .active && services.phase == .open
+    }
+
+    // Covers upgraders whose notification permission was never decided; the ask waits for a clear screen.
+    private var isReadyForNotificationPrompt: Bool {
+        scenePhase == .active && importReady && services.clipboardHandoff.isFinished
+            && services.inboundShare.queue.isEmpty && !AppServices.suppressesNotificationPrompt
+    }
+
+    private func requestNotificationPermissionIfNeeded() async {
+        guard NotificationPromptPolicy.shouldRequest(
+            status: await NotificationAuthorization.status(),
+            allowNotifications: services.preferences.allowNotifications,
+            hasReminder: NotificationPromptPolicy.hasReminder(in: services.database),
+            isPresentationClear: isReadyForNotificationPrompt)
+        else { return }
+        if await NotificationAuthorization.request() {
+            services.reconcileReminders()
+        } else {
+            services.preferences.allowNotifications = false
+        }
     }
 
     // The queue head waits until nothing else covers the screen (one sheet at a time).

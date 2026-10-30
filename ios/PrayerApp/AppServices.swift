@@ -90,6 +90,15 @@ final class AppServices {
         #endif
     }
 
+    // Fixture-driven UI suites would otherwise meet the system permission alert on a fresh simulator.
+    static var suppressesNotificationPrompt: Bool {
+        #if DEBUG
+        return ProcessInfo.processInfo.environment["PRAYER_DB_PATH"] != nil
+        #else
+        return false
+        #endif
+    }
+
     static var defaultPasteboard: any PasteboardReading {
         #if DEBUG
         if let text = UserDefaults.standard.string(forKey: "StubClipboard") {

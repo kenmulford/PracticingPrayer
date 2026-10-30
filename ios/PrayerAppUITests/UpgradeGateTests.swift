@@ -33,7 +33,11 @@ final class UpgradeGateTests: XCTestCase {
         openCards(app)
         assertNoTips(app, on: "Cards")
 
-        // Phase 2: the 1.7.2 PIN reveals the confidential card.
+        // Phase 2: the 1.7.2 PIN reveals the confidential card. Sections start collapsed after an upgrade, so the
+        // card's section is opened first; otherwise its title is hidden whether or not the PIN verifies.
+        let looseCards = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Loose Cards")).firstMatch
+        XCTAssertTrue(looseCards.waitForExistence(timeout: 10), "Loose Cards section missing")
+        if looseCards.images["collapsed"].exists { looseCards.tap() }
         let more = app.buttons["More"].firstMatch
         XCTAssertTrue(more.waitForExistence(timeout: 10), "More missing")
         more.tap()
