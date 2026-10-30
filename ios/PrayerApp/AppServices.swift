@@ -10,7 +10,7 @@ extension ReminderScheduler: ReminderReconciling {}
 
 @Observable
 final class AppServices {
-    enum Phase: Equatable { case opening, open, failed }
+    enum Phase: Equatable { case opening, open, restoring, failed }
 
     private(set) var phase: Phase = .opening
     private(set) var databaseGeneration = 0
@@ -26,7 +26,7 @@ final class AppServices {
     @ObservationIgnored private let databasePath: String
 
     var database: PrayerDatabase {
-        guard phase == .open, let openedDatabase else {
+        guard phase == .open || phase == .restoring, let openedDatabase else {
             preconditionFailure("AppServices.database read before the database opened")
         }
         return openedDatabase
@@ -129,9 +129,11 @@ final class AppServices {
         databaseGeneration += 1
     }
 
-    /// Closes the live connection, runs `swap` on the database file, then reopens it. Never leaves `.opening`,
-    /// so the shell keeps its tabs (and the restore overlay) mounted until the caller rebuilds them.
+    /// Closes the live connection, runs `swap` on the database file, then reopens it. Holds `.restoring` for the
+    /// swap (the shell keeps its tabs and the restore overlay mounted, while every `.open` gate pauses) and never
+    /// leaves `.opening`, so nothing queries the closed connection.
     func reopenDatabase<T: Sendable>(after swap: @escaping @Sendable (URL) throws -> T) async throws -> T {
+        phase = .restoring
         let closing = openedDatabase
         let path = databasePath
         let (outcome, reopened) = await Task.detached {

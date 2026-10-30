@@ -78,6 +78,25 @@ private struct Harness {
         #expect(try harness.hasCardTwo() == false)
         #expect(harness.flow.failure == nil)
         #expect(harness.flow.phase == .idle)
+        #expect(harness.flow.skippedProtectedCards == false)
+    }
+
+    @Test func wrongPassphraseFlagsSkippedProtectedCards() async throws {
+        let harness = try await Harness()
+        await harness.flow.picked(.success(try harness.protectedExport()))
+        await harness.flow.restore(passphrase: "not the right passphrase")
+        #expect(try harness.hasCardTwo() == false)
+        #expect(harness.flow.skippedProtectedCards)
+    }
+
+    @Test func swapHoldsRestoringPhase() async throws {
+        let harness = try await Harness()
+        let services = harness.services
+        let swap = Task { try await services.reopenDatabase { _ in Thread.sleep(forTimeInterval: 0.5) } }
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(services.phase == .restoring)
+        try await swap.value
+        #expect(services.phase == .open)
     }
 
     @Test func correctPassphraseRestoresConfidential() async throws {
@@ -86,5 +105,6 @@ private struct Harness {
         await harness.flow.restore(passphrase: passphrase)
         #expect(try harness.hasCardTwo())
         #expect(harness.flow.failure == nil)
+        #expect(harness.flow.skippedProtectedCards == false)
     }
 }

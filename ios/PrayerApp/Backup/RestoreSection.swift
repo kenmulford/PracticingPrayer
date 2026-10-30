@@ -25,7 +25,7 @@ private struct RestorePresentation: ViewModifier {
             .alert("Restore Backup?", isPresented: binding(for: .confirming)) {
                 Button("Cancel", role: .cancel) { flow?.cancel() }
                 Button("Restore", role: .destructive) { flow?.confirm() }
-                    .accessibilityIdentifier("restore.confirm")
+                    .accessibilityIdentifier("backup.restoreConfirm")
             } message: {
                 Text("This will permanently replace all your current prayer data.")
             }
@@ -35,10 +35,10 @@ private struct RestorePresentation: ViewModifier {
             }
             .alert("Enter the backup passphrase", isPresented: promptingBinding) {
                 SecureField("Passphrase", text: $passphrase)
-                    .accessibilityIdentifier("restore.passphraseField")
+                    .accessibilityIdentifier("backup.restorePassphraseField")
                 Button("Cancel", role: .cancel) { submit(nil) }
                 Button("Restore") { submit(passphrase) }
-                    .accessibilityIdentifier("restore.passphraseRestore")
+                    .accessibilityIdentifier("backup.restorePassphraseRestore")
             } message: {
                 Text("This backup includes confidential cards protected by a passphrase. Enter it to restore them.")
             }

@@ -29,7 +29,7 @@ struct AppShell: View {
                     .buttonStyle(.borderedProminent)
                     .prominentLabel()
                 }
-            case .open:
+            case .open, .restoring:
                 tabs.fullScreenCover(item: Bindable(services).prayerSession) { PrayerSessionView(session: $0) }
                     .environment(services.onboarding)
                     .sheet(isPresented: welcomeBinding) {

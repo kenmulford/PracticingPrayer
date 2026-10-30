@@ -45,7 +45,7 @@ final class BackupExportFlow {
 
     func continueUnencrypted() async {
         phase = .exporting
-        await export(passphrase: nil)
+        await export(passphrase: nil, acknowledgingPlaintext: true)
     }
 
     func protect(passphrase: String) async {
@@ -57,18 +57,24 @@ final class BackupExportFlow {
         phase = .idle
     }
 
+    // The share sheet dismisses on completion and on failure; the file is a throwaway copy either way.
     func finishSharing() {
+        if case .sharing(let url) = phase { try? FileManager.default.removeItem(at: url) }
         phase = .idle
     }
 
-    private func export(passphrase: String?) async {
+    private func export(passphrase: String?, acknowledgingPlaintext: Bool = false) async {
         let database = database
         let directory = exportDirectory
         do {
             let url = try await Task.detached {
-                try BackupExporter.export(database: database, passphrase: passphrase, to: directory)
+                try BackupExporter.export(
+                    database: database, passphrase: passphrase, acknowledgingPlaintext: acknowledgingPlaintext,
+                    to: directory)
             }.value
             phase = .sharing(url)
+        } catch BackupExporterError.confidentialCardsPresent {
+            phase = .choosing
         } catch {
             fail()
         }

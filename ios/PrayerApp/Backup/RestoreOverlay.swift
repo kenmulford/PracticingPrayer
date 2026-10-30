@@ -7,6 +7,6 @@ struct RestoreOverlay: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(.background)
             .interactiveDismissDisabled()
-            .accessibilityIdentifier("restore.overlay")
+            .accessibilityIdentifier("backup.restoreOverlay")
     }
 }
