@@ -353,7 +353,13 @@
     "Couldn't Delete Tag" : {
 
     },
+    "Couldn't reach Practicing Prayer's storage. Reinstall the app to fix sharing." : {
+
+    },
     "Couldn't Save" : {
+
+    },
+    "Couldn't save the prayer right now. Try again." : {
 
     },
     "Couldn't Start Prayer Time" : {
@@ -988,6 +994,12 @@
     "Save and Add Another" : {
 
     },
+    "Save shared text as a new prayer card in Practicing Prayer." : {
+
+    },
+    "Save to Prayer" : {
+
+    },
     "Search Cards" : {
 
     },
@@ -1022,6 +1034,9 @@
 
     },
     "Share" : {
+
+    },
+    "Shared Text" : {
 
     },
     "Show Confidential" : {
@@ -1075,6 +1090,12 @@
     "Teal" : {
 
     },
+    "Text to save as a prayer card." : {
+
+    },
+    "That prayer is too long to save from the share sheet. Try a shorter selection." : {
+
+    },
     "The card is hidden from every list until you choose Show Confidential." : {
 
     },
@@ -1082,6 +1103,9 @@
 
     },
     "The star marks a card as a favorite. Swipe a card to the right in the Cards list, or touch and hold the card and choose Favorite. Favorited cards sort to the top of their collection so they're always easy to find." : {
+
+    },
+    "There's no text to save. Try again with a longer selection." : {
 
     },
     "This also deletes its %lld prayer requests." : {
@@ -1191,6 +1215,9 @@
 
     },
     "What is auto-mode in Prayer Time?" : {
+
+    },
+    "What text should I save?" : {
 
     },
     "White" : {

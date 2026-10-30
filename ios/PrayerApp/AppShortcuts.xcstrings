@@ -1,0 +1,18 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "Add a prayer to ${applicationName}" : {
+
+    },
+    "New prayer card in ${applicationName}" : {
+
+    },
+    "Save to ${applicationName}" : {
+
+    },
+    "Save to Prayer" : {
+
+    }
+  },
+  "version" : "1.0"
+}
