@@ -50,6 +50,17 @@ struct AppShell: View {
                     } message: { failure in
                         Text(failure.message)
                     }
+                    .alert("Did someone share a prayer with you?", isPresented: promptBinding) {
+                        Button("Cancel", role: .cancel) { services.clipboardHandoff.cancel() }
+                        Button("Import") { services.clipboardHandoff.importClipboard() }
+                    } message: {
+                        Text("Import it from your clipboard.")
+                    }
+                    .alert("No Shared Prayer Found", isPresented: nothingFoundBinding) {
+                        Button("OK") { services.clipboardHandoff.acknowledgeNothingFound() }
+                    } message: {
+                        Text("Tap the link you received to open it.")
+                    }
                     .onChange(of: services.onboarding.stage, initial: true) { services.onboarding.syncTips() }
                     .task(id: services.onboarding.run) { await services.onboarding.watchTips() }
             }
@@ -76,6 +87,9 @@ struct AppShell: View {
             services.inboundShare.handleLaunchArgument()
             #endif
             await services.open()
+            await services.clipboardHandoff.run(
+                isEligible: services.phase == .open && services.onboarding.showsWelcome
+                    && !services.inboundShare.isDeepLinkSession)
             #if DEBUG
             if ProcessInfo.processInfo.arguments.contains(PrayerSession.debugArgument), services.phase == .open {
                 let items = (try? PrayerStore(database: services.database)
@@ -143,7 +157,15 @@ struct AppShell: View {
     }
 
     private var welcomeBinding: Binding<Bool> {
-        Binding(get: { services.onboarding.showsWelcome }, set: { _ in })
+        Binding(get: { services.onboarding.showsWelcome && services.clipboardHandoff.isFinished }, set: { _ in })
+    }
+
+    private var promptBinding: Binding<Bool> {
+        Binding(get: { services.clipboardHandoff.prompt == .importPrompt }, set: { _ in })
+    }
+
+    private var nothingFoundBinding: Binding<Bool> {
+        Binding(get: { services.clipboardHandoff.prompt == .nothingFound }, set: { _ in })
     }
 
     private var tabs: some View {

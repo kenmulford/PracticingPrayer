@@ -523,6 +523,9 @@
     "Diagnostic Log" : {
 
     },
+    "Did someone share a prayer with you?" : {
+
+    },
     "Discard Changes" : {
 
     },
@@ -620,6 +623,12 @@
 
     },
     "How does Prayer Time work?" : {
+
+    },
+    "Import" : {
+
+    },
+    "Import it from your clipboard." : {
 
     },
     "Imported" : {
@@ -763,6 +772,9 @@
 
     },
     "No Prayers" : {
+
+    },
+    "No Shared Prayer Found" : {
 
     },
     "No Tags" : {
@@ -1100,6 +1112,9 @@
 
     },
     "Take the Tour Again" : {
+
+    },
+    "Tap the link you received to open it." : {
 
     },
     "Tap the Prayer Cards tab, then tap \"Add Card\" in the top right. Give your card a name \u2014 a person, topic, or place \u2014 then tap Save, or Save + to save it and start another card in the same collection." : {
