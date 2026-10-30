@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		AA0000000000000000000012 /* PrayerKit in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000011 /* PrayerKit */; };
+		AA0000000000000004290001 /* PrayerKit in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000004290010 /* PrayerKit */; };
+		AA0000000000000004290002 /* ShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AA0000000000000004290004 /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -25,7 +27,28 @@
 			remoteGlobalIDString = AA0000000000000000000004;
 			remoteInfo = PrayerApp;
 		};
+		AA0000000000000004290003 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AA0000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AA0000000000000004290008;
+			remoteInfo = ShareExtension;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		AA000000000000000429000C /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				AA0000000000000004290002 /* ShareExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		AA0000000000000000000005 /* PrayerApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PrayerApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -35,6 +58,8 @@
 		AA0000000000000000000015 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
 		AA0000000000000000000016 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		AA0000000000000000000017 /* PrayerApp-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "PrayerApp-Info.plist"; sourceTree = "<group>"; };
+		AA0000000000000004290004 /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA0000000000000004290005 /* ShareExtension-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "ShareExtension-Info.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -51,6 +76,11 @@
 		AA0000000000000000000033 /* PrayerAppUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = PrayerAppUITests;
+			sourceTree = "<group>";
+		};
+		AA0000000000000004290006 /* ShareExtension */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = ShareExtension;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -78,6 +108,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AA0000000000000004290007 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA0000000000000004290001 /* PrayerKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -88,6 +126,7 @@
 				AA000000000000000000000F /* PrayerApp */,
 				AA0000000000000000000023 /* PrayerAppTests */,
 				AA0000000000000000000033 /* PrayerAppUITests */,
+				AA0000000000000004290006 /* ShareExtension */,
 				AA0000000000000000000003 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -98,6 +137,7 @@
 				AA0000000000000000000005 /* PrayerApp.app */,
 				AA0000000000000000000022 /* PrayerAppTests.xctest */,
 				AA0000000000000000000032 /* PrayerAppUITests.xctest */,
+				AA0000000000000004290004 /* ShareExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -109,6 +149,7 @@
 				AA0000000000000000000015 /* Debug.xcconfig */,
 				AA0000000000000000000016 /* Release.xcconfig */,
 				AA0000000000000000000017 /* PrayerApp-Info.plist */,
+				AA0000000000000004290005 /* ShareExtension-Info.plist */,
 			);
 			path = Configuration;
 			sourceTree = "<group>";
@@ -123,10 +164,12 @@
 				AA0000000000000000000006 /* Sources */,
 				AA0000000000000000000007 /* Frameworks */,
 				AA0000000000000000000008 /* Resources */,
+				AA000000000000000429000C /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				AA000000000000000429000B /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				AA000000000000000000000F /* PrayerApp */,
@@ -185,6 +228,29 @@
 			productReference = AA0000000000000000000032 /* PrayerAppUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		AA0000000000000004290008 /* ShareExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA000000000000000429000D /* Build configuration list for PBXNativeTarget "ShareExtension" */;
+			buildPhases = (
+				AA0000000000000004290009 /* Sources */,
+				AA0000000000000004290007 /* Frameworks */,
+				AA000000000000000429000A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				AA0000000000000004290006 /* ShareExtension */,
+			);
+			name = ShareExtension;
+			packageProductDependencies = (
+				AA0000000000000004290010 /* PrayerKit */,
+			);
+			productName = ShareExtension;
+			productReference = AA0000000000000004290004 /* ShareExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -196,6 +262,9 @@
 				LastUpgradeCheck = 2700;
 				TargetAttributes = {
 					AA0000000000000000000004 = {
+						CreatedOnToolsVersion = 27.0;
+					};
+					AA0000000000000004290008 = {
 						CreatedOnToolsVersion = 27.0;
 					};
 					AA0000000000000000000021 = {
@@ -228,6 +297,7 @@
 				AA0000000000000000000004 /* PrayerApp */,
 				AA0000000000000000000021 /* PrayerAppTests */,
 				AA0000000000000000000031 /* PrayerAppUITests */,
+				AA0000000000000004290008 /* ShareExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -248,6 +318,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		AA0000000000000000000036 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA000000000000000429000A /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -278,6 +355,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AA0000000000000004290009 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -290,6 +374,11 @@
 			isa = PBXTargetDependency;
 			target = AA0000000000000000000004 /* PrayerApp */;
 			targetProxy = AA0000000000000000000038 /* PBXContainerItemProxy */;
+		};
+		AA000000000000000429000B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AA0000000000000004290008 /* ShareExtension */;
+			targetProxy = AA0000000000000004290003 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -518,6 +607,54 @@
 			};
 			name = Release;
 		};
+		AA000000000000000429000E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.entitlements;
+				DEAD_CODE_STRIPPING = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Configuration/ShareExtension-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Practicing Prayer";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.multithreadedllc.prayercards.actionextension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+			};
+			name = Debug;
+		};
+		AA000000000000000429000F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.entitlements;
+				DEAD_CODE_STRIPPING = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Configuration/ShareExtension-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Practicing Prayer";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.multithreadedllc.prayercards.actionextension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -557,6 +694,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		AA000000000000000429000D /* Build configuration list for PBXNativeTarget "ShareExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA000000000000000429000E /* Debug */,
+				AA000000000000000429000F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
@@ -568,6 +714,10 @@
 
 /* Begin XCSwiftPackageProductDependency section */
 		AA0000000000000000000011 /* PrayerKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = PrayerKit;
+		};
+		AA0000000000000004290010 /* PrayerKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = PrayerKit;
 		};

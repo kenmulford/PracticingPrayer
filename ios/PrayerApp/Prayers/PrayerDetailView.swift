@@ -109,6 +109,9 @@ struct PrayerDetailView<CardLink: Hashable>: View {
         .listStyle(.insetGrouped)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            if model.canShowShare {
+                ToolbarItem(placement: .topBarTrailing) { ShareMenuItem(item: model.shareItem) }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button { editingPrayerID = prayer.id } label: {
                     Label("Edit", systemImage: "pencil")
@@ -145,6 +148,15 @@ struct PrayerDetailView<CardLink: Hashable>: View {
             Button("OK") {}
         } message: {
             Text(model.errorMessage ?? "")
+        }
+        .alert(
+            "Couldn't Share",
+            isPresented: Binding(
+                get: { model.shareError != nil }, set: { if !$0 { model.shareError = nil } })
+        ) {
+            Button("OK") {}
+        } message: {
+            Text(model.shareError ?? "")
         }
     }
 

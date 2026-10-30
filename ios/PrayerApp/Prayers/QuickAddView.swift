@@ -1,16 +1,23 @@
 import PrayerKit
 import SwiftUI
 
-struct QuickAddView: View {
+struct QuickAddView<Extra: View>: View {
     @State private var model: QuickAddModel
     @Environment(\.dismiss) private var dismiss
     @State private var showingDiscard = false
 
     private let database: PrayerDatabase
+    private let title: LocalizedStringKey
+    private let extra: Extra
 
-    init(database: PrayerDatabase) {
+    init(
+        database: PrayerDatabase, model: QuickAddModel, title: LocalizedStringKey,
+        @ViewBuilder extra: () -> Extra
+    ) {
         self.database = database
-        self.model = QuickAddModel(database: database)
+        self.title = title
+        self.extra = extra()
+        self.model = model
     }
 
     var body: some View {
@@ -20,12 +27,13 @@ struct QuickAddView: View {
                 ForEach($model.prayers) { $entry in
                     prayerSection($entry)
                 }
+                extra
                 Section {
                     Button("Add Prayer", systemImage: "plus") { model.addPrayer() }
                         .accessibilityIdentifier("QuickAdd_AddPrayer")
                 }
             }
-            .navigationTitle("Quick Add")
+            .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -112,6 +120,14 @@ struct QuickAddView: View {
         } header: {
             Text("Prayer \(number)")
                 .accessibilityAddTraits(.isHeader)
+        }
+    }
+}
+
+extension QuickAddView where Extra == EmptyView {
+    init(database: PrayerDatabase) {
+        self.init(database: database, model: QuickAddModel(database: database), title: "Quick Add") {
+            EmptyView()
         }
     }
 }

@@ -130,6 +130,11 @@ private struct CardDetailContent: View {
         } message: {
             Text(model.errorMessage ?? "")
         }
+        .alert("Couldn't Share", isPresented: shareErrorBinding) {
+            Button("OK") {}
+        } message: {
+            Text(model.shareError ?? "")
+        }
     }
 
     // MARK: - Toolbar
@@ -158,6 +163,7 @@ private struct CardDetailContent: View {
         }
         .onboardingTip(.addPrayer)
         Menu {
+            if model.canShowShare { ShareMenuItem(item: model.shareItem) }
             if !model.isSystem {
                 Button(
                     model.card?.isFavorite == true ? "Unfavorite" : "Favorite",
@@ -256,6 +262,12 @@ private struct CardDetailContent: View {
         Binding(
             get: { model.errorMessage != nil },
             set: { if !$0 { model.errorMessage = nil } })
+    }
+
+    private var shareErrorBinding: Binding<Bool> {
+        Binding(
+            get: { model.shareError != nil },
+            set: { if !$0 { model.shareError = nil } })
     }
 
     private var prayerDeleteBinding: Binding<Bool> {

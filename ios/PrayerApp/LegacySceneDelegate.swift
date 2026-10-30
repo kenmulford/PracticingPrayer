@@ -11,11 +11,21 @@ final class LegacySceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let windowScene = scene as? UIWindowScene else { return }
+        connectionOptions.urlContexts.forEach { InboundShareHandler.shared.handle($0.url) }
+        connectionOptions.userActivities.forEach { InboundShareHandler.shared.handle(userActivity: $0) }
         let window = UIWindow(windowScene: windowScene)
         window.rootViewController = UIHostingController(rootView: AppRoot())
         self.window = window
         window.makeKeyAndVisible()
         Logger(subsystem: "com.multithreadedllc.prayercards", category: "UpgradeGate")
             .debug("legacy scene session connected")
+    }
+
+    func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
+        URLContexts.forEach { InboundShareHandler.shared.handle($0.url) }
+    }
+
+    func scene(_ scene: UIScene, continue userActivity: NSUserActivity) {
+        InboundShareHandler.shared.handle(userActivity: userActivity)
     }
 }

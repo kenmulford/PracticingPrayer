@@ -40,9 +40,35 @@ struct AppShell: View {
                             },
                             skip: services.onboarding.skip)
                     }
+                    .sheet(item: importSheetBinding) { item in
+                        if case .payload(let payload) = item.content {
+                            ConfirmImportView(database: services.database, payload: payload)
+                        }
+                    }
+                    .alert("Unable to Import", isPresented: failureBinding, presenting: failure) { _ in
+                        Button("OK") {}
+                    } message: { failure in
+                        Text(failure.message)
+                    }
+                    .alert("Did someone share a prayer with you?", isPresented: promptBinding) {
+                        Button("Cancel", role: .cancel) { services.clipboardHandoff.cancel() }
+                        Button("Import") { services.clipboardHandoff.importClipboard() }
+                    } message: {
+                        Text("Import it from your clipboard.")
+                    }
+                    .alert("No Shared Prayer Found", isPresented: nothingFoundBinding) {
+                        Button("OK") { services.clipboardHandoff.acknowledgeNothingFound() }
+                    } message: {
+                        Text("Tap the link you received to open it.")
+                    }
                     .onChange(of: services.onboarding.stage, initial: true) { services.onboarding.syncTips() }
                     .task(id: services.onboarding.run) { await services.onboarding.watchTips() }
             }
+        }
+        .onOpenURL { services.inboundShare.handle($0) }
+        .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { services.inboundShare.handle(userActivity: $0) }
+        .onChange(of: services.inboundShare.isDeepLinkSession, initial: true) { _, isDeepLink in
+            if isDeepLink { services.onboarding.markDeepLinkSession() }
         }
         .accessibilityHidden(isCovered)
         .onChange(of: scenePhase, initial: true) { _, phase in
@@ -57,7 +83,13 @@ struct AppShell: View {
             if isCovered { coverWindow.show() } else { coverWindow.hide() }
         }
         .task {
+            #if DEBUG
+            services.inboundShare.handleLaunchArgument()
+            #endif
             await services.open()
+            await services.clipboardHandoff.run(
+                isEligible: services.phase == .open && services.onboarding.showsWelcome
+                    && !services.inboundShare.isDeepLinkSession)
             #if DEBUG
             if ProcessInfo.processInfo.arguments.contains(PrayerSession.debugArgument), services.phase == .open {
                 let items = (try? PrayerStore(database: services.database)
@@ -84,10 +116,56 @@ struct AppShell: View {
         } message: {
             Text("Would you like to pray for your recently notified prayer requests now?")
         }
+        .onChange(of: isReadyForPendingImport, initial: true) { _, ready in
+            if ready { services.pendingImport = PendingImport.pickUp() }
+        }
+        .sheet(item: Bindable(services).pendingImport) {
+            ConfirmImportView(database: services.database, payload: $0.payload, cardTitle: $0.cardTitle)
+        }
+    }
+
+    // Pick up only when a sheet can present, since pickup deletes the file. An empty link queue keeps
+    // the file in place while a link import or failure is pending, so two sheets never compete.
+    private var isReadyForPendingImport: Bool {
+        scenePhase == .active && services.phase == .open && services.pendingImport == nil
+            && services.inboundShare.queue.isEmpty
+            && services.prayerSession == nil && services.onboarding.stage != .welcome && !showsPrayerTimeAlert
+    }
+
+    // The link queue head waits while the App Group import sheet is up (one sheet at a time).
+    private var importReady: Bool {
+        services.phase == .open && services.prayerSession == nil && !showsPrayerTimeAlert
+            && !services.onboarding.showsWelcome && services.pendingImport == nil
+    }
+
+    private var importSheetBinding: Binding<InboundShareHandler.Item?> {
+        Binding(
+            get: {
+                guard importReady, let head = services.inboundShare.queue.first, case .payload = head.content else { return nil }
+                return head
+            },
+            set: { if $0 == nil { services.inboundShare.dismissHead() } })
+    }
+
+    private var failure: InboundShareHandler.Failure? {
+        guard importReady, let head = services.inboundShare.queue.first, case .failure(let failure) = head.content else { return nil }
+        return failure
+    }
+
+    private var failureBinding: Binding<Bool> {
+        Binding(get: { failure != nil }, set: { if !$0 { services.inboundShare.dismissHead() } })
     }
 
     private var welcomeBinding: Binding<Bool> {
-        Binding(get: { services.onboarding.stage == .welcome }, set: { _ in })
+        Binding(get: { services.onboarding.showsWelcome && services.clipboardHandoff.isFinished }, set: { _ in })
+    }
+
+    private var promptBinding: Binding<Bool> {
+        Binding(get: { services.clipboardHandoff.prompt == .importPrompt }, set: { _ in })
+    }
+
+    private var nothingFoundBinding: Binding<Bool> {
+        Binding(get: { services.clipboardHandoff.prompt == .nothingFound }, set: { _ in })
     }
 
     private var tabs: some View {

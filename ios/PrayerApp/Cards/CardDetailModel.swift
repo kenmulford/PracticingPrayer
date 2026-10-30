@@ -15,6 +15,9 @@ final class CardDetailModel {
     private(set) var isMutating = false
     var searchText = ""
     var errorMessage: String?
+    private(set) var shareItem: ShareItem?
+    var shareError: String?
+    var canShowShare: Bool { !isSystem && !isProtected }
     var isSystem: Bool { card?.isSystem ?? false }
     var isArchived: Bool {
         let folder = Int64(preferences.archivedFolderId)
@@ -48,6 +51,12 @@ final class CardDetailModel {
 
             let all = try PrayerStore(database: database).prayers(cardId: cardId).map(\.record)
             prayerCount = all.count
+            do {
+                shareItem = try ShareItemBuilder.card(record, prayers: all)
+            } catch {
+                shareItem = nil
+                shareError = error.localizedDescription
+            }
             activePrayerCount = all.filter { !$0.isAnswered }.count
             let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
             let matching = query.isEmpty ? all : all.filter { $0.title.range(of: query, options: .caseInsensitive) != nil }

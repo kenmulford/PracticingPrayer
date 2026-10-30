@@ -11,7 +11,7 @@ public struct ImportResolution: Sendable, Equatable {
     public private(set) var alreadyOnCard: [SharedPrayer]
     public let lookupError: ImportResolverError?
 
-    init(
+    public init(
         target: ImportTarget, toImport: [SharedPrayer], alreadyOnCard: [SharedPrayer] = [],
         lookupError: ImportResolverError? = nil
     ) {

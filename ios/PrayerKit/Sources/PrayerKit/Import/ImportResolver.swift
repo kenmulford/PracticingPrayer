@@ -49,7 +49,7 @@ public struct ImportResolver: Sendable {
         return ImportResolution(target: target, toImport: fresh, alreadyOnCard: duplicates)
     }
 
-    public func save(_ resolution: ImportResolution, newCardTitle: String? = nil, now: Date) throws
+    public func save(_ resolution: ImportResolution, newCardTitle: String? = nil, boxId: Int64 = 0, now: Date) throws
         -> ImportSaveResult
     {
         if resolution.hasNothingToSave { throw ImportResolverError.nothingToSave }
@@ -72,7 +72,7 @@ public struct ImportResolver: Sendable {
                 switch resolution.target {
                 case .newCard:
                     cardId = try CardMutations.insertRow(
-                        CardDraft(title: cardTitle, boxId: 0, isImported: true), ticks: ticks, db)
+                        CardDraft(title: cardTitle, boxId: boxId, isImported: true), ticks: ticks, db)
                 case .existingCard(let id):
                     guard try PrayerCardRecord.exists(db, key: id) else {
                         throw PrayerStoreError.cardNotFound(id)
@@ -97,7 +97,7 @@ public struct ImportResolver: Sendable {
         TextNormalization.collapseWhitespace(TextNormalization.normalizeQuotes(title)).lowercased()
     }
 
-    static func defaultCardTitle(now: Date, locale: Locale = .current) -> String {
+    public static func defaultCardTitle(now: Date, locale: Locale = .current) -> String {
         let formatter = DateFormatter()
         formatter.locale = locale
         formatter.setLocalizedDateFormatFromTemplate("MMMd")

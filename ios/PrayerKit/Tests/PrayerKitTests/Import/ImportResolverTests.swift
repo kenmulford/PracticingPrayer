@@ -68,6 +68,17 @@ private func titles(_ prayers: [SharedPrayer]) -> [String] { prayers.map(\.title
         }
     }
 
+    @Test func newCardUsesBoxId() throws {
+        try withCopy("long-upgraded.db") { database in
+            let sut = resolver(database)
+            let payload = SharePayload.request(SharedPrayer(title: "One", notes: nil))
+            let result = try sut.save(sut.resolve(payload, to: .newCard), boxId: 2, now: now)
+            let card = try #require(
+                try database.dbQueue.read { try PrayerCardRecord.fetchOne($0, key: result.cardId) })
+            #expect(card.boxId == 2)
+        }
+    }
+
     @Test func newCardRunsNoMatching() throws {
         try withCopy("long-upgraded.db") { database in
             let payload = SharePayload.request(SharedPrayer(title: "Sample Prayer Entry 1", notes: nil))

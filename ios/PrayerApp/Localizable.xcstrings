@@ -99,6 +99,12 @@
     "Active Cards" : {
 
     },
+    "Add" : {
+
+    },
+    "Add %@" : {
+
+    },
     "Add Card" : {
 
     },
@@ -133,6 +139,12 @@
 
     },
     "Allow Notifications" : {
+
+    },
+    "Already on This Card (%lld)" : {
+
+    },
+    "Already on this card" : {
 
     },
     "Answered" : {
@@ -341,6 +353,9 @@
     "Confidential cards unlocked" : {
 
     },
+    "Confirm Import" : {
+
+    },
     "Confirm PIN" : {
 
     },
@@ -365,10 +380,19 @@
     "Couldn't Update Cards" : {
 
     },
+    "Couldn't Share" : {
+
+    },
     "Couldn't Update Prayer" : {
 
     },
     "Couldn't create the tag." : {
+
+    },
+    "Couldn't reach Practicing Prayer's storage. Reinstall the app to fix sharing." : {
+
+    },
+    "Couldn't save the prayer right now. Try again." : {
 
     },
     "Couldn't verify PIN. Try again." : {
@@ -502,6 +526,9 @@
     "Diagnostic Log" : {
 
     },
+    "Did someone share a prayer with you?" : {
+
+    },
     "Discard Changes" : {
 
     },
@@ -533,6 +560,9 @@
 
     },
     "Enter the backup passphrase" : {
+
+    },
+    "Everything in this share is already on %@." : {
 
     },
     "Existing Card" : {
@@ -596,6 +626,12 @@
 
     },
     "How does Prayer Time work?" : {
+
+    },
+    "Import" : {
+
+    },
+    "Import it from your clipboard." : {
 
     },
     "Imported" : {
@@ -739,6 +775,9 @@
 
     },
     "No Prayers" : {
+
+    },
+    "No Shared Prayer Found" : {
 
     },
     "No Tags" : {
@@ -988,6 +1027,12 @@
     "Save and Add Another" : {
 
     },
+    "Save shared text as a new prayer card in Practicing Prayer." : {
+
+    },
+    "Save to Prayer" : {
+
+    },
     "Search Cards" : {
 
     },
@@ -1022,6 +1067,9 @@
 
     },
     "Share" : {
+
+    },
+    "Shared Text" : {
 
     },
     "Show Confidential" : {
@@ -1069,10 +1117,19 @@
     "Take the Tour Again" : {
 
     },
+    "Tap the link you received to open it." : {
+
+    },
     "Tap the Prayer Cards tab, then tap \"Add Card\" in the top right. Give your card a name \u2014 a person, topic, or place \u2014 then tap Save, or Save + to save it and start another card in the same collection." : {
 
     },
     "Teal" : {
+
+    },
+    "Text to save as a prayer card." : {
+
+    },
+    "That prayer is too long to save from the share sheet. Try a shorter selection." : {
 
     },
     "The card is hidden from every list until you choose Show Confidential." : {
@@ -1081,7 +1138,22 @@
     "The card shows as “Protected” until you unlock with Face ID or your passcode." : {
 
     },
+    "The shared prayer card file appears to be invalid." : {
+
+    },
+    "The shared prayer card link appears to be invalid or incomplete." : {
+
+    },
+    "The shared prayer link appears to be invalid or incomplete." : {
+
+    },
     "The star marks a card as a favorite. Swipe a card to the right in the Cards list, or touch and hold the card and choose Favorite. Favorited cards sort to the top of their collection so they're always easy to find." : {
+
+    },
+    "There's no text to save. Try again with a longer selection." : {
+
+    },
+    "These won't be added." : {
 
     },
     "This also deletes its %lld prayer requests." : {
@@ -1127,6 +1199,9 @@
     "This is the Quick Add card, so it can't be edited, favorited, archived, or deleted." : {
 
     },
+    "This prayer was shared from a newer version of Practicing Prayer. Please update the app to import it." : {
+
+    },
     "This will permanently replace all your current prayer data." : {
 
     },
@@ -1146,6 +1221,9 @@
 
     },
     "Type a name to create a tag." : {
+
+    },
+    "Unable to Import" : {
 
     },
     "Unable to Load" : {
@@ -1191,6 +1269,9 @@
 
     },
     "What is auto-mode in Prayer Time?" : {
+
+    },
+    "What text should I save?" : {
 
     },
     "White" : {

@@ -13,7 +13,13 @@ final class QuickAddModel {
         var details: String
     }
 
+    typealias Saver = @Sendable (QuickAddRequest, Date) throws -> Int
+
     @ObservationIgnored private let database: PrayerDatabase
+    @ObservationIgnored private let saver: Saver
+    private let initialPrayers: [PrayerEntry]
+    private let initialCardTitle: String
+    @ObservationIgnored var onTargetChange: (() -> Void)?
 
     var addTo: AddTo = .newCard {
         didSet {
@@ -23,22 +29,35 @@ final class QuickAddModel {
                 cardTitle = ""
                 collectionId = 0
             case .newCard:
+                cardTitle = initialCardTitle
                 selectedCardId = nil
                 selectedCardTitle = nil
             }
+            onTargetChange?()
         }
     }
     var collectionId: Int64 = 0
-    var cardTitle = ""
+    var cardTitle: String
     private(set) var selectedCardId: Int64?
     private(set) var selectedCardTitle: String?
-    var prayers = [QuickAddModel.emptyEntry()]
+    var prayers: [PrayerEntry]
     private(set) var collections: [CardBoxRecord] = []
     private(set) var isSaving = false
     var errorMessage: String?
 
-    init(database: PrayerDatabase) {
+    init(
+        database: PrayerDatabase, prayers: [PrayerEntry]? = nil, cardTitle: String = "", saver: Saver? = nil
+    ) {
+        let seeded = prayers ?? [Self.emptyEntry()]
         self.database = database
+        self.initialPrayers = seeded
+        self.initialCardTitle = cardTitle
+        self.prayers = seeded
+        self.cardTitle = cardTitle
+        self.saver =
+            saver ?? { request, now in
+                try QuickAddSaver(database: database).save(request, now: now).savedCount
+            }
     }
 
     var canSave: Bool {
@@ -50,9 +69,8 @@ final class QuickAddModel {
     }
 
     var isDirty: Bool {
-        prayers.count > 1
-            || prayers.contains { !Self.isBlank($0.title) || !Self.isBlank($0.details) }
-            || !Self.isBlank(cardTitle)
+        Self.signature(prayers) != Self.signature(initialPrayers)
+            || cardTitle != initialCardTitle
             || selectedCardId != nil
     }
 
@@ -72,6 +90,7 @@ final class QuickAddModel {
     func selectCard(id: Int64, title: String) {
         selectedCardId = id
         selectedCardTitle = title
+        onTargetChange?()
     }
 
     func save(now: Date = .now) async -> Bool {
@@ -87,13 +106,13 @@ final class QuickAddModel {
         let request = QuickAddRequest(
             target: target,
             prayers: prayers.map { QuickAddPrayer(title: $0.title, details: $0.details) })
-        let saver = QuickAddSaver(database: database)
+        let saver = saver
         do {
-            let result = try await Task.detached { try saver.save(request, now: now) }.value
+            let savedCount = try await Task.detached { try saver(request, now) }.value
             let message =
-                result.savedCount == 1
+                savedCount == 1
                 ? String(localized: "Prayer saved")
-                : String(localized: "\(result.savedCount) prayers saved")
+                : String(localized: "\(savedCount) prayers saved")
             AccessibilityNotification.Announcement(message).post()
             return true
         } catch {
@@ -104,6 +123,15 @@ final class QuickAddModel {
 
     private static func emptyEntry() -> PrayerEntry {
         PrayerEntry(id: UUID(), title: "", details: "")
+    }
+
+    private static func signature(_ entries: [PrayerEntry]) -> [[String]] {
+        entries.map {
+            [
+                $0.id.uuidString, $0.title.trimmingCharacters(in: .whitespacesAndNewlines),
+                $0.details.trimmingCharacters(in: .whitespacesAndNewlines),
+            ]
+        }
     }
 
     private static func isBlank(_ text: String) -> Bool {

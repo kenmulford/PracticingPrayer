@@ -56,6 +56,10 @@ final class OnboardingCoordinator {
     private(set) var stage: OnboardingStage
     private(set) var run: Int
     private(set) var tips: TipGroup
+    /// A share link opened the app; the welcome and tour stay out of the way without touching saved progress.
+    private(set) var isDeepLinkSession = false
+
+    var showsWelcome: Bool { stage == .welcome && !isDeepLinkSession }
 
     @ObservationIgnored private let preferences: AppPreferences
     @ObservationIgnored private let defaults: UserDefaults
@@ -92,10 +96,15 @@ final class OnboardingCoordinator {
         set(.welcome)
     }
 
+    func markDeepLinkSession() {
+        isDeepLinkSession = true
+        syncTips()
+    }
+
     func syncTips() {
-        AddCardTip.isActive = stage == .addCard
-        AddPrayerTip.isActive = stage == .addPrayer
-        PrayerTimeTip.isActive = stage == .prayerTime
+        AddCardTip.isActive = !isDeepLinkSession && stage == .addCard
+        AddPrayerTip.isActive = !isDeepLinkSession && stage == .addPrayer
+        PrayerTimeTip.isActive = !isDeepLinkSession && stage == .prayerTime
         // An ordered group waits on every earlier tip, so a resume past one invalidates it.
         if stage.order > OnboardingStage.addCard.order { AddCardTip(run: run).invalidate(reason: .actionPerformed) }
         if stage.order > OnboardingStage.addPrayer.order { AddPrayerTip(run: run).invalidate(reason: .actionPerformed) }

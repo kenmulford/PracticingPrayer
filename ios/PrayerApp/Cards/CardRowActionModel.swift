@@ -3,13 +3,14 @@ import Observation
 import PrayerKit
 
 enum CardRowAction: Hashable {
-    case pray, favorite, unfavorite, edit, moveTo, archive, unarchive, delete
+    case pray, share, favorite, unfavorite, edit, moveTo, archive, unarchive, delete
 }
 
 extension CardRowAction {
     var title: LocalizedStringResource {
         switch self {
         case .pray: "Pray"
+        case .share: "Share"
         case .favorite: "Favorite"
         case .unfavorite: "Unfavorite"
         case .edit: "Edit"
@@ -23,6 +24,7 @@ extension CardRowAction {
     var systemImage: String {
         switch self {
         case .pray: "hands.and.sparkles"
+        case .share: "square.and.arrow.up"
         case .favorite: "star.fill"
         case .unfavorite: "star.slash"
         case .edit: "pencil"
@@ -62,7 +64,7 @@ final class CardRowActionModel {
     private var archiveAction: CardRowAction { isArchived ? .unarchive : .archive }
 
     var menuActions: [CardRowAction] {
-        isLocked ? [] : [.pray, favoriteAction, .edit, .moveTo, archiveAction, .delete]
+        isLocked ? [] : [.pray, .share, favoriteAction, .edit, .moveTo, archiveAction, .delete]
     }
 
     var canPray: Bool { activePrayerCount > 0 }
@@ -89,7 +91,7 @@ final class CardRowActionModel {
         case .archive: _ = model.archive()
         case .unarchive: model.unarchive()
         case .delete: _ = model.delete()
-        case .pray, .edit, .moveTo: return nil
+        case .pray, .share, .edit, .moveTo: return nil
         }
         return model.errorMessage
     }

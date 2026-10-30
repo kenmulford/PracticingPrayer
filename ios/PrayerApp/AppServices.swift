@@ -16,8 +16,11 @@ final class AppServices {
     private(set) var databaseGeneration = 0
     let preferences: AppPreferences
     let onboarding: OnboardingCoordinator
+    let inboundShare: InboundShareHandler
+    let clipboardHandoff: ClipboardHandoffCoordinator
     let confidential: ConfidentialSession
     var prayerSession: PrayerSession?
+    var pendingImport: PendingImport?
 
     @ObservationIgnored private var openedDatabase: PrayerDatabase?
     @ObservationIgnored private let databasePath: String
@@ -29,8 +32,12 @@ final class AppServices {
         return openedDatabase
     }
 
-    init(preferences: AppPreferences = AppServices.defaultPreferences, databasePath: String = AppServices.defaultDatabasePath) {
+    init(preferences: AppPreferences = AppServices.defaultPreferences, databasePath: String = AppServices.defaultDatabasePath,
+         inboundShare: InboundShareHandler = .shared) {
         self.preferences = preferences
+        self.inboundShare = inboundShare
+        clipboardHandoff = ClipboardHandoffCoordinator(
+            preferences: preferences, pasteboard: Self.defaultPasteboard, inboundShare: inboundShare)
         onboarding = OnboardingCoordinator(preferences: preferences, isSuppressed: Self.suppressesOnboarding)
         self.databasePath = databasePath
         confidential = ConfidentialSession(authenticator: Self.defaultAuthenticator)
@@ -80,6 +87,18 @@ final class AppServices {
         #else
         return false
         #endif
+    }
+
+    static var defaultPasteboard: any PasteboardReading {
+        #if DEBUG
+        if let text = UserDefaults.standard.string(forKey: "StubClipboard") {
+            return StubPasteboard(text: text)
+        }
+        if ProcessInfo.processInfo.environment["PRAYER_DB_PATH"] != nil {
+            return StubPasteboard(text: "")
+        }
+        #endif
+        return SystemPasteboard()
     }
 
     static var defaultDatabasePath: String {
