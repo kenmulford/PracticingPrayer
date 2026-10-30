@@ -1120,6 +1120,15 @@
     "The card shows as “Protected” until you unlock with Face ID or your passcode." : {
 
     },
+    "The shared prayer card file appears to be invalid." : {
+
+    },
+    "The shared prayer card link appears to be invalid or incomplete." : {
+
+    },
+    "The shared prayer link appears to be invalid or incomplete." : {
+
+    },
     "The star marks a card as a favorite. Swipe a card to the right in the Cards list, or touch and hold the card and choose Favorite. Favorited cards sort to the top of their collection so they're always easy to find." : {
 
     },
@@ -1172,6 +1181,9 @@
     "This is the Quick Add card, so it can't be edited, favorited, archived, or deleted." : {
 
     },
+    "This prayer was shared from a newer version of Practicing Prayer. Please update the app to import it." : {
+
+    },
     "This will permanently replace all your current prayer data." : {
 
     },
@@ -1191,6 +1203,9 @@
 
     },
     "Type a name to create a tag." : {
+
+    },
+    "Unable to Import" : {
 
     },
     "Unable to Load" : {

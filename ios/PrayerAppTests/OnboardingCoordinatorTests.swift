@@ -87,4 +87,19 @@ import Testing
         #expect(preferences.onboardingStep == "Welcome")
         #expect(!preferences.onboardingComplete)
     }
+
+    @Test func deepLinkSessionWritesNothing() {
+        let coordinator = make()
+        coordinator.markDeepLinkSession()
+        #expect(!coordinator.showsWelcome)
+        #expect(preferences.onboardingStep == "Welcome")
+        #expect(!preferences.onboardingComplete)
+    }
+
+    @Test func deepLinkSessionDeactivatesTips() {
+        let coordinator = make(step: "CreateCard")
+        coordinator.syncTips()
+        coordinator.markDeepLinkSession()
+        #expect(!AddCardTip.isActive)
+    }
 }

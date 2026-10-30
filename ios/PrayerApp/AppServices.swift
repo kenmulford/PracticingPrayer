@@ -16,6 +16,7 @@ final class AppServices {
     private(set) var databaseGeneration = 0
     let preferences: AppPreferences
     let onboarding: OnboardingCoordinator
+    let inboundShare: InboundShareHandler
     let confidential: ConfidentialSession
     var prayerSession: PrayerSession?
     var pendingImport: PendingImport?
@@ -30,8 +31,10 @@ final class AppServices {
         return openedDatabase
     }
 
-    init(preferences: AppPreferences = AppServices.defaultPreferences, databasePath: String = AppServices.defaultDatabasePath) {
+    init(preferences: AppPreferences = AppServices.defaultPreferences, databasePath: String = AppServices.defaultDatabasePath,
+         inboundShare: InboundShareHandler = .shared) {
         self.preferences = preferences
+        self.inboundShare = inboundShare
         onboarding = OnboardingCoordinator(preferences: preferences, isSuppressed: Self.suppressesOnboarding)
         self.databasePath = databasePath
         confidential = ConfidentialSession(authenticator: Self.defaultAuthenticator)

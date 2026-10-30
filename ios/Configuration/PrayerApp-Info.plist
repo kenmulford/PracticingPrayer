@@ -19,6 +19,41 @@
 			</array>
 		</dict>
 	</dict>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<false/>
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Prayer Card</string>
+			<key>LSHandlerRank</key>
+			<string>Owner</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.multithreadedllc.prayercards.prayercard</string>
+			</array>
+		</dict>
+	</array>
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.multithreadedllc.prayercards.prayercard</string>
+			<key>UTTypeDescription</key>
+			<string>Prayer Card</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>prayercard</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Face ID unlocks your confidential prayer cards.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>

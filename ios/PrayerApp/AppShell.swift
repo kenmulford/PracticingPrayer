@@ -40,9 +40,24 @@ struct AppShell: View {
                             },
                             skip: services.onboarding.skip)
                     }
+                    .sheet(item: importSheetBinding) { item in
+                        if case .payload(let payload) = item.content {
+                            ConfirmImportView(database: services.database, payload: payload)
+                        }
+                    }
+                    .alert("Unable to Import", isPresented: failureBinding, presenting: failure) { _ in
+                        Button("OK") {}
+                    } message: { failure in
+                        Text(failure.message)
+                    }
                     .onChange(of: services.onboarding.stage, initial: true) { services.onboarding.syncTips() }
                     .task(id: services.onboarding.run) { await services.onboarding.watchTips() }
             }
+        }
+        .onOpenURL { services.inboundShare.handle($0) }
+        .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { services.inboundShare.handle(userActivity: $0) }
+        .onChange(of: services.inboundShare.isDeepLinkSession, initial: true) { _, isDeepLink in
+            if isDeepLink { services.onboarding.markDeepLinkSession() }
         }
         .accessibilityHidden(isCovered)
         .onChange(of: scenePhase, initial: true) { _, phase in
@@ -57,6 +72,9 @@ struct AppShell: View {
             if isCovered { coverWindow.show() } else { coverWindow.hide() }
         }
         .task {
+            #if DEBUG
+            services.inboundShare.handleLaunchArgument()
+            #endif
             await services.open()
             #if DEBUG
             if ProcessInfo.processInfo.arguments.contains(PrayerSession.debugArgument), services.phase == .open {
@@ -92,14 +110,40 @@ struct AppShell: View {
         }
     }
 
-    // Pick up only when a sheet can present, since pickup deletes the file.
+    // Pick up only when a sheet can present, since pickup deletes the file. An empty link queue keeps
+    // the file in place while a link import or failure is pending, so two sheets never compete.
     private var isReadyForPendingImport: Bool {
         scenePhase == .active && services.phase == .open && services.pendingImport == nil
+            && services.inboundShare.queue.isEmpty
             && services.prayerSession == nil && services.onboarding.stage != .welcome && !showsPrayerTimeAlert
     }
 
+    // The link queue head waits while the App Group import sheet is up (one sheet at a time).
+    private var importReady: Bool {
+        services.phase == .open && services.prayerSession == nil && !showsPrayerTimeAlert
+            && !services.onboarding.showsWelcome && services.pendingImport == nil
+    }
+
+    private var importSheetBinding: Binding<InboundShareHandler.Item?> {
+        Binding(
+            get: {
+                guard importReady, let head = services.inboundShare.queue.first, case .payload = head.content else { return nil }
+                return head
+            },
+            set: { if $0 == nil { services.inboundShare.dismissHead() } })
+    }
+
+    private var failure: InboundShareHandler.Failure? {
+        guard importReady, let head = services.inboundShare.queue.first, case .failure(let failure) = head.content else { return nil }
+        return failure
+    }
+
+    private var failureBinding: Binding<Bool> {
+        Binding(get: { failure != nil }, set: { if !$0 { services.inboundShare.dismissHead() } })
+    }
+
     private var welcomeBinding: Binding<Bool> {
-        Binding(get: { services.onboarding.stage == .welcome }, set: { _ in })
+        Binding(get: { services.onboarding.showsWelcome }, set: { _ in })
     }
 
     private var tabs: some View {
