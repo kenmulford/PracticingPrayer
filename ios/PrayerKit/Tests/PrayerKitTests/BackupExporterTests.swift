@@ -12,6 +12,10 @@ private func repoRoot() -> URL {
 
 private let passphrase = "correct horse battery"
 
+/// Every passphrase export writes a scrub copy into the shared temp directory; suites run in parallel,
+/// so exports and the leftover check hold this lock to keep a sibling's in-flight copy out of the listing.
+let scrubFileLock = NSLock()
+
 @Suite struct BackupExporterTests {
     private struct Fixture {
         let directory: URL
@@ -71,8 +75,10 @@ private let passphrase = "correct horse battery"
 
     @Test func passphraseExportScrubsAndEncrypts() throws {
         let fixture = try makeFixture(protectCard: true)
-        let url = try BackupExporter.export(
-            database: fixture.database, passphrase: passphrase, to: exportDirectory(fixture))
+        let url = try scrubFileLock.withLock {
+            try BackupExporter.export(
+                database: fixture.database, passphrase: passphrase, to: exportDirectory(fixture))
+        }
         let entries = try BackupArchive.entries(of: Data(contentsOf: url))
         #expect(Set(entries.keys) == ["prayer_app.db", "confidential.enc"])
 
@@ -96,14 +102,16 @@ private let passphrase = "correct horse battery"
 
     @Test func passphraseExportLeavesLiveDatabase() throws {
         let fixture = try makeFixture(protectCard: true)
-        _ = try BackupExporter.export(
-            database: fixture.database, passphrase: passphrase, to: exportDirectory(fixture))
+        let leftovers = try scrubFileLock.withLock {
+            _ = try BackupExporter.export(
+                database: fixture.database, passphrase: passphrase, to: exportDirectory(fixture))
+            return try FileManager.default.contentsOfDirectory(atPath: FileManager.default.temporaryDirectory.path)
+                .filter { $0.hasPrefix("prayer_app_scrub_") }
+        }
         let cards = try fixture.database.dbQueue.read { db in
             try count(db, "SELECT COUNT(*) FROM PrayerCard WHERE Id = 2")
         }
         #expect(cards == 1)
-        let leftovers = try FileManager.default.contentsOfDirectory(atPath: FileManager.default.temporaryDirectory.path)
-            .filter { $0.hasPrefix("prayer_app_scrub_") }
         #expect(leftovers.isEmpty)
     }
 

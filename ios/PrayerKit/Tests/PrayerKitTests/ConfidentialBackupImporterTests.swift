@@ -21,8 +21,10 @@ private let passphrase = "correct horse battery"
         try database.dbQueue.write { db in
             try db.execute(sql: "UPDATE PrayerCard SET ProtectionMode = 1 WHERE Id = 2")
         }
-        let url = try BackupExporter.export(
-            database: database, passphrase: passphrase, to: directory.appendingPathComponent("exports"))
+        let url = try scrubFileLock.withLock {
+            try BackupExporter.export(
+                database: database, passphrase: passphrase, to: directory.appendingPathComponent("exports"))
+        }
         try database.close()
         return url
     }
