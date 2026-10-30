@@ -115,8 +115,11 @@ struct CardsView: View {
                     ) { card in
                         rowError = CardRowActionModel.perform(
                             .delete, cardId: card.card.id, database: services.database,
-                            preferences: services.preferences)
-                        if rowError == nil { services.reconcileReminders() }
+                            preferences: services.preferences, isSessionUnlocked: isSessionUnlocked)
+                        if rowError == nil {
+                            services.reconcileReminders()
+                            deselect(card.card.id)
+                        }
                         reload()
                     }
                 )
@@ -324,13 +327,20 @@ struct CardsView: View {
         case .prayer(let id):
             PrayerDetailView(prayerId: id, cardRoute: CardsRoute.card(id:), onChange: reload, onClose: closeDetail)
         case .manageCollections:
-            CollectionsView()
+            CollectionsView(onChange: reload)
         }
     }
 
     private func closeDetail() {
         if path.isEmpty { selection = nil } else { path.removeLast() }
         reload()
+    }
+
+    // A removed or archived card must not stay open in the detail pane.
+    private func deselect(_ cardId: Int64) {
+        guard selection == .card(id: cardId) else { return }
+        selection = nil
+        path = []
     }
 
     private func reload() {
@@ -398,7 +408,9 @@ struct CardsView: View {
             cardToDelete = item
         case .favorite, .unfavorite, .archive, .unarchive:
             rowError = CardRowActionModel.perform(
-                action, cardId: item.card.id, database: services.database, preferences: services.preferences)
+                action, cardId: item.card.id, database: services.database, preferences: services.preferences,
+                isSessionUnlocked: isSessionUnlocked)
+            if rowError == nil, action == .archive { deselect(item.card.id) }
             reload()
         }
     }
@@ -406,7 +418,8 @@ struct CardsView: View {
     private func moveRowCard(toBox boxId: Int64) {
         guard let card = rowCard else { return }
         rowError = CardRowActionModel.move(
-            cardId: card.card.id, toBox: boxId, database: services.database, preferences: services.preferences)
+            cardId: card.card.id, toBox: boxId, database: services.database, preferences: services.preferences,
+            isSessionUnlocked: isSessionUnlocked)
         reload()
     }
 

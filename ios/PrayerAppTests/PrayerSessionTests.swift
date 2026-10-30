@@ -100,17 +100,34 @@ private struct WriteFailure: Error {}
         }
     }
 
-    @Test func failedWritesStillAdvance() async throws {
+    @Test func markAnsweredReconcilesRemindersAfterWrite() async throws {
+        try await withSession(titles: ["reconA", "reconB"]) { _, database, _ in
+            var reconciled = 0
+            let items = try PrayerStore(database: database).prayers(segment: .active, isSessionUnlocked: false)
+            let session = try #require(PrayerSession(
+                items: Array(items.prefix(1)), database: database, reconcile: { reconciled += 1 }))
+            session.markAnswered()
+            #expect(reconciled == 1)
+        }
+    }
+
+    @Test func failedAnswerSurfacesErrorAndStays() async throws {
         let items = try await {
             var result: [PrayerListItem] = []
             try await withSession(titles: ["failA", "failB"]) { session, _, _ in result = session.items }
             return result
         }()
+        var reconciled = 0
         let session = try #require(PrayerSession(
-            items: items, recordPrayed: { _ in throw WriteFailure() }, markAnswered: { _ in throw WriteFailure() }))
+            items: items, recordPrayed: { _ in throw WriteFailure() }, markAnswered: { _ in throw WriteFailure() },
+            reconcile: { reconciled += 1 }))
         session.next()
+        #expect(session.currentIndex == 1)
         session.markAnswered()
-        #expect(session.currentIndex == 2)
+        #expect(session.currentIndex == 1)
+        #expect(session.errorMessage != nil)
+        #expect(!session.isAnswered(items[1]))
+        #expect(reconciled == 0)
     }
 
     @Test func autoIntervalNormalizes() {

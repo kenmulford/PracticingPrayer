@@ -1,6 +1,6 @@
 import XCTest
 
-final class PrayerSessionTests: XCTestCase {
+final class PrayerSessionUITests: XCTestCase {
     private var fixtureCopy: URL?
 
     override func tearDown() {

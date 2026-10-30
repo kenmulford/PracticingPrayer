@@ -80,9 +80,11 @@ final class CardRowActionModel {
     }
 
     static func perform(
-        _ action: CardRowAction, cardId: Int64, database: PrayerDatabase, preferences: AppPreferences
+        _ action: CardRowAction, cardId: Int64, database: PrayerDatabase, preferences: AppPreferences,
+        isSessionUnlocked: Bool
     ) -> String? {
-        let model = CardDetailModel(cardId: cardId, database: database, preferences: preferences)
+        let model = CardDetailModel(
+            cardId: cardId, database: database, preferences: preferences, isSessionUnlocked: isSessionUnlocked)
         model.load()
         switch action {
         case .favorite, .unfavorite: model.toggleFavorite()
@@ -94,15 +96,21 @@ final class CardRowActionModel {
         return model.errorMessage
     }
 
-    static func move(cardId: Int64, toBox boxId: Int64, database: PrayerDatabase, preferences: AppPreferences) -> String? {
-        let model = CardDetailModel(cardId: cardId, database: database, preferences: preferences)
+    static func move(
+        cardId: Int64, toBox boxId: Int64, database: PrayerDatabase, preferences: AppPreferences, isSessionUnlocked: Bool
+    ) -> String? {
+        let model = CardDetailModel(
+            cardId: cardId, database: database, preferences: preferences, isSessionUnlocked: isSessionUnlocked)
         model.load()
         model.move(toBox: boxId)
         return model.errorMessage
     }
 
-    static func previewTitles(cardId: Int64, database: PrayerDatabase, preferences: AppPreferences) -> [String] {
-        let model = CardDetailModel(cardId: cardId, database: database, preferences: preferences)
+    static func previewTitles(
+        cardId: Int64, database: PrayerDatabase, preferences: AppPreferences, isSessionUnlocked: Bool
+    ) -> [String] {
+        let model = CardDetailModel(
+            cardId: cardId, database: database, preferences: preferences, isSessionUnlocked: isSessionUnlocked)
         model.load()
         return model.activePrayers.prefix(3).map(\.title)
     }

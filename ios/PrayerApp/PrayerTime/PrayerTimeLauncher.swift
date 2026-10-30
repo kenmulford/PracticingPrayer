@@ -26,7 +26,9 @@ nonisolated struct PrayerTimeLauncher: Sendable {
         let store = PrayerStore(database: database)
         switch scope {
         case .all:
-            return try store.prayers(segment: .active, isSessionUnlocked: isSessionUnlocked)
+            let active = try store.prayers(segment: .active, isSessionUnlocked: isSessionUnlocked)
+            let archived = try archivedCardIds(isSessionUnlocked: isSessionUnlocked)
+            return active.filter { !archived.contains($0.record.prayerCardId) }
         case .tags(let ids):
             return try store.prayers(segment: .active, tagIds: ids, isSessionUnlocked: isSessionUnlocked)
         case .cards(let ids):
@@ -42,6 +44,11 @@ nonisolated struct PrayerTimeLauncher: Sendable {
             let cards = try eligibleCards(search: "", isSessionUnlocked: isSessionUnlocked).filter { $0.boxId == id }.flatMap(\.cards)
             return try activePrayers(of: cards, store: store)
         }
+    }
+
+    private func archivedCardIds(isSessionUnlocked: Bool) throws -> Set<Int64> {
+        let list = try database.cardList(filter: CardListFilter(searchText: ""), isSessionUnlocked: isSessionUnlocked)
+        return Set(list.sections.filter { $0.box?.systemKey == "archived" }.flatMap { $0.cards.map(\.card.id) })
     }
 
     func eligibleCards(search: String, isSessionUnlocked: Bool = false) throws -> [PrayerTimeSection] {
@@ -78,14 +85,14 @@ nonisolated struct PrayerTimeLauncher: Sendable {
 }
 
 extension PrayerTimeLauncher {
-    /// Protected prayers join a scoped session only after the device owner unlocks them.
+    /// Protected prayers join a session only after the device owner verifies, every time, even when the
+    /// session is already unlocked (1.7.2 #255: Prayer Time is an exposed landscape view).
     @MainActor
     func items(for scope: PrayerTimeScope, session: ConfidentialSession) async throws -> [PrayerListItem] {
-        if scope == .all { return try items(for: .all, isSessionUnlocked: session.isUnlocked) }
         let visible = try items(for: scope, isSessionUnlocked: false)
         let unlocked = try items(for: scope, isSessionUnlocked: true)
         if Set(visible.map(\.record.id)) == Set(unlocked.map(\.record.id)) { return visible }
-        let allowed = await session.authenticate(reason: "Start Prayer Time with protected prayers")
+        let allowed = await session.verifyOwner(reason: "Start Prayer Time with protected prayers")
         return allowed ? unlocked : visible
     }
 }
@@ -102,6 +109,7 @@ private struct PrayerTimeLauncherModifier: ViewModifier {
     @State private var hasCollections = false
     @State private var sheet: Sheet?
     @State private var pendingScope: PrayerTimeScope?
+    @State private var errorMessage: String?
 
     func body(content: Content) -> some View {
         content
@@ -123,6 +131,15 @@ private struct PrayerTimeLauncherModifier: ViewModifier {
                 }
             }
             .onAppear(perform: refresh)
+            .alert("Couldn't Start Prayer Time", isPresented: errorBinding) {
+                Button("OK") {}
+            } message: {
+                Text(errorMessage ?? "")
+            }
+    }
+
+    private var errorBinding: Binding<Bool> {
+        Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })
     }
 
     private var launcher: PrayerTimeLauncher {
@@ -143,8 +160,13 @@ private struct PrayerTimeLauncherModifier: ViewModifier {
 
     private func start(_ scope: PrayerTimeScope) {
         Task {
-            guard let items = try? await launcher.items(for: scope, session: services.confidential) else { return }
-            services.prayerSession = PrayerSession(items: items, database: services.database)
+            do {
+                let items = try await launcher.items(for: scope, session: services.confidential)
+                services.prayerSession = PrayerSession(
+                    items: items, database: services.database, reconcile: services.reconcileReminders)
+            } catch {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 
@@ -152,10 +174,12 @@ private struct PrayerTimeLauncherModifier: ViewModifier {
         let launcher = launcher
         Task {
             let result = await Task.detached {
-                (try? launcher.tagOptions().isEmpty == false, try? launcher.collectionOptions().isEmpty == false)
+                Result { (try launcher.tagOptions().isEmpty == false, try launcher.collectionOptions().isEmpty == false) }
             }.value
-            hasTags = result.0 ?? false
-            hasCollections = result.1 ?? false
+            switch result {
+            case .success(let flags): (hasTags, hasCollections) = flags
+            case .failure(let error): errorMessage = error.localizedDescription
+            }
         }
     }
 }
@@ -188,7 +212,8 @@ private struct PrayerTimeStartModifier: ViewModifier {
             do {
                 let items = try await PrayerTimeLauncher(database: services.database)
                     .items(for: scope, session: services.confidential)
-                services.prayerSession = PrayerSession(items: items, database: services.database)
+                services.prayerSession = PrayerSession(
+                    items: items, database: services.database, reconcile: services.reconcileReminders)
             } catch {
                 errorMessage = error.localizedDescription
             }

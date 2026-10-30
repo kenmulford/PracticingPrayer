@@ -41,7 +41,8 @@ struct CardRowActions: ViewModifier {
                     CardRowPreview(
                         title: item.card.title,
                         prayerTitles: CardRowActionModel.previewTitles(
-                            cardId: item.card.id, database: services.database, preferences: services.preferences))
+                            cardId: item.card.id, database: services.database, preferences: services.preferences,
+                            isSessionUnlocked: services.confidential.isUnlocked))
                 }
         }
     }

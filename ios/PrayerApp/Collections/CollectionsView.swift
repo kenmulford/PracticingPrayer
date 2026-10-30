@@ -3,6 +3,7 @@ import SwiftUI
 
 struct CollectionsView: View {
     @Environment(AppServices.self) private var services
+    var onChange: () -> Void = {}
 
     private struct Loaded {
         let collections: [CardBoxRecord]
@@ -31,7 +32,7 @@ struct CollectionsView: View {
                     ToolbarItem(placement: .topBarTrailing) { addButton }
                 }
             }
-            .sheet(item: $editor, onDismiss: reload) { target in
+            .sheet(item: $editor, onDismiss: changed) { target in
                 CollectionEditorView(database: services.database, collection: target.record, onFinish: {})
             }
             .deleteCollectionDialog(isPresented: $showingDelete, name: deleteTarget?.name ?? "") { option in
@@ -128,7 +129,7 @@ struct CollectionsView: View {
             try CollectionStore(database: services.database).delete(
                 id: target.id, option: option, ownerVerified: verified)
             services.reconcileReminders()
-            reload()
+            changed()
         } catch {
             deleteError = error.localizedDescription
         }
@@ -147,5 +148,10 @@ struct CollectionsView: View {
                 collections: collections,
                 counts: Dictionary(sections.map { ($0.boxId, $0.cards.count) }, uniquingKeysWith: +))
         }
+    }
+
+    private func changed() {
+        reload()
+        onChange()
     }
 }

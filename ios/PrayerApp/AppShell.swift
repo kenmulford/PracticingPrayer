@@ -11,6 +11,7 @@ struct AppShell: View {
     @State private var tagsPath: [TagsRoute] = []
     @State private var settingsPath: [SettingsRoute] = []
     @State private var showsPrayerTimeAlert = false
+    @State private var notifiedPrayers: [PrayerListItem] = []
     @State private var coverWindow = PrivacyCoverWindow()
     @State private var isCovered = false
 
@@ -104,14 +105,14 @@ struct AppShell: View {
         .onChange(of: services.phase == .open && NotificationTapHandler.shared.hasPendingTap, initial: true) { _, ready in
             guard ready else { return }
             NotificationTapHandler.shared.hasPendingTap = false
-            showsPrayerTimeAlert = !NotificationTapHandler.recentlyNotifiedPrayers(database: services.database).isEmpty
+            notifiedPrayers = NotificationTapHandler.recentlyNotifiedPrayers(database: services.database)
+            showsPrayerTimeAlert = !notifiedPrayers.isEmpty
         }
         .alert("Prayer Time", isPresented: $showsPrayerTimeAlert) {
             Button("Cancel", role: .cancel) {}
             Button("Pray Now") {
                 services.prayerSession = PrayerSession(
-                    items: NotificationTapHandler.recentlyNotifiedPrayers(database: services.database),
-                    database: services.database)
+                    items: notifiedPrayers, database: services.database, reconcile: services.reconcileReminders)
             }
         } message: {
             Text("Would you like to pray for your recently notified prayer requests now?")

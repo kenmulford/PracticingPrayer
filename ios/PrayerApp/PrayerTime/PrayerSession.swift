@@ -19,10 +19,12 @@ final class PrayerSession: Identifiable {
     let items: [PrayerListItem]
     private(set) var currentIndex = 0
     private(set) var answeredIds: Set<Int64> = []
+    var errorMessage: String?
 
     @ObservationIgnored private let recordPrayed: (Int64) throws -> Void
     @ObservationIgnored private let markAnsweredWrite: (Int64) throws -> Void
     @ObservationIgnored private let clearRecentlyNotified: (Int64) throws -> Void
+    @ObservationIgnored private let reconcile: () -> Void
 
     var isComplete: Bool { currentIndex >= items.count }
     var isFirst: Bool { currentIndex == 0 }
@@ -31,16 +33,21 @@ final class PrayerSession: Identifiable {
         items: [PrayerListItem],
         recordPrayed: @escaping (Int64) throws -> Void,
         markAnswered: @escaping (Int64) throws -> Void,
-        clearRecentlyNotified: @escaping (Int64) throws -> Void = { _ in }
+        clearRecentlyNotified: @escaping (Int64) throws -> Void = { _ in },
+        reconcile: @escaping () -> Void = {}
     ) {
         guard !items.isEmpty else { return nil }
         self.items = items
         self.recordPrayed = recordPrayed
         self.markAnsweredWrite = markAnswered
         self.clearRecentlyNotified = clearRecentlyNotified
+        self.reconcile = reconcile
     }
 
-    convenience init?(items: [PrayerListItem], database: PrayerDatabase, now: @escaping () -> Date = { .now }) {
+    convenience init?(
+        items: [PrayerListItem], database: PrayerDatabase, now: @escaping () -> Date = { .now },
+        reconcile: @escaping () -> Void = {}
+    ) {
         let recorder = PrayerInteractionRecorder(database: database)
         let store = PrayerStore(database: database)
         let tags = TagStore(database: database)
@@ -48,7 +55,8 @@ final class PrayerSession: Identifiable {
             items: items,
             recordPrayed: { _ = try recorder.recordPrayed(prayerId: $0, now: now()) },
             markAnswered: { try store.markAnswered(id: $0, now: now()) },
-            clearRecentlyNotified: { try tags.removeRecentlyNotified(prayerId: $0) })
+            clearRecentlyNotified: { try tags.removeRecentlyNotified(prayerId: $0) },
+            reconcile: reconcile)
     }
 
     func isAnswered(_ item: PrayerListItem) -> Bool {
@@ -75,7 +83,13 @@ final class PrayerSession: Identifiable {
     func markAnswered() {
         guard !isComplete else { return }
         let item = items[currentIndex]
-        try? markAnsweredWrite(item.record.id)
+        do {
+            try markAnsweredWrite(item.record.id)
+        } catch {
+            errorMessage = error.localizedDescription
+            return
+        }
+        reconcile()
         answeredIds.insert(item.record.id)
         AccessibilityNotification.Announcement(String(localized: "\(item.record.title) marked as answered")).post()
         next()

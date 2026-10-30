@@ -74,7 +74,7 @@ private func model(
 
     @Test func performFavoritePersists() async throws {
         try await withDatabase { database, preferences in
-            #expect(CardRowActionModel.perform(.favorite, cardId: 2, database: database, preferences: preferences) == nil)
+            #expect(CardRowActionModel.perform(.favorite, cardId: 2, database: database, preferences: preferences, isSessionUnlocked: false) == nil)
             let fresh = CardDetailModel(cardId: 2, database: database, preferences: preferences)
             fresh.load()
             #expect(fresh.card?.isFavorite == true)
@@ -83,11 +83,11 @@ private func model(
 
     @Test func archiveThenUnarchiveRestoresBox() async throws {
         try await withDatabase(archivedFolderId: 2) { database, preferences in
-            _ = CardRowActionModel.perform(.archive, cardId: 2, database: database, preferences: preferences)
+            _ = CardRowActionModel.perform(.archive, cardId: 2, database: database, preferences: preferences, isSessionUnlocked: false)
             let archived = CardDetailModel(cardId: 2, database: database, preferences: preferences)
             archived.load()
             #expect(archived.card?.boxId == 2)
-            _ = CardRowActionModel.perform(.unarchive, cardId: 2, database: database, preferences: preferences)
+            _ = CardRowActionModel.perform(.unarchive, cardId: 2, database: database, preferences: preferences, isSessionUnlocked: false)
             let restored = CardDetailModel(cardId: 2, database: database, preferences: preferences)
             restored.load()
             #expect(restored.isArchived == false)
@@ -97,13 +97,32 @@ private func model(
 
     @Test func performFailureReturnsMessage() async throws {
         try await withDatabase { database, preferences in
-            #expect(CardRowActionModel.perform(.delete, cardId: 999_999, database: database, preferences: preferences) != nil)
+            #expect(CardRowActionModel.perform(.delete, cardId: 999_999, database: database, preferences: preferences, isSessionUnlocked: false) != nil)
         }
     }
 
     @Test func previewTitlesAreActiveOnly() async throws {
         try await withDatabase { database, preferences in
-            #expect(CardRowActionModel.previewTitles(cardId: 2, database: database, preferences: preferences).count == 1)
+            #expect(CardRowActionModel.previewTitles(cardId: 2, database: database, preferences: preferences, isSessionUnlocked: false).count == 1)
+        }
+    }
+
+    @Test func hiddenCardActionsNeedTheLiveUnlockState() async throws {
+        try await withDatabase { database, preferences in
+            let made = try CardMutations(database: database, preferences: preferences).create(
+                CardDraft(title: "Secret", boxId: 0, protectionMode: .hidden), now: .now)
+            @MainActor func isFavorite() -> Bool? {
+                let m = CardDetailModel(
+                    cardId: made.id, database: database, preferences: preferences, isSessionUnlocked: true)
+                m.load()
+                return m.card?.isFavorite
+            }
+            _ = CardRowActionModel.perform(
+                .favorite, cardId: made.id, database: database, preferences: preferences, isSessionUnlocked: false)
+            #expect(isFavorite() == false)
+            #expect(CardRowActionModel.perform(
+                .favorite, cardId: made.id, database: database, preferences: preferences, isSessionUnlocked: true) == nil)
+            #expect(isFavorite() == true)
         }
     }
 }

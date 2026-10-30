@@ -6,7 +6,7 @@ struct ChooseTagsSheet: View {
     let onStart: (PrayerTimeScope) -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @State private var state = ScopeLoadState<[PrayerTimeOption]>.loading
+    @State private var loader = ScopeLoader<[PrayerTimeOption]>()
     @State private var selected = Set<Int64>()
 
     init(launcher: PrayerTimeLauncher, onStart: @escaping (PrayerTimeScope) -> Void) {
@@ -16,27 +16,16 @@ struct ChooseTagsSheet: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                switch state {
-                case .loading:
-                    ProgressView()
-                case .failed:
-                    ContentUnavailableView {
-                        Label("Unable to Load", systemImage: "exclamationmark.triangle")
-                    } actions: {
-                        Button("Retry") { Task { await load() } }
-                    }
-                case .loaded(let options):
-                    if options.isEmpty {
-                        ContentUnavailableView("No Tags", systemImage: "tag")
-                    } else {
-                        List(options) { option in
-                            ScopeOptionRow(option: option, isSelected: selected.contains(option.id)) {
-                                if !selected.insert(option.id).inserted { selected.remove(option.id) }
-                            }
+            ScopeLoadView(loader: loader, retry: { Task { await load() } }) { options in
+                if options.isEmpty {
+                    ContentUnavailableView("No Tags", systemImage: "tag")
+                } else {
+                    List(options) { option in
+                        ScopeOptionRow(option: option, isSelected: selected.contains(option.id)) {
+                            if !selected.insert(option.id).inserted { selected.remove(option.id) }
                         }
-                        .accessibilityIdentifier("PrayerTimeScope_TagsList")
                     }
+                    .accessibilityIdentifier("PrayerTimeScope_TagsList")
                 }
             }
             .navigationTitle("By Tags")
@@ -48,7 +37,7 @@ struct ChooseTagsSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Start") { onStart(.tags(selected)) }
-                        .disabled(selected.isEmpty || !isLoaded)
+                        .disabled(selected.isEmpty || !loader.isLoaded)
                         .accessibilityIdentifier("PrayerTimeScope_Start")
                 }
             }
@@ -56,15 +45,9 @@ struct ChooseTagsSheet: View {
         }
     }
 
-    private var isLoaded: Bool {
-        if case .loaded = state { return true }
-        return false
-    }
-
     private func load() async {
         let launcher = launcher
-        let result = await Task.detached { try? launcher.tagOptions() }.value
-        state = result.map { .loaded($0) } ?? .failed
+        await loader.load { try launcher.tagOptions() }
     }
 }
 

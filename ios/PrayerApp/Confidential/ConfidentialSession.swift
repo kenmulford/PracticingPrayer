@@ -28,6 +28,11 @@ final class ConfidentialSession {
         return await task.value
     }
 
+    /// Prompts even when already unlocked; use for exposed views that must re-verify the device owner.
+    func verifyOwner(reason: LocalizedStringResource) async -> Bool {
+        isUnlocked ? await evaluate(reason: reason) : await authenticate(reason: reason)
+    }
+
     func toggle() {
         if isUnlocked {
             relock()

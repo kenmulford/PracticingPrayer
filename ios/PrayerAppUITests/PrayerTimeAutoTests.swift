@@ -26,7 +26,7 @@ final class PrayerTimeAutoTests: XCTestCase {
 
     func testPauseShowsResume() throws {
         let app = try launch()
-        let button = app.buttons["session.pauseResume"]
+        let button = app.buttons["PrayerSession_PauseResume"]
         XCTAssertTrue(button.waitForExistence(timeout: 5))
         XCTAssertEqual(button.label, "Pause")
         button.tap()
