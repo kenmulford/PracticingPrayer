@@ -1,7 +1,7 @@
-# Builds and ships both platforms when you PUBLISH a GitHub Release.
-# Trigger is the release event itself — NOT a tag push, NOT a commit/PR merge.
-# Reuses the same fastlane lanes you run locally; CI only adds the runner-side
-# signing setup and the secrets.
+# Publishing a GitHub Release ships Android to Play and runs a Release build check of the
+# native iOS app, which you archive and upload from the Xcode Organizer. The trigger is the
+# release event itself (not a tag push, not a commit or PR merge). Android reuses the fastlane lane
+# you run locally; CI only adds the runner-side signing setup and the secrets.
 name: Release to stores
 
 on:
@@ -66,75 +66,17 @@ jobs:
           PLAY_JSON_KEY_PATH: ${{ steps.gcp-auth.outputs.credentials_file_path }}
         run: bundle exec fastlane android release
 
-  ios:
-    name: iOS → TestFlight
+  ios-release-build:
+    name: iOS Release build check
     runs-on: xcode-27
-    environment: store-release
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v7   # release event → defaults to the released tag's commit
-        with:
-          fetch-depth: 0            # full history: Directory.Build.props needs `git rev-list --count HEAD`
+      - uses: actions/checkout@v7
 
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: '27.0'
 
-      - uses: actions/setup-dotnet@v6
-        with:
-          global-json-file: global.json
-
-      - name: Install MAUI iOS workload
-        run: dotnet workload restore PrayerApp/PrayerApp.csproj
-
-      - uses: ruby/setup-ruby@v1
-        with:
-          ruby-version-file: .ruby-version
-          bundler-cache: true
-
-      # Import the distribution cert into a throwaway keychain.
-      - uses: apple-actions/import-codesign-certs@v7
-        with:
-          p12-file-base64: ${{ secrets.IOS_DIST_CERT_P12_BASE64 }}
-          p12-password: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
-
-      # Download the App Store profiles for BOTH targets via the ASC API key.
-      - uses: apple-actions/download-provisioning-profiles@v7
-        with:
-          bundle-id: com.multithreadedllc.prayercards
-          profile-type: IOS_APP_STORE
-          issuer-id: ${{ secrets.ASC_ISSUER_ID }}
-          api-key-id: ${{ secrets.ASC_KEY_ID }}
-          api-private-key: ${{ secrets.ASC_API_KEY_P8 }}
-      - uses: apple-actions/download-provisioning-profiles@v7
-        with:
-          bundle-id: com.multithreadedllc.prayercards.actionextension
-          profile-type: IOS_APP_STORE
-          issuer-id: ${{ secrets.ASC_ISSUER_ID }}
-          api-key-id: ${{ secrets.ASC_KEY_ID }}
-          api-private-key: ${{ secrets.ASC_API_KEY_P8 }}
-
-      # iOS-signing.local.props is gitignored, so recreate the main app's signing on the runner.
-      # (The action extension self-signs from its own csproj; its profile was downloaded above.)
-      - name: Write main-app signing props
-        run: |
-          cat > PrayerApp/iOS-signing.local.props <<'EOF'
-          <Project>
-            <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net10.0-ios|AnyCPU'">
-              <CodesignKey>Apple Distribution: Kenneth Mulford (6GV6UL86RM)</CodesignKey>
-              <CodesignProvision>Practicing Prayer</CodesignProvision>
-            </PropertyGroup>
-          </Project>
-          EOF
-
-      # The fastlane lane reads ASC_KEY_P8_BASE64; derive it from the raw .p8 secret.
-      - name: Prepare ASC key for fastlane
-        env:
-          ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
-        run: echo "ASC_KEY_P8_BASE64=$(printf '%s' "$ASC_API_KEY_P8" | base64 | tr -d '\n')" >> "$GITHUB_ENV"
-
-      - name: Build IPA + upload to TestFlight (fastlane)
-        env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-          # ASC_KEY_P8_BASE64 exported by the previous step
-        run: bundle exec fastlane ios release
+      - name: Build native app (Release, unsigned)
+        run: xcodebuild build -project ios/PrayerApp.xcodeproj -scheme PrayerApp -configuration Release -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO
