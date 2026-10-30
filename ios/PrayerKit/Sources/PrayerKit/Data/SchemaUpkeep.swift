@@ -80,6 +80,7 @@ public enum SchemaUpkeep {
 
         step("backfillNotifyDates") { try backfillNotifyDates($0, now: now) }
         step("backfillDefaultColors", backfillDefaultColors)
+        step("backfillNullDefaults", backfillNullDefaults)
     }
 
     /// The id `AppPreferences.archivedFolderId` mirrors, as `DBService.EnsureCardBoxMigrationAsync` writes it.
@@ -186,6 +187,25 @@ public enum SchemaUpkeep {
             try db.execute(
                 sql: "UPDATE PrayerRequest SET NotifyDate = ? WHERE Id = ?",
                 arguments: [fire - fire % ticksPerDay, id])
+        }
+    }
+
+    /// sqlite-net's `ALTER TABLE ADD COLUMN` left NULL on rows that predate a column, and it read NULL as false/0.
+    /// Runs last so the steps above, which test `= 0`, see the data MAUI's upkeep saw.
+    static let nullDefaults: [(table: String, columns: [String])] = [
+        ("CardBox", ["IsSystem", "SortOrder", "ProtectAllCards", "CardProtectionMode"]),
+        ("PrayerCard", ["CanNotify", "PrayerFrequency", "IsAnswered", "IsFavorite", "IsSystem", "IsImported", "ProtectionMode"]),
+        ("PrayerRequest", ["CanNotify", "PrayerFrequency", "IsAnswered", "IsImported"]),
+        ("PrayerTag", ["IsSystem"]),
+        ("UserColor", ["IsDefault"]),
+    ]
+
+    static func backfillNullDefaults(_ db: Database) throws {
+        for (table, columns) in nullDefaults {
+            let existing = try Set(db.columns(in: table).map(\.name))
+            for column in columns where existing.contains(column) {
+                try db.execute(sql: #"UPDATE "\#(table)" SET "\#(column)" = 0 WHERE "\#(column)" IS NULL"#)
+            }
         }
     }
 

@@ -44,10 +44,10 @@ public struct PrayerCardRecord: FetchableRecord, PersistableRecord, Equatable, S
         let table = Self.databaseTableName
         id = try row.decode(forColumn: "Id")
         title = try row.decode(forColumn: "Title")
-        canNotify = try row.decode(forColumn: "CanNotify")
+        canNotify = try row.flag("CanNotify")
         prayerFrequency = try row.requiredEnum(PrayerFrequency.self, "PrayerFrequency", table: table)
-        isAnswered = try row.decode(forColumn: "IsAnswered")
-        isFavorite = try row.decode(forColumn: "IsFavorite")
+        isAnswered = try row.flag("IsAnswered")
+        isFavorite = try row.flag("IsFavorite")
         isSystem = try row.decode(forColumn: "IsSystem")
         isImported = try row.decode(forColumn: "IsImported")
         protectionMode = try row.enumValue(CardProtectionMode.self, "ProtectionMode", table: table)

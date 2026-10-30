@@ -18,7 +18,7 @@ public struct UserColorRecord: FetchableRecord, PersistableRecord, Equatable, Se
     public init(row: Row) throws {
         id = try row.decode(forColumn: "Id")
         hexValue = try row.decode(forColumn: "HexValue")
-        isDefault = try row.decode(forColumn: "IsDefault")
+        isDefault = try row.flag("IsDefault")
         createdAtTicks = try row.requiredTicks("CreatedAt", table: Self.databaseTableName)
     }
 
