@@ -99,6 +99,12 @@
     "Active Cards" : {
 
     },
+    "Add" : {
+
+    },
+    "Add %@" : {
+
+    },
     "Add Card" : {
 
     },
@@ -133,6 +139,12 @@
 
     },
     "Allow Notifications" : {
+
+    },
+    "Already on This Card (%lld)" : {
+
+    },
+    "Already on this card" : {
 
     },
     "Answered" : {
@@ -341,6 +353,9 @@
     "Confidential cards unlocked" : {
 
     },
+    "Confirm Import" : {
+
+    },
     "Confirm PIN" : {
 
     },
@@ -353,13 +368,7 @@
     "Couldn't Delete Tag" : {
 
     },
-    "Couldn't reach Practicing Prayer's storage. Reinstall the app to fix sharing." : {
-
-    },
     "Couldn't Save" : {
-
-    },
-    "Couldn't save the prayer right now. Try again." : {
 
     },
     "Couldn't Start Prayer Time" : {
@@ -375,6 +384,12 @@
 
     },
     "Couldn't create the tag." : {
+
+    },
+    "Couldn't reach Practicing Prayer's storage. Reinstall the app to fix sharing." : {
+
+    },
+    "Couldn't save the prayer right now. Try again." : {
 
     },
     "Couldn't verify PIN. Try again." : {
@@ -539,6 +554,9 @@
 
     },
     "Enter the backup passphrase" : {
+
+    },
+    "Everything in this share is already on %@." : {
 
     },
     "Existing Card" : {
@@ -1106,6 +1124,9 @@
 
     },
     "There's no text to save. Try again with a longer selection." : {
+
+    },
+    "These won't be added." : {
 
     },
     "This also deletes its %lld prayer requests." : {
