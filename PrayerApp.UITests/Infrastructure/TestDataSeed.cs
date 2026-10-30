@@ -117,11 +117,12 @@ internal static class TestDataSeed
             await PushSeedToSimulatorAsync(tempPath);
             if (IsUpgradeGate) await SeedUpgradeGatePreferencesAsync();
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!IsUpgradeGate)
         {
             // Don't block the run on a seed failure — let the suite start against
             // whatever state the sim has and surface data-dependent failures in
             // triage. Matches the Android intent (seed is best-effort baseline).
+            // The upgrade gate rethrows: a half-seeded install would fail it for the wrong reason.
             Console.WriteLine($"[TestDataSeed] iOS seed failed: {ex.Message}");
         }
         finally

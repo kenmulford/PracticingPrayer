@@ -54,7 +54,7 @@ final class PrayerTimeEntryPointsTests: XCTestCase {
         let app = XCUIApplication()
         app.launchEnvironment["PRAYER_DB_PATH"] = database.path
         app.launch()
-        let tab = app.tabBars.buttons["Cards"].exists ? app.tabBars.buttons["Cards"] : app.buttons["Cards"].firstMatch
+        let tab = app.cardsTab
         XCTAssertTrue(tab.waitForExistence(timeout: 20), "Cards tab missing")
         tab.tap()
         let row = element(app, labelStartingWith: card)

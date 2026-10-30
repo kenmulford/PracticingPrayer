@@ -41,7 +41,7 @@ final class CardDetailUITests: XCTestCase {
     }
 
     private func openCardsTab(_ app: XCUIApplication) {
-        let tab = app.tabBars.buttons["Cards"].exists ? app.tabBars.buttons["Cards"] : app.buttons["Cards"].firstMatch
+        let tab = app.cardsTab
         XCTAssertTrue(tab.waitForExistence(timeout: 20), "Cards tab missing")
         tab.tap()
     }

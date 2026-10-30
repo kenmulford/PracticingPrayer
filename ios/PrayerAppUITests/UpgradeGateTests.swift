@@ -45,6 +45,7 @@ final class UpgradeGateTests: XCTestCase {
         entry.typeText("000000")
         XCTAssertTrue(app.staticTexts["UpgradeGate Confidential"].waitForNonExistence(timeout: 3),
                       "confidential card shown after wrong PIN")
+        XCTAssertTrue(app.staticTexts["Incorrect PIN. 4 attempts left."].waitForExistence(timeout: 10), "wrong PIN not rejected")
         entry.typeText("135790")
         XCTAssertTrue(app.staticTexts["UpgradeGate Confidential"].waitForExistence(timeout: 10), "PIN did not verify")
 
@@ -63,7 +64,7 @@ final class UpgradeGateTests: XCTestCase {
     }
 
     private func openCards(_ app: XCUIApplication) {
-        let tab = app.tabBars.buttons["Cards"].exists ? app.tabBars.buttons["Cards"] : app.buttons["Cards"].firstMatch
+        let tab = app.cardsTab
         XCTAssertTrue(tab.waitForExistence(timeout: 15), "Cards tab missing")
         tab.tap()
         XCTAssertTrue(app.navigationBars["Prayer Cards"].waitForExistence(timeout: 10), "Cards missing")
@@ -71,7 +72,7 @@ final class UpgradeGateTests: XCTestCase {
 
     private func assertNoTips(_ app: XCUIApplication, on screen: String) {
         for tip in Self.tips {
-            XCTAssertFalse(app.staticTexts[tip].exists, "onboarding tip \"\(tip)\" shown on \(screen)")
+            XCTAssertTrue(app.staticTexts[tip].waitForNonExistence(timeout: 3), "onboarding tip \"\(tip)\" shown on \(screen)")
         }
     }
 }

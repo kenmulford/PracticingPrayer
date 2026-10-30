@@ -20,14 +20,20 @@ import PrayerKit
     }
 
     @Test func remindersParsesSpec() {
-        let parsed = UpgradeGateChecks.reminders("7:2:7:30:3::")
-        #expect(parsed == [UpgradeGateChecks.Reminder(
-            id: 7, frequency: 2, hour: 7, minute: 30, dayOfWeek: 3, dayOfMonth: nil, dateTicks: nil)])
+        let parsed = UpgradeGateChecks.reminders("7:2:7:30:3::;1:1:::::;2:1:::::;3:1:::::;4:1:::::")
+        #expect(parsed.failures.isEmpty)
+        #expect(parsed.rows.first == UpgradeGateChecks.Reminder(
+            id: 7, frequency: 2, hour: 7, minute: 30, dayOfWeek: 3, dayOfMonth: nil, dateTicks: nil))
+    }
+
+    @Test func remindersFailOnUnparsableRowAndWrongCount() {
+        let parsed = UpgradeGateChecks.reminders("7:2:7:30:3::;bad;1:1:::::")
+        #expect(parsed.failures == ["reminder row unparsable: bad", "reminder count expected 5 actual 3"])
     }
 
     @Test func reminderFailuresNamesChangedField() {
-        let expected = UpgradeGateChecks.reminders("7:2:7:30:3::;8:1:7:30:::")
-        let actual = UpgradeGateChecks.reminders("7:2:9:30:3::")
+        let expected = UpgradeGateChecks.reminders("7:2:7:30:3::;8:1:7:30:::").rows
+        let actual = UpgradeGateChecks.reminders("7:2:9:30:3::").rows
         let failures = UpgradeGateChecks.reminderFailures(expected: expected, actual: actual)
         #expect(failures == ["reminder 7 expected 7:2:7:30:3:: actual 7:2:9:30:3::", "reminder 8 missing"])
     }

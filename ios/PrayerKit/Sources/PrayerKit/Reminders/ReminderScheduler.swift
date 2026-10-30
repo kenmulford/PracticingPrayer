@@ -65,12 +65,31 @@ public struct ReminderScheduler {
 
         guard preferences.allowNotifications else { return }
 
+        let requests = try await scheduledRequests(records, now: now)
+        await center.removeAllPendingRequests()
+        for request in requests {
+            do {
+                try await center.add(request)
+            } catch {
+                log("Scheduling \(request.identifier) failed: \(error)")
+            }
+        }
+    }
+
+    /// Identifiers `reconcile` would leave pending, without touching the center, preferences or database.
+    public func pendingIdentifiers(now: Date) async throws -> Set<String> {
+        guard preferences.allowNotifications else { return [] }
+        let records = try PrayerStore(database: database).prayers(segment: .active, isSessionUnlocked: true).map(\.record)
+        return Set(try await scheduledRequests(records, now: now).map(\.identifier))
+    }
+
+    private func scheduledRequests(_ records: [PrayerRequestRecord], now: Date) async throws -> [ReminderRequest] {
         let protectedCardIds = try await database.dbQueue.read { db in
             ProtectionPolicy.blockedCardIds(
                 cards: try PrayerCardRecord.fetchAll(db), boxes: try CardBoxRecord.fetchAll(db), isSessionUnlocked: false)
         }
 
-        await center.removeAllPendingRequests()
+        var requests: [ReminderRequest] = []
         for record in records where record.canNotify {
             do {
                 let hour = record.notifyHour ?? preferences.defaultNotifyHour
@@ -79,11 +98,12 @@ public struct ReminderScheduler {
                     for: record, hour: hour, minute: minute, now: now, calendar: calendar)
                 else { continue }
                 if protectedCardIds.contains(record.prayerCardId) { request.body = ReminderScheduler.protectedBody }
-                try await center.add(request)
+                requests.append(request)
             } catch {
                 log("Scheduling prayer \(record.id) failed: \(error)")
             }
         }
+        return requests
     }
 
     public static func logError(_ message: String) {

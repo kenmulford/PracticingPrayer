@@ -35,15 +35,17 @@ struct UpgradeGateView: View {
         log.debug("launch arguments parsed, expected tables=\(expected.count)")
 
         var failures: [String] = []
+        var database: PrayerDatabase?
 
         do {
             let library = try FileManager.default.url(
                 for: .libraryDirectory, in: .userDomainMask, appropriateFor: nil, create: false)
             let path = library.appendingPathComponent("prayer_app.db").path
             log.debug("database path resolved, file exists=\(FileManager.default.fileExists(atPath: path))")
-            let database = try PrayerDatabase(path: path)
+            let opened = try PrayerDatabase(path: path)
+            database = opened
             log.debug("database opened")
-            let actual = try database.rowCounts()
+            let actual = try opened.rowCounts()
             let checks: [(String, Int)] = [
                 ("PrayerCard", actual.cards), ("PrayerRequest", actual.prayers),
                 ("PrayerTag", actual.tags), ("CardBox", actual.collections),
@@ -59,7 +61,7 @@ struct UpgradeGateView: View {
             failures.append("database error \(error)")
         }
 
-        failures += await reminderFailures(arguments: arguments)
+        failures += await reminderFailures(arguments: arguments, database: database)
 
         do {
             let record = try PinRecord().read()
@@ -80,17 +82,17 @@ struct UpgradeGateView: View {
         return failures.isEmpty ? ["PASS"] : failures
     }
 
-    private nonisolated static func reminderFailures(arguments: [String]) async -> [String] {
-        guard let index = arguments.firstIndex(of: UpgradeGateChecks.remindersArgument),
-              arguments.indices.contains(index + 1)
-        else { return ["expected reminders argument missing"] }
-        let expected = UpgradeGateChecks.reminders(arguments[index + 1])
+    private nonisolated static func reminderFailures(arguments: [String], database: PrayerDatabase?) async -> [String] {
         let preferences = AppPreferences()
         var failures = UpgradeGateChecks.settingFailures(preferences)
+        guard let index = arguments.firstIndex(of: UpgradeGateChecks.remindersArgument),
+              arguments.indices.contains(index + 1)
+        else { return failures + ["expected reminders argument missing"] }
+        guard let database else { return failures + ["reminder check skipped, database unavailable"] }
+        let parsed = UpgradeGateChecks.reminders(arguments[index + 1])
+        failures += parsed.failures
+        let expected = parsed.rows
         do {
-            let library = try FileManager.default.url(
-                for: .libraryDirectory, in: .userDomainMask, appropriateFor: nil, create: false)
-            let database = try PrayerDatabase(path: library.appendingPathComponent("prayer_app.db").path)
             let records = try await database.dbQueue.read { db in
                 try PrayerRequestRecord.fetchAll(db, keys: expected.map(\.id))
             }

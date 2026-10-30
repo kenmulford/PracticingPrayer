@@ -31,15 +31,27 @@ nonisolated enum UpgradeGateChecks {
         return result
     }
 
+    static let expectedReminderCount = 5
+
     /// Rows are `Id:Frequency:Hour:Minute:DayOfWeek:DayOfMonth:DateTicks` joined with `;`; an empty field is nil.
-    static func reminders(_ argument: String) -> [Reminder] {
-        argument.split(separator: ";").compactMap { row in
+    /// An unparsable row or a count other than `expectedReminderCount` is a failure, so a mangled argument cannot shrink the check.
+    static func reminders(_ argument: String) -> (rows: [Reminder], failures: [String]) {
+        var rows: [Reminder] = []
+        var failures: [String] = []
+        for row in argument.split(separator: ";") {
             let fields = row.split(separator: ":", omittingEmptySubsequences: false)
-            guard fields.count == 7, let id = Int64(fields[0]), let frequency = Int64(fields[1]) else { return nil }
-            return Reminder(
+            guard fields.count == 7, let id = Int64(fields[0]), let frequency = Int64(fields[1]) else {
+                failures.append("reminder row unparsable: \(row)")
+                continue
+            }
+            rows.append(Reminder(
                 id: id, frequency: frequency, hour: Int(fields[2]), minute: Int(fields[3]),
-                dayOfWeek: Int(fields[4]), dayOfMonth: Int(fields[5]), dateTicks: Int64(fields[6]))
+                dayOfWeek: Int(fields[4]), dayOfMonth: Int(fields[5]), dateTicks: Int64(fields[6])))
         }
+        if rows.count + failures.count != expectedReminderCount {
+            failures.append("reminder count expected \(expectedReminderCount) actual \(rows.count + failures.count)")
+        }
+        return (rows, failures)
     }
 
     static func reminder(_ record: PrayerRequestRecord) -> Reminder {
@@ -81,19 +93,10 @@ nonisolated enum UpgradeGateChecks {
         return "pending identifiers missing [\(missing)] extra [\(extra)]"
     }
 
-    /// Runs the real reconcile against a recording center, since `ReminderTrigger.request` is internal to PrayerKit.
+    /// Read-only: the identifiers `ReminderScheduler.reconcile` would leave pending.
     static func derivedIdentifiers(database: PrayerDatabase, preferences: AppPreferences) async throws -> Set<String> {
-        let center = RecordingCenter()
-        try await ReminderScheduler(database: database, preferences: preferences, center: center)
-            .reconcile(now: Date())
-        return await center.identifiers
-    }
-
-    private actor RecordingCenter: ReminderCenter {
-        private(set) var identifiers: Set<String> = []
-
-        func removeAllPendingRequests() { identifiers = [] }
-        func add(_ request: ReminderRequest) { identifiers.insert(request.identifier) }
+        try await ReminderScheduler(database: database, preferences: preferences, center: SystemReminderCenter())
+            .pendingIdentifiers(now: Date())
     }
 }
 #endif
