@@ -10,7 +10,10 @@ final class ConfirmImportModel {
     @ObservationIgnored private let resolver: ImportResolver
     @ObservationIgnored private let seedOrder: [UUID]
 
-    init(database: PrayerDatabase, payload: SharePayload, now: Date = .now, locale: Locale = .current) {
+    init(
+        database: PrayerDatabase, payload: SharePayload, cardTitle: String? = nil, now: Date = .now,
+        locale: Locale = .current
+    ) {
         let shared: [SharedPrayer]
         switch payload {
         case .request(let prayer): shared = [prayer]
@@ -24,7 +27,7 @@ final class ConfirmImportModel {
         self.seedOrder = entries.map(\.id)
         self.form = QuickAddModel(
             database: database, prayers: entries,
-            cardTitle: ImportResolver.defaultCardTitle(now: now, locale: locale),
+            cardTitle: cardTitle ?? ImportResolver.defaultCardTitle(now: now, locale: locale),
             saver: { request, now in
                 let target: ImportTarget
                 var newCardTitle: String?

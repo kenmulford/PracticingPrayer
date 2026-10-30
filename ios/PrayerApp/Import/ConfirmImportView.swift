@@ -5,9 +5,9 @@ struct ConfirmImportView: View {
     @State private var model: ConfirmImportModel
     private let database: PrayerDatabase
 
-    init(database: PrayerDatabase, payload: SharePayload) {
+    init(database: PrayerDatabase, payload: SharePayload, cardTitle: String? = nil) {
         self.database = database
-        self.model = ConfirmImportModel(database: database, payload: payload)
+        self.model = ConfirmImportModel(database: database, payload: payload, cardTitle: cardTitle)
     }
 
     var body: some View {

@@ -115,7 +115,7 @@ nonisolated struct AppGroupWriter {
     /// `forWritingTo:` and `seekToEndOfFile()` is a TOCTOU race against the
     /// main app's truncation of the log. Use Darwin.open directly.
     /// Best-effort; failure to log must never break the import path.
-    private func appendBreadcrumb(containerURL: URL, byteCount: Int, token: String) {
+    func appendBreadcrumb(containerURL: URL, byteCount: Int, token: String) {
         let line = "\(Self.iso8601String()) \(byteCount < 0 ? "-" : String(byteCount)) \(token)\n"
         guard let bytes = line.data(using: .ascii) else { return }
         let logPath = containerURL.appendingPathComponent(AppGroupWriter.logFileName).path

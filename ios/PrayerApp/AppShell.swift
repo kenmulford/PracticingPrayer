@@ -84,6 +84,18 @@ struct AppShell: View {
         } message: {
             Text("Would you like to pray for your recently notified prayer requests now?")
         }
+        .onChange(of: isReadyForPendingImport, initial: true) { _, ready in
+            if ready { services.pendingImport = PendingImport.pickUp() }
+        }
+        .sheet(item: Bindable(services).pendingImport) {
+            ConfirmImportView(database: services.database, payload: $0.payload, cardTitle: $0.cardTitle)
+        }
+    }
+
+    // Pick up only when a sheet can present, since pickup deletes the file.
+    private var isReadyForPendingImport: Bool {
+        scenePhase == .active && services.phase == .open && services.pendingImport == nil
+            && services.prayerSession == nil && services.onboarding.stage != .welcome && !showsPrayerTimeAlert
     }
 
     private var welcomeBinding: Binding<Bool> {
