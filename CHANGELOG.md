@@ -2,6 +2,43 @@
 
 Release notes for Practicing Prayer, newest first.
 
+## 2.0.0 UX Feedback
+
+**Theme:** Changes from hand use of TestFlight build 1001. The Cards tab opens on Collections in a three-column layout with 1.7.2-style card tiles, and protected collections stay locked on every surface. Lands on `ios-2.0-refactor`, not a release.
+
+### ✨ Collections-first Cards tab
+
+| Issue | PR | What |
+|---|---|---|
+| #449 List locked collections in Prayer Time's By Collection sheet | #461 | By Collection lists a Locked collection with a lock and no count, and Start asks for Face ID first |
+| #452 Collapse answered prayers behind one Answered row on Card Detail | #461 | Answered prayers sit behind one collapsed "Answered" row with a count |
+| #453 Draw the privacy cover and launch screen in brand green | #461 | The app-switcher cover and the launch screen use the brand green |
+| #454 Make the Cards tab a three-column Collections, Collection Cards, Card Detail flow | #461 | The Cards tab opens on a Collections list; a collection opens its cards, and a card opens Card Detail. Search is visible at launch |
+| #455 Lock and hide protected collections on the Collections root | #461 | A Locked collection shows a lock and no count and asks for Face ID to open; a Hidden collection is absent until unlocked |
+| #456 Add a Prayer Time and Edit Collection menu to collection rows | #461 | Long-press a collection for Prayer Time or Edit Collection |
+| #457 Add the Collection Cards toolbar and move Select Cards into it | #461 | Collection Cards has Pray, More (Select Cards) and Add Card, which preselects the collection |
+| #458 Replace the root Add Card button with an Add menu | #461 | The root Add menu offers New Card and New Collection |
+| #459 Show Collection Cards as expandable 1.7.2-style card tiles | #461 | Cards expand in place to show their actions, prayers and Add Prayer, and stay open across relaunch |
+
+### 🔧 Fixes
+
+| Issue | PR | What |
+|---|---|---|
+| #450 Make a tap anywhere on a Locked card row prompt for Face ID | #461 | A tap anywhere on a Locked card row asks for Face ID |
+| #451 Put Archive outermost in the card trailing swipe | #461 | The trailing swipe shows Archive outermost, then Delete |
+
+### Consumer notes
+
+- Select Cards moved from the Cards root into Collection Cards, and select mode no longer runs on search or tag-filter results.
+- New stored preference `ExpandedCardIds` (PrayerKit `AppPreferences.expandedCardIds`) holds the expanded tiles. `ExpandedSectionIds` is no longer read by the app.
+
+### ⚖️ Post-run audit trail
+
+Judgment-call PRs: none.
+
+- The UI suite was not run at milestone end. It runs once at the end of the 2.0.0 epic, so the new and migrated XCUITests, including #450's full-row tap test, have compiled but not run.
+- While locked, Prayer Time's All and Tags scopes, and Pray on Loose Cards, System and Archived, still prompt for Face ID only when protected prayers would join, as 1.7.2 does. The By Collection picker, the collection row menu and the Collection Cards Pray button on a user collection always prompt.
+
 ## 2.0.0 Share and import
 
 **Theme:** Sharing cards and prayers, and bringing them in from links, `.prayercard` files, the share extension, Shortcuts and the clipboard, all on the native screens. Lands on `ios-2.0-refactor`, not a release.
