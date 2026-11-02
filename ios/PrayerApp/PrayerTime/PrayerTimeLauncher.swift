@@ -20,7 +20,7 @@ nonisolated enum PrayerTimeLauncherError: LocalizedError {
     case noActivePrayers
 
     var errorDescription: String? {
-        String(localized: "This collection has no active prayers.")
+        String(localized: "There are no active prayers to pray for.")
     }
 }
 
@@ -99,6 +99,28 @@ nonisolated struct PrayerTimeLauncher: Sendable {
         return list.sections.filter { $0.boxId == id }.flatMap(\.cards).contains { $0.isMasked && $0.card.isSystem != true }
     }
 
+    func holdsMaskedUserCard(reachedBy scope: PrayerTimeScope) throws -> Bool {
+        let inReach: (CardSection) -> Bool
+        let wanted: (CardListItem) -> Bool
+        switch scope {
+        case .prayers: return false
+        case .collection(let id): return try holdsMaskedUserCard(inCollection: id)
+        case .all:
+            inReach = { $0.box?.systemKey != "archived" }
+            wanted = { _ in true }
+        case .tags:
+            inReach = { _ in true }
+            wanted = { _ in true }
+        case .cards(let ids):
+            inReach = { _ in true }
+            wanted = { ids.contains($0.card.id) }
+        }
+        let list = try database.cardList(filter: CardListFilter(searchText: ""), isSessionUnlocked: false)
+        return list.sections.filter(inReach).flatMap(\.cards).contains {
+            $0.isMasked && $0.card.isSystem != true && wanted($0)
+        }
+    }
+
     private func activePrayers(of cards: [CardListItem], store: PrayerStore) throws -> [PrayerListItem] {
         try cards.flatMap { try store.prayers(cardId: $0.card.id).filter { !$0.record.isAnswered } }
     }
@@ -110,19 +132,19 @@ extension PrayerTimeLauncher {
     @MainActor
     func items(for scope: PrayerTimeScope, session: ConfidentialSession) async throws -> [PrayerListItem] {
         let visible = try items(for: scope, isSessionUnlocked: false)
-        let unlocked = try items(for: scope, isSessionUnlocked: true)
-        // A locked session always prompts for a collection holding a masked card, so Start cannot reveal whether it has active prayers.
-        var promptsForMaskedCard = false
-        if case .collection(let id) = scope, !session.isUnlocked {
-            promptsForMaskedCard = try holdsMaskedUserCard(inCollection: id)
-        }
-        if !promptsForMaskedCard, Set(visible.map(\.record.id)) == Set(unlocked.map(\.record.id)) { return visible }
+        // A locked session decides from masked cards in the scope's reach, never from prayers, so Start reveals nothing.
         let reason: LocalizedStringResource = "Start Prayer Time with protected prayers"
-        // Locked sessions unlock on success (the prompt doubles as the unlock); unlocked ones re-verify without changing state.
-        let allowed = session.isUnlocked ? await session.verifyOwner(reason: reason) : await session.authenticate(reason: reason)
-        guard allowed else { return visible }
-        if case .collection = scope, unlocked.isEmpty { throw PrayerTimeLauncherError.noActivePrayers }
-        return unlocked
+        if session.isUnlocked {
+            let unlocked = try items(for: scope, isSessionUnlocked: true)
+            if Set(visible.map(\.record.id)) == Set(unlocked.map(\.record.id)) { return visible }
+            return await session.verifyOwner(reason: reason) ? unlocked : visible
+        }
+        guard try holdsMaskedUserCard(reachedBy: scope) else { return visible }
+        // The prompt doubles as the unlock on success.
+        guard await session.authenticate(reason: reason) else { return visible }
+        let revealed = try items(for: scope, isSessionUnlocked: true)
+        if revealed.isEmpty { throw PrayerTimeLauncherError.noActivePrayers }
+        return revealed
     }
 }
 
