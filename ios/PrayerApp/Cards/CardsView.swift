@@ -30,6 +30,14 @@ struct CardsView: View {
     @State private var isMoving = false
     @State private var confirmArchive = false
     @State private var confirmDelete = false
+    @State private var collectionPrayScope: PrayerTimeScope?
+    @State private var collectionEditor: CollectionEditorTarget?
+    @State private var prayableCollectionIds: Set<Int64> = []
+
+    private struct CollectionEditorTarget: Identifiable {
+        let record: CardBoxRecord
+        var id: Int64 { record.id }
+    }
 
     private var isSearching: Bool {
         !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -103,6 +111,10 @@ struct CardsView: View {
                 .sheet(isPresented: $isAddingCard, onDismiss: reload) {
                     CardEditorView(card: nil, database: services.database, preferences: services.preferences) { _ in }
                 }
+                .sheet(item: $collectionEditor, onDismiss: reload) { target in
+                    CollectionEditorView(database: services.database, collection: target.record, onFinish: {})
+                }
+                .prayerTimeStart($collectionPrayScope)
         } content: {
             contentColumn
         } detail: {
@@ -252,7 +264,13 @@ struct CardsView: View {
         List(selection: $collectionSelection) {
             listTips
             Section {
-                ForEach(rootSections.user, id: \.boxId) { collectionLink($0) }
+                ForEach(rootSections.user, id: \.boxId) { section in
+                    collectionLink(section).modifier(
+                        CollectionRowMenu(
+                            box: section.box, canPray: prayableCollectionIds.contains(section.boxId),
+                            pray: { collectionPrayScope = .collection($0.id) },
+                            edit: { collectionEditor = CollectionEditorTarget(record: $0) }))
+                }
             }
             Section {
                 ForEach(rootSections.system, id: \.boxId) { collectionLink($0) }
@@ -395,6 +413,9 @@ struct CardsView: View {
         if let id = collectionSelection, case .success(let list) = load, !list.sections.contains(where: { $0.boxId == id }) {
             collectionSelection = nil
         }
+        prayableCollectionIds = Set(
+            ((try? PrayerTimeLauncher(database: services.database).collectionOptions(isSessionUnlocked: isSessionUnlocked)) ?? [])
+                .map(\.id))
         listRevision &+= 1
         refreshSelection()
     }
@@ -483,6 +504,29 @@ struct CardsView: View {
                 dismissBanner()
                 return
             }
+        }
+    }
+}
+
+struct CollectionRowMenu: ViewModifier {
+    let box: CardBoxRecord?
+    let canPray: Bool
+    let pray: (CardBoxRecord) -> Void
+    let edit: (CardBoxRecord) -> Void
+
+    static func isShown(for box: CardBoxRecord?) -> Bool {
+        box.map { !$0.isSystem } ?? false
+    }
+
+    func body(content: Content) -> some View {
+        if let box, Self.isShown(for: box) {
+            content.contextMenu {
+                Button("Prayer Time", systemImage: "hands.and.sparkles") { pray(box) }
+                    .disabled(!canPray)
+                Button("Edit Collection", systemImage: "pencil") { edit(box) }
+            }
+        } else {
+            content
         }
     }
 }
