@@ -67,10 +67,28 @@ let scrubFileLock = NSLock()
         let fixture = try makeFixture(protectCard: true)
         let now = Date()
         let url = try BackupExporter.export(
-            database: fixture.database, passphrase: nil, to: exportDirectory(fixture), now: now)
+            database: fixture.database, passphrase: nil, acknowledgingPlaintext: true,
+            to: exportDirectory(fixture), now: now)
         let entries = try BackupArchive.entries(of: Data(contentsOf: url))
         #expect(Set(entries.keys) == ["prayer_app.db"])
         #expect(url.lastPathComponent == BackupArchive.fileName(for: now))
+    }
+
+    @Test func shortPassphraseIsRejected() throws {
+        let fixture = try makeFixture(protectCard: true)
+        #expect(throws: BackupExporterError.passphraseTooShort) {
+            try BackupExporter.export(
+                database: fixture.database, passphrase: "short", to: exportDirectory(fixture))
+        }
+        #expect(!FileManager.default.fileExists(atPath: exportDirectory(fixture).path))
+    }
+
+    @Test func unacknowledgedPlaintextRefusesWhenCardsAreProtected() throws {
+        let fixture = try makeFixture(protectCard: true)
+        #expect(throws: BackupExporterError.confidentialCardsPresent) {
+            try BackupExporter.export(
+                database: fixture.database, passphrase: nil, to: exportDirectory(fixture))
+        }
     }
 
     @Test func passphraseExportScrubsAndEncrypts() throws {

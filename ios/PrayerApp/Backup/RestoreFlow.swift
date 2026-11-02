@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import OSLog
 import PrayerKit
 import SwiftUI
 
@@ -17,6 +18,9 @@ final class RestoreFlow {
     @ObservationIgnored private var confidentialBlob: Data?
     @ObservationIgnored private var outcome: Failure?
     @ObservationIgnored private var didRestore = false
+    @ObservationIgnored private(set) var skippedProtectedCards = false
+
+    private nonisolated static let log = Logger(subsystem: "com.multithreadedllc.prayercards", category: "Backup")
 
     init(services: AppServices, importDirectory: URL = URL.temporaryDirectory) {
         self.services = services
@@ -87,18 +91,23 @@ final class RestoreFlow {
             payload = try? await Task.detached { try ConfidentialBackupImporter.decode(blob, passphrase: passphrase) }.value
         }
         let confidential = payload
+        // Only a passphrase the user entered counts as wrong; cancelling the prompt keeps the plain message.
+        let decodeFailed = passphrase != nil && confidentialBlob != nil && payload == nil
         do {
-            try await services.reopenDatabase { url in
+            let importFailed = try await services.reopenDatabase { url -> Bool in
                 _ = try BackupArchive.restore(archiveURL: archive, databaseURL: url)
-                guard let confidential else { return }
+                guard let confidential else { return false }
                 do {
                     let database = try PrayerDatabase(path: url.path)
                     defer { try? database.close() }
                     try ConfidentialBackupImporter.insert(confidential, into: database)
+                    return false
                 } catch {
-                    ReminderScheduler.logError("Confidential import failed: \(error.localizedDescription)")
+                    Self.log.error("Confidential import failed: \(error.localizedDescription, privacy: .public)")
+                    return true
                 }
             }
+            skippedProtectedCards = decodeFailed || importFailed
             didRestore = true
         } catch {
             outcome = .afterSwap
@@ -112,7 +121,11 @@ final class RestoreFlow {
             didRestore = false
             services.didReplaceDatabase()
             services.reconcileReminders()
-            AccessibilityNotification.Announcement(String(localized: "Restore complete")).post()
+            let message = skippedProtectedCards
+                ? String(localized: "Restore complete. Protected cards weren't restored because the passphrase was wrong.")
+                : String(localized: "Restore complete")
+            skippedProtectedCards = false
+            AccessibilityNotification.Announcement(message).post()
         } else if let pending = outcome {
             outcome = nil
             failure = pending

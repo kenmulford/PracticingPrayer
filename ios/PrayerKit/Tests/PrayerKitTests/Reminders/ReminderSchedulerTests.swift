@@ -182,6 +182,22 @@ private func scheduler(
         }
     }
 
+    @Test func pendingIdentifiersMatchReconcileWithoutSideEffects() async throws {
+        try await withCopy("long-upgraded.db") { database in
+            try await withPreferences { preferences in
+                let center = FakeReminderCenter()
+                let s = scheduler(database, preferences, center)
+                let now = date(2025, 3, 1, 12)
+                let derived = try await s.pendingIdentifiers(now: now)
+                #expect(preferences.nativeRemindersMigrated == false)
+                #expect(center.pending.isEmpty)
+                try await s.reconcile(now: now)
+                #expect(derived == Set(center.pending.map(\.identifier)))
+                #expect(derived == ["monthly_7"])
+            }
+        }
+    }
+
     @Test func reconcileTwiceYieldsIdenticalPendingSet() async throws {
         try await withCopy("long-upgraded.db") { database in
             try await withPreferences { preferences in

@@ -127,3 +127,25 @@ private let tagInserts = [
         try list(of: "long-upgraded.db", sql: ["DROP TABLE PrayerRequest"])
     }
 }
+
+@Test func effectiveProtectionModeFollowsCardThenCollection() throws {
+    let source = repoRoot().appendingPathComponent("contracts/db/fresh-install.db")
+    let path = FileManager.default.temporaryDirectory
+        .appendingPathComponent("pk_protection_\(UUID().uuidString).db").path
+    try FileManager.default.copyItem(atPath: source.path, toPath: path)
+    defer {
+        for suffix in ["", "-journal", "-wal", "-shm"] {
+            try? FileManager.default.removeItem(atPath: path + suffix)
+        }
+    }
+    let database = try PrayerDatabase(path: path)
+    defer { try? database.close() }
+    try database.dbQueue.write { db in
+        try db.execute(sql: newBox(10, "Locked").replacingOccurrences(of: "0, 0, 638712864000000000, 638712864000000000)", with: "1, 1, 638712864000000000, 638712864000000000)"))
+        try db.execute(sql: newCard(20, "inBox", box: 10))
+        try db.execute(sql: newCard(21, "loose", box: 0))
+    }
+    #expect(try database.effectiveProtectionMode(ofCard: 20) == .lockedVisible)
+    #expect(try database.effectiveProtectionMode(ofCard: 21) == .unprotected)
+    #expect(try database.effectiveProtectionMode(ofCard: 999) == nil)
+}

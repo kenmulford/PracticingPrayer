@@ -94,6 +94,16 @@ private let goldenURL = URL(fileURLWithPath: #filePath)
         }
     }
 
+    @Test func pickupLeavesNoClaimedFileAndAFreshWriteSurvives() throws {
+        try withContainer { dir, reader in
+            try seedGolden(dir)
+            _ = reader.takePending()
+            #expect(try FileManager.default.contentsOfDirectory(atPath: dir.path).sorted() == ["import-log.txt"])
+            try Data(#"{"raw":"Second","ts":"x"}"#.utf8).write(to: payloadURL(dir))
+            #expect(reader.takePending() == "Second")
+        }
+    }
+
     @Test func secondPickupFindsNothing() throws {
         try withContainer { dir, reader in
             try seedGolden(dir)

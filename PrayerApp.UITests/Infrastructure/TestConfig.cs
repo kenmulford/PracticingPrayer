@@ -120,7 +120,7 @@ public static class TestConfig
     private static readonly Lazy<string> IOSUdidLazy = new(() => ResolveIOSUdid(
         Environment.GetEnvironmentVariable("IOS_UDID"),
         Environment.GetEnvironmentVariable("IOS_SIMULATOR") ?? "Test iPad",
-        Environment.GetEnvironmentVariable("IOS_VERSION") ?? "27.0",
+        Environment.GetEnvironmentVariable("IOS_VERSION") ?? "27.2",
         ReadSimctlDevicesJson));
 
     /// <summary>UDID of the target iOS simulator, resolved once per process from <c>IOS_UDID</c>, else the one available <c>IOS_SIMULATOR</c> on <c>IOS_VERSION</c>.</summary>
@@ -256,7 +256,7 @@ public static class TestConfig
         // iPad: mobile: hideKeyboard works reliably on tablets (has "Done" button).
         // iPhone keyboard has no dismiss button, causing cascade failures.
         options.DeviceName = Environment.GetEnvironmentVariable("IOS_SIMULATOR") ?? "Test iPad";
-        options.PlatformVersion = Environment.GetEnvironmentVariable("IOS_VERSION") ?? "27.0";
+        options.PlatformVersion = Environment.GetEnvironmentVariable("IOS_VERSION") ?? "27.2";
         options.AddAdditionalAppiumOption("udid", IOSUdid);
 
         return options;

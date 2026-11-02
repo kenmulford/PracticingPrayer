@@ -56,7 +56,7 @@ final class BackupTests: XCTestCase {
 
     private func startProtectedBackup(_ app: XCUIApplication) {
         app.buttons["backup.backUpNow"].firstMatch.tap()
-        let choice = app.buttons["backup.protectChoice"]
+        let choice = app.buttons["backup.protectChoice"].firstMatch
         XCTAssertTrue(choice.waitForExistence(timeout: 10))
         choice.tap()
     }
@@ -78,26 +78,26 @@ final class BackupTests: XCTestCase {
     func testPassphraseLengthGate() throws {
         let app = try openBackup(statements: [insertCard("BackupGate", protection: 1)])
         startProtectedBackup(app)
-        let field = app.secureTextFields["backup.passphraseField"]
+        let field = app.alerts["Protect with a Passphrase"].secureTextFields.firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         field.tap()
         field.typeText("abcdefghijk")
-        XCTAssertFalse(app.buttons["backup.protectBackup"].isEnabled)
+        XCTAssertFalse(app.buttons["backup.protectBackup"].firstMatch.isEnabled)
         field.typeText("l")
-        XCTAssertTrue(app.buttons["backup.protectBackup"].isEnabled)
+        XCTAssertTrue(app.buttons["backup.protectBackup"].firstMatch.isEnabled)
     }
 
     func testCancelClearsField() throws {
         let app = try openBackup(statements: [insertCard("BackupCancel", protection: 1)])
         startProtectedBackup(app)
-        let field = app.secureTextFields["backup.passphraseField"]
+        let field = app.alerts["Protect with a Passphrase"].secureTextFields.firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         field.tap()
         field.typeText("abcdefghijkl")
         app.alerts.buttons["Cancel"].tap()
 
         startProtectedBackup(app)
-        let reopened = app.secureTextFields["backup.passphraseField"]
+        let reopened = app.alerts["Protect with a Passphrase"].secureTextFields.firstMatch
         XCTAssertTrue(reopened.waitForExistence(timeout: 5))
         XCTAssertTrue((reopened.value as? String ?? "").isEmpty || reopened.value as? String == "Passphrase (12+ characters)")
     }

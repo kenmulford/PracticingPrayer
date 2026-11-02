@@ -26,6 +26,9 @@ final class CollectionsTests: XCTestCase {
             var message: UnsafeMutablePointer<CChar>?
             let result = sqlite3_exec(handle, statement, nil, nil, &message)
             XCTAssertEqual(result, SQLITE_OK, "\(statement): \(message.map { String(cString: $0) } ?? "")")
+            if statement.hasPrefix("UPDATE") {
+                XCTAssertGreaterThan(sqlite3_changes(handle), 0, "\(statement) changed no rows")
+            }
             sqlite3_free(message)
         }
         return copy
@@ -77,7 +80,7 @@ final class CollectionsTests: XCTestCase {
         XCTAssertTrue(field.waitForExistence(timeout: 10), "name field missing")
         field.tap()
         field.typeText(name)
-        app.buttons["CollectionEditor_Confirm"].tap()
+        app.buttons["CollectionEditor_Confirm"].firstMatch.tap()
     }
 
     // MARK: - Tests
@@ -113,7 +116,7 @@ final class CollectionsTests: XCTestCase {
         XCTAssertTrue(field.waitForExistence(timeout: 10))
         field.tap()
         field.clearAndTypeText("RenamedBox")
-        app.buttons["CollectionEditor_Confirm"].tap()
+        app.buttons["CollectionEditor_Confirm"].firstMatch.tap()
         XCTAssertTrue(element(app, labelContaining: "RenamedBox").waitForExistence(timeout: 10))
         XCTAssertFalse(element(app, labelContaining: "RenameBox").exists)
     }
@@ -140,7 +143,8 @@ final class CollectionsTests: XCTestCase {
     }
 
     func testLoadFailureShowsTryAgain() throws {
-        let app = launch(database: try prepareDatabase(["DR" + "OP TABLE PrayerCardTag"]))
+        // Schema upkeep recreates a dropped table on open, so the fault is a row whose date cannot decode.
+        let app = launch(database: try prepareDatabase(["UPDATE PrayerCardTag SET CreatedAt = NULL"]))
         openCollections(app)
         XCTAssertTrue(app.staticTexts["Can't Load Collections"].waitForExistence(timeout: 20))
         XCTAssertTrue(app.buttons["Try Again"].exists)

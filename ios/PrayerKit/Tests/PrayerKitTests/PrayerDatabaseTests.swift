@@ -83,6 +83,51 @@ import Testing
         #expect(!FileManager.default.fileExists(atPath: path))
     }
 
+    @Test func openOrCreateBuildsTheFreshInstallSchemaOfTheFixture() throws {
+        let path = tempPath()
+        defer { removeFiles(path) }
+
+        let database = try PrayerDatabase.openOrCreate(path: path)
+        defer { try? database.close() }
+        try SchemaUpkeep.run(on: database, log: { _ in })
+
+        var readOnly = Configuration()
+        readOnly.readonly = true
+        let fixture = try DatabaseQueue(
+            path: URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+                .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+                .appendingPathComponent("contracts/db/fresh-install.db").path,
+            configuration: readOnly)
+        defer { try? fixture.close() }
+
+        func shape(_ queue: DatabaseQueue) throws -> [String] {
+            try queue.read { db in
+                var rows: [String] = []
+                for table in try String.fetchAll(
+                    db, sql: "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name") {
+                    for column in try db.columns(in: table) { rows.append("\(table).\(column.name):\(column.type.uppercased())") }
+                }
+                return rows
+            }
+        }
+        #expect(try shape(database.dbQueue) == shape(fixture))
+        let keys = try database.dbQueue.read { try String.fetchAll($0, sql: "SELECT SystemKey FROM CardBox ORDER BY Id") }
+        #expect(keys == ["system", "archived"])
+        #expect(try SchemaUpkeep.archivedBoxId(on: database) == 2)
+    }
+
+    @Test func openOrCreateKeepsAnExistingFileUntouched() throws {
+        let path = tempPath()
+        defer { removeFiles(path) }
+        try makeFixture(at: path)
+        let before = try Data(contentsOf: URL(fileURLWithPath: path))
+
+        let database = try PrayerDatabase.openOrCreate(path: path)
+        try database.close()
+
+        #expect(try Data(contentsOf: URL(fileURLWithPath: path)) == before)
+    }
+
     @Test func nonSqliteFileThrowsNotADatabase() throws {
         let path = tempPath()
         defer { removeFiles(path) }

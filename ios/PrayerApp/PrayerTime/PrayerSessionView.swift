@@ -29,6 +29,11 @@ struct PrayerSessionView: View {
                     #endif
                 }
                 .onDisappear { AppDelegate.setPrayerSessionActive(false) }
+                .alert("Couldn't Mark Answered", isPresented: errorBinding) {
+                    Button("OK") {}
+                } message: {
+                    Text(session.errorMessage ?? "")
+                }
                 .task(id: isAuto && !isPaused && !session.isComplete) {
                     guard isAuto && !isPaused && !session.isComplete else { return }
                     while true {
@@ -74,22 +79,26 @@ struct PrayerSessionView: View {
         }
     }
 
+    private var errorBinding: Binding<Bool> {
+        Binding(get: { session.errorMessage != nil }, set: { if !$0 { session.errorMessage = nil } })
+    }
+
     private var autoMenu: some View {
         Menu {
             Toggle("Auto Advance", isOn: Binding(get: { isAuto }, set: { $0 ? startAuto() : stopAuto() }))
                 .disabled(session.isComplete)
-                .accessibilityIdentifier("session.autoToggle")
+                .accessibilityIdentifier("PrayerSession_AutoToggle")
             Picker("Interval", selection: Binding(get: { interval }, set: setInterval)) {
                 Text("30 Seconds").tag(30)
                 Text("1 Minute").tag(60)
                 Text("2 Minutes").tag(120)
             }
-            .accessibilityIdentifier("session.intervalPicker")
+            .accessibilityIdentifier("PrayerSession_IntervalPicker")
         } label: {
             Label("Auto Advance", systemImage: "timer")
         }
         .accessibilityLabel("Auto Advance")
-        .accessibilityIdentifier("session.autoMenu")
+        .accessibilityIdentifier("PrayerSession_AutoMenu")
     }
 
     private func startAuto() {
@@ -188,7 +197,7 @@ struct PrayerSessionView: View {
                 }
             }
             .accessibilityLabel(isPaused ? "Resume" : "Pause")
-            .accessibilityIdentifier("session.pauseResume")
+            .accessibilityIdentifier("PrayerSession_PauseResume")
         }
         Button {
             animated { session.next() }

@@ -18,6 +18,6 @@ struct PrivacyCoverView: View {
         .background(Color(.systemBackground).ignoresSafeArea())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("Practicing Prayer"))
-        .accessibilityIdentifier("PrivacyCover")
+        .accessibilityIdentifier("PrivacyCover_Root")
     }
 }

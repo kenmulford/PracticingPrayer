@@ -7,7 +7,7 @@
 set -euo pipefail
 
 SIM="Test iPad"
-SIM_OS="27.0"
+SIM_OS="${IOS_VERSION:-27.2}"
 BUNDLE_ID="com.multithreadedllc.prayercards"
 OLD_TAG="v1.7.2"
 APPIUM_URL="http://127.0.0.1:4725"
@@ -70,6 +70,59 @@ app_identifier() {
 
 table_count() {
   sqlite3 "$1" "select count(*) from $2" 2>/dev/null || echo 0
+}
+
+# UNAuthorizationStatus of the app as SpringBoard stored it: 0 not determined, 1 denied, 2 authorized.
+# Prints "missing" until the plist holds the app and "error:<message>" on any failure, never a traceback.
+notification_status() {
+  python3 -I - "$(xcrun simctl getenv "$SIM" HOME)/Library/BulletinBoard/VersionedSectionInfo.plist" "$BUNDLE_ID" <<'PY' || echo "error:python exited $?"
+import plistlib, sys
+
+def find(o, bundle):
+    if isinstance(o, dict):
+        if isinstance(o.get(bundle), bytes):
+            return o[bundle]
+        children = o.values()
+    elif isinstance(o, list):
+        children = o
+    else:
+        return None
+    for v in children:
+        found = find(v, bundle)
+        if found is not None:
+            return found
+
+def status(path, bundle):
+    try:
+        with open(path, "rb") as f:
+            sections = plistlib.load(f)
+    except FileNotFoundError:
+        return "missing"
+    data = find(sections, bundle)
+    if data is None:
+        return "missing"
+    for obj in plistlib.loads(data)["$objects"]:
+        if isinstance(obj, dict) and "authorizationStatus" in obj:
+            return str(obj["authorizationStatus"])
+    return "missing"
+
+try:
+    print(status(sys.argv[1], sys.argv[2]))
+except Exception as e:
+    print("error:%s: %s" % (type(e).__name__, e))
+PY
+}
+
+# SpringBoard writes the plist after the alert is answered, so poll up to 10 s for a readable status.
+wait_notification_status() {
+  local status="" tries=0
+  while [ "$tries" -lt 20 ]; do
+    status="$(notification_status)"
+    case "$status" in 0|1|2) break ;; esac
+    sleep 0.5
+    tries=$((tries + 1))
+  done
+  printf '%s' "$status"
 }
 
 step "appium"
@@ -143,6 +196,19 @@ echo "recorded: $EXPECTED"
 if [ "$CARDS" = 0 ] && [ "$PRAYERS" = 0 ] && [ "$TAGS" = 0 ] && [ "$BOXES" = 0 ]; then
   fail "no prior install"
 fi
+REMINDERS="$(sqlite3 -separator ':' "$DB" "select Id, PrayerFrequency, ifnull(NotifyHour,''), ifnull(NotifyMinute,''), ifnull(NotifyDayOfWeek,''), ifnull(NotifyDayOfMonth,''), ifnull(NotifyDate,'') from PrayerRequest where Title like '% UpgradeGate' order by Id" | paste -sd ';' -)"
+[ "$(sqlite3 "$DB" "select count(*) from PrayerRequest where Title like '% UpgradeGate'")" = 5 ] || fail "seed missing reminder prayers"
+echo "recorded reminders: $REMINDERS"
+
+APP_GROUP="$(xcrun simctl get_app_container "$SIM" "$BUNDLE_ID" groups | awk -F'\t' '$1 == "group.com.multithreadedllc.prayercards" {print $2}')"
+[ -n "$APP_GROUP" ] || fail "app group container missing"
+cp "$ROOT/contracts/app-group/pending-import.golden.json" "$APP_GROUP/pending-import.json"
+IMPORT_TEXT="$(plutil -extract raw raw -o - "$APP_GROUP/pending-import.json" | head -n 1)"
+
+step "notification authorization"
+AUTH="$(wait_notification_status)"
+echo "1.7.2 notification authorization status: $AUTH"
+[ "$AUTH" = 2 ] || fail "1.7.2 is not authorized for notifications (status '$AUTH'; 2 = authorized, 0 = undecided, 1 = denied, missing/error:... = SpringBoard record unreadable); the seed step did not get the system alert accepted"
 
 step "install native app over $OLD_TAG"
 xcrun simctl install "$SIM" "$NATIVE_APP"
@@ -153,7 +219,10 @@ xcrun simctl spawn "$SIM" log stream --level debug \
   --predicate 'process == "PrayerApp" OR subsystem == "com.multithreadedllc.prayercards"' >"$GATE_DIR/gate-app.log" 2>&1 &
 LOG_PID=$!
 # xcodebuild can hang after the suite result prints, so the log is polled and the process killed after a grace period.
-TEST_RUNNER_UPGRADE_GATE_EXPECTED="$EXPECTED" xcodebuild test-without-building \
+TEST_RUNNER_UPGRADE_GATE_EXPECTED="$EXPECTED" \
+TEST_RUNNER_UPGRADE_GATE_REMINDERS="$REMINDERS" \
+TEST_RUNNER_UPGRADE_GATE_IMPORT_TEXT="$IMPORT_TEXT" \
+xcodebuild test-without-building \
   -project "$ROOT/ios/PrayerApp.xcodeproj" -scheme PrayerApp -configuration Debug \
   -destination "platform=iOS Simulator,name=$SIM,OS=$SIM_OS" \
   -derivedDataPath "$DERIVED" \
@@ -190,7 +259,7 @@ if grep -q "Test Suite 'UpgradeGateTests' passed" "$XCODE_LOG"; then
 fi
 
 if grep -q "error:" "$XCODE_LOG"; then
-  grep -E "error:" "$XCODE_LOG" | cut -c1-600
+  grep -m1 -E "error:" "$XCODE_LOG" | cut -c1-600
 else
   tail -30 "$XCODE_LOG" >&2
 fi

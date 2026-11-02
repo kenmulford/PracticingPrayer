@@ -87,6 +87,5 @@ struct CardsToolbar: ToolbarContent {
         Button(action: addCard) {
             Label("Add Card", systemImage: "plus")
         }
-        .onboardingTip(.addCard)
     }
 }

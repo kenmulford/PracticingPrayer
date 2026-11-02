@@ -1,9 +1,3 @@
-//
-//  PrayerAppShortcuts.swift
-//
-//  The app's single AppShortcutsProvider.
-//
-
 import AppIntents
 
 nonisolated struct PrayerAppShortcuts: AppShortcutsProvider {

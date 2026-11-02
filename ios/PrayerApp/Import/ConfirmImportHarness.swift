@@ -10,21 +10,28 @@ struct ConfirmImportHarness: View {
     @State private var isPresented = false
 
     var body: some View {
-        Color.clear
-            .task {
-                await services.open()
-                isPresented = true
+        Group {
+            if services.phase == .failed {
+                Text("Harness could not open the database")
+            } else {
+                Color.clear
             }
-            .sheet(isPresented: $isPresented) {
-                ConfirmImportView(
-                    database: services.database,
-                    payload: .card(
-                        title: "Shared",
-                        requests: [
-                            SharedPrayer(title: "Sample Prayer Entry 1", notes: nil),
-                            SharedPrayer(title: "New One", notes: nil),
-                        ]))
-            }
+        }
+        .task {
+            await services.open()
+            isPresented = services.phase == .open
+        }
+        .sheet(isPresented: $isPresented) {
+            // `isPresented` only turns on once the database is open, so `database` is safe to read here.
+            ConfirmImportView(
+                database: services.database,
+                payload: .card(
+                    title: "Shared",
+                    requests: [
+                        SharedPrayer(title: "Sample Prayer Entry 1", notes: nil),
+                        SharedPrayer(title: "New One", notes: nil),
+                    ]))
+        }
     }
 }
 #endif

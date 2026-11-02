@@ -24,7 +24,7 @@ final class ConfidentialUnlockTests: XCTestCase {
             "-ArchivedFolderId", "2",
         ]
         app.launch()
-        let tab = app.tabBars.buttons["Cards"].exists ? app.tabBars.buttons["Cards"] : app.buttons["Cards"].firstMatch
+        let tab = app.cardsTab
         XCTAssertTrue(tab.waitForExistence(timeout: 20), "Cards tab missing")
         tab.tap()
         return app
@@ -37,7 +37,7 @@ final class ConfidentialUnlockTests: XCTestCase {
         field.tap()
         field.typeText(title)
         app.buttons["Locked"].firstMatch.tap()
-        app.buttons["CardEditor_Confirm"].tap()
+        app.buttons["CardEditor_Confirm"].firstMatch.tap()
         XCTAssertTrue(app.navigationBars["New Card"].waitForNonExistence(timeout: 10))
     }
 

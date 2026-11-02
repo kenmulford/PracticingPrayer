@@ -183,4 +183,59 @@ private func ids(_ items: [PrayerListItem]) -> Set<Int64> {
             #expect(PrayerTimeScope.activePrayers(in: items.filter { $0.record.isAnswered }) == nil)
         }
     }
+
+    @Test func allScopeExcludesArchivedCards() throws {
+        try withLauncher { launcher, database, cards in
+            let store = PrayerStore(database: database)
+            let kept = try cards.create(CardDraft(title: "Kept allScope"), now: now)
+            let archived = try cards.create(CardDraft(title: "Archived allScope"), now: now)
+            let keptPrayer = try store.create(PrayerDraft(prayerCardId: kept.id, title: "k"), now: now)
+            let archivedPrayer = try store.create(PrayerDraft(prayerCardId: archived.id, title: "x"), now: now)
+            try cards.archive(id: archived.id, now: now)
+            let found = ids(try launcher.items(for: .all))
+            #expect(found.contains(keptPrayer))
+            #expect(!found.contains(archivedPrayer))
+        }
+    }
+
+    @Test func allScopePromptsEvenWhenSessionIsUnlocked() async throws {
+        let (database, copy) = try openFixture()
+        defer {
+            try? database.close()
+            for suffix in ["", "-journal", "-wal", "-shm"] {
+                try? FileManager.default.removeItem(atPath: copy.path + suffix)
+            }
+        }
+        let preferences = AppPreferences(defaults: UserDefaults(suiteName: "PrayerTimeLauncherTests-\(UUID().uuidString)")!)
+        let card = try CardMutations(database: database, preferences: preferences)
+            .create(CardDraft(title: "Secret allScope", protectionMode: .lockedVisible), now: now)
+        let prayer = try PrayerStore(database: database)
+            .create(PrayerDraft(prayerCardId: card.id, title: "secret"), now: now)
+        let authenticator = CountingOwnerAuthenticator(.success)
+        let session = ConfidentialSession(authenticator: authenticator)
+        let launcher = PrayerTimeLauncher(database: database)
+        #expect(ids(try await launcher.items(for: .all, session: session)).contains(prayer))
+        #expect(authenticator.calls == 1)
+        #expect(session.isUnlocked)
+        #expect(ids(try await launcher.items(for: .all, session: session)).contains(prayer))
+        #expect(authenticator.calls == 2)
+        authenticator.outcome = .failed
+        #expect(!ids(try await launcher.items(for: .all, session: session)).contains(prayer))
+        #expect(authenticator.calls == 3)
+    }
+}
+
+@MainActor
+private final class CountingOwnerAuthenticator: DeviceOwnerAuthenticating {
+    var outcome: DeviceOwnerAuthOutcome
+    private(set) var calls = 0
+
+    init(_ outcome: DeviceOwnerAuthOutcome) {
+        self.outcome = outcome
+    }
+
+    func authenticate(reason: String) async -> DeviceOwnerAuthOutcome {
+        calls += 1
+        return outcome
+    }
 }

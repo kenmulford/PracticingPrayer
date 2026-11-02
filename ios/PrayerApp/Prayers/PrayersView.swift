@@ -67,6 +67,7 @@ struct PrayersView: View {
                         perform {
                             try store.delete(id: item.record.id)
                             services.reconcileReminders()
+                            deselect(item.record.id)
                         }
                     }
                 }
@@ -108,6 +109,13 @@ struct PrayersView: View {
     private func closeDetail() {
         if path.isEmpty { selection = nil } else { path.removeLast() }
         reload()
+    }
+
+    // A deleted prayer must not stay open in the detail pane.
+    private func deselect(_ prayerId: Int64) {
+        guard selection == .prayer(id: prayerId) else { return }
+        selection = nil
+        path = []
     }
 
     private var toolbarScope: PrayerTimeScope? {

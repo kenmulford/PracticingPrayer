@@ -42,13 +42,24 @@ enum ShareItemBuilder {
     }
 
     static func isShareable(cardId: Int64, database: PrayerDatabase) throws -> Bool {
-        let list = try database.cardList(isSessionUnlocked: true)
-        for section in list.sections {
-            if let item = section.cards.first(where: { $0.card.id == cardId }) {
-                return isShareable(item.card, box: section.box)
-            }
+        try database.effectiveProtectionMode(ofCard: cardId) == .unprotected
+    }
+
+    /// What a row's Share menu item needs: hidden when the card is protected, disabled when the share
+    /// content cannot be built, so a failure never leaves a live-looking item that does nothing.
+    struct RowShare {
+        var isShown = false
+        var item: ShareItem?
+
+        static func card(_ card: PrayerCardRecord, database: PrayerDatabase) -> RowShare {
+            guard (try? isShareable(cardId: card.id, database: database)) == true else { return RowShare() }
+            return RowShare(isShown: true, item: try? ShareItemBuilder.card(card, database: database))
         }
-        return false
+
+        static func prayer(_ prayer: PrayerRequestRecord, database: PrayerDatabase) -> RowShare {
+            guard (try? isShareable(cardId: prayer.prayerCardId, database: database)) == true else { return RowShare() }
+            return RowShare(isShown: true, item: try? ShareItemBuilder.prayer(prayer))
+        }
     }
 
     nonisolated static func sanitizedFileName(_ name: String) -> String {

@@ -15,12 +15,13 @@ struct HomeListView: View {
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .onAppear { model?.load() }
+            .onChange(of: services.confidential.isUnlocked) { model?.load() }
             .task {
                 if model == nil {
                     model = HomeListModel(
                         scope: scope, database: services.database,
                         overdueDayThreshold: services.preferences.overdueDayThreshold,
-                        isSessionUnlocked: services.confidential.isUnlocked)
+                        isSessionUnlocked: { services.confidential.isUnlocked })
                 }
                 model?.load()
             }

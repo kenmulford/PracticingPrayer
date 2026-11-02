@@ -10,7 +10,7 @@ extension ReminderScheduler: ReminderReconciling {}
 
 @Observable
 final class AppServices {
-    enum Phase: Equatable { case opening, open, failed }
+    enum Phase: Equatable { case opening, open, restoring, failed }
 
     private(set) var phase: Phase = .opening
     private(set) var databaseGeneration = 0
@@ -20,20 +20,21 @@ final class AppServices {
     let clipboardHandoff: ClipboardHandoffCoordinator
     let confidential: ConfidentialSession
     var prayerSession: PrayerSession?
-    var pendingImport: PendingImport?
 
     @ObservationIgnored private var openedDatabase: PrayerDatabase?
     @ObservationIgnored private let databasePath: String
+    @ObservationIgnored private let reminderCenter: any ReminderCenter
 
     var database: PrayerDatabase {
-        guard phase == .open, let openedDatabase else {
+        guard phase == .open || phase == .restoring, let openedDatabase else {
             preconditionFailure("AppServices.database read before the database opened")
         }
         return openedDatabase
     }
 
     init(preferences: AppPreferences = AppServices.defaultPreferences, databasePath: String = AppServices.defaultDatabasePath,
-         inboundShare: InboundShareHandler = .shared) {
+         inboundShare: InboundShareHandler = .shared, reminderCenter: any ReminderCenter = SystemReminderCenter()) {
+        self.reminderCenter = reminderCenter
         self.preferences = preferences
         self.inboundShare = inboundShare
         clipboardHandoff = ClipboardHandoffCoordinator(
@@ -89,6 +90,15 @@ final class AppServices {
         #endif
     }
 
+    // Fixture-driven UI suites would otherwise meet the system permission alert on a fresh simulator.
+    static var suppressesNotificationPrompt: Bool {
+        #if DEBUG
+        return ProcessInfo.processInfo.environment["PRAYER_DB_PATH"] != nil
+        #else
+        return false
+        #endif
+    }
+
     static var defaultPasteboard: any PasteboardReading {
         #if DEBUG
         if let text = UserDefaults.standard.string(forKey: "StubClipboard") {
@@ -111,12 +121,13 @@ final class AppServices {
     }
 
     var reminders: any ReminderReconciling {
-        ReminderScheduler(database: database, preferences: preferences, center: SystemReminderCenter())
+        ReminderScheduler(database: database, preferences: preferences, center: reminderCenter)
     }
 
-    func reconcileReminders() {
+    @discardableResult
+    func reconcileReminders() -> Task<Void, Never> {
         let reminders = reminders
-        Task {
+        return Task {
             do {
                 try await reminders.reconcile(now: .now)
             } catch {
@@ -129,19 +140,22 @@ final class AppServices {
         databaseGeneration += 1
     }
 
-    /// Closes the live connection, runs `swap` on the database file, then reopens it. Never leaves `.opening`,
-    /// so the shell keeps its tabs (and the restore overlay) mounted until the caller rebuilds them.
+    /// Closes the live connection, runs `swap` on the database file, then reopens it. Holds `.restoring` for the
+    /// swap (the shell keeps its tabs and the restore overlay mounted, while every `.open` gate pauses) and never
+    /// leaves `.opening`, so nothing queries the closed connection.
     func reopenDatabase<T: Sendable>(after swap: @escaping @Sendable (URL) throws -> T) async throws -> T {
+        phase = .restoring
         let closing = openedDatabase
         let path = databasePath
         let (outcome, reopened) = await Task.detached {
             try? closing?.close()
             let outcome = Result { try swap(URL(fileURLWithPath: path)) }
-            return (outcome, Result { try PrayerDatabase(path: path) })
+            return (outcome, Result { try Self.openPrepared(path: path) })
         }.value
         switch reopened {
-        case .success(let database):
+        case .success(let (database, archivedBoxId)):
             openedDatabase = database
+            preferences.archivedFolderId = archivedBoxId
             phase = .open
         case .failure:
             openedDatabase = nil
@@ -154,11 +168,30 @@ final class AppServices {
         phase = .opening
         let path = databasePath
         do {
-            openedDatabase = try await Task.detached { try PrayerDatabase(path: path) }.value
+            let (database, archivedBoxId) = try await Task.detached { try Self.openPrepared(path: path) }.value
+            openedDatabase = database
+            preferences.archivedFolderId = archivedBoxId
             phase = .open
+            reconcileReminders()
         } catch {
             openedDatabase = nil
             phase = .failed
+        }
+    }
+
+    /// Opens (creating a missing file on a fresh install), runs the 1.7.2 schema upkeep, and returns the
+    /// Archived box id that `AppPreferences.archivedFolderId` mirrors. Blocking; call off the main thread.
+    nonisolated static func openPrepared(path: String) throws -> (PrayerDatabase, Int) {
+        let database = try PrayerDatabase.openOrCreate(path: path)
+        do {
+            try SchemaUpkeep.run(on: database)
+            let now = Date()
+            try TagStore(database: database).seedSystemTags(now: now)
+            try UserColorStore(database: database).seedDefaults(now: now)
+            return (database, Int(try SchemaUpkeep.archivedBoxId(on: database) ?? 0))
+        } catch {
+            try? database.close()
+            throw error
         }
     }
 }

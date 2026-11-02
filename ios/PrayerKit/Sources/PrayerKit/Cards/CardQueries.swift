@@ -127,3 +127,14 @@ public extension PrayerDatabase {
         return CardList(sections: sections, totalMatchCount: sections.reduce(0) { $0 + $1.cards.count })
     }
 }
+
+public extension PrayerDatabase {
+    /// The mode that governs one card (its own, else its collection's), or nil when the card is gone.
+    func effectiveProtectionMode(ofCard id: Int64) throws -> CardProtectionMode? {
+        try dbQueue.read { db in
+            guard let card = try PrayerCardRecord.fetchOne(db, key: id) else { return nil }
+            let box = try card.boxId.flatMap { try CardBoxRecord.fetchOne(db, key: $0) }
+            return ProtectionPolicy.effectiveMode(of: card, box: box)
+        }
+    }
+}

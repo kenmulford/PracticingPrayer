@@ -1,13 +1,27 @@
-//
-//  ImportTextIntent.swift
-//
-//  Shortcuts action that hands text to the app through the App Group file.
-//  The type name and phrases stay as in 1.7.2 so saved shortcuts keep working.
-//
-
 import AppIntents
 import Foundation
 
+nonisolated enum IntentError: Error, LocalizedError {
+    case emptyText
+    case appGroupUnavailable
+    case payloadTooLarge(byteCount: Int)
+    case writeFailed(underlying: Error?)
+
+    var errorDescription: String? {
+        switch self {
+        case .emptyText:
+            return String(localized: "There's no text to save. Try again with a longer selection.")
+        case .appGroupUnavailable:
+            return String(localized: "Couldn't reach Practicing Prayer's storage. Reinstall the app to fix sharing.")
+        case .payloadTooLarge:
+            return String(localized: "That prayer is too long to save from the share sheet. Try a shorter selection.")
+        case .writeFailed:
+            return String(localized: "Couldn't save the prayer right now. Try again.")
+        }
+    }
+}
+
+/// The type name and phrases stay as in 1.7.2 so saved shortcuts keep working.
 struct ImportTextIntent: AppIntent {
     static let title: LocalizedStringResource = "Save to Prayer"
     static let description = IntentDescription(

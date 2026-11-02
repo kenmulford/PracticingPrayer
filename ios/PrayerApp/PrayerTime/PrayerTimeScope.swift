@@ -9,9 +9,3 @@ nonisolated enum PrayerTimeScope: Hashable, Sendable {
         return ids.isEmpty ? nil : .prayers(ids)
     }
 }
-
-enum ScopeLoadState<Value> {
-    case loading
-    case loaded(Value)
-    case failed
-}

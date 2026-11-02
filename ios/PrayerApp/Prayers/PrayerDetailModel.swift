@@ -10,7 +10,7 @@ final class PrayerDetailModel {
     @ObservationIgnored private let prayerId: Int64
     @ObservationIgnored private let database: PrayerDatabase
     @ObservationIgnored private let reminders: any ReminderReconciling
-    @ObservationIgnored private let isSessionUnlocked: Bool
+    @ObservationIgnored private let isSessionUnlocked: () -> Bool
 
     private(set) var phase: Phase = .loading
     private(set) var prayer: PrayerRequestRecord?
@@ -31,7 +31,10 @@ final class PrayerDetailModel {
             : String(localized: "\(prayedCount) times since \(date)")
     }
 
-    init(prayerId: Int64, database: PrayerDatabase, reminders: any ReminderReconciling, isSessionUnlocked: Bool = false) {
+    init(
+        prayerId: Int64, database: PrayerDatabase, reminders: any ReminderReconciling,
+        isSessionUnlocked: @escaping () -> Bool = { false }
+    ) {
         self.isSessionUnlocked = isSessionUnlocked
         self.prayerId = prayerId
         self.database = database
@@ -43,14 +46,14 @@ final class PrayerDetailModel {
     func load() {
         do {
             let id = prayerId
-            let items = try store.prayers(segment: .all, isSessionUnlocked: isSessionUnlocked)
+            let items = try store.prayers(segment: .all, isSessionUnlocked: isSessionUnlocked())
             guard let item = items.first(where: { $0.record.id == id }) else {
                 prayer = nil
                 phase = .notFound
                 return
             }
             let wanted = Set(item.tagIds)
-            tags = try TagStore(database: database).tags(isSessionUnlocked: isSessionUnlocked).map(\.tag).filter { wanted.contains($0.id) }
+            tags = try TagStore(database: database).tags(isSessionUnlocked: isSessionUnlocked()).map(\.tag).filter { wanted.contains($0.id) }
             prayedCount = try database.interactionCount(prayerId: id)
             prayer = item.record
             cardTitle = item.cardTitle

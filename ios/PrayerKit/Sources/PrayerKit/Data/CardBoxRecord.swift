@@ -33,10 +33,10 @@ public struct CardBoxRecord: FetchableRecord, PersistableRecord, Equatable, Send
         let table = Self.databaseTableName
         id = try row.decode(forColumn: "Id")
         name = try row.decode(forColumn: "Name")
-        isSystem = try row.decode(forColumn: "IsSystem")
+        isSystem = try row.flag("IsSystem")
         systemKey = try row.decode(forColumn: "SystemKey")
-        sortOrder = try row.decode(forColumn: "SortOrder")
-        protectAllCards = try row.decode(forColumn: "ProtectAllCards")
+        sortOrder = try row.intOrZero("SortOrder")
+        protectAllCards = try row.flag("ProtectAllCards")
         cardProtectionMode = try row.requiredEnum(CardProtectionMode.self, "CardProtectionMode", table: table)
         createdAtTicks = try row.requiredTicks("CreatedAt", table: table)
         updatedAtTicks = try row.requiredTicks("UpdatedAt", table: table)

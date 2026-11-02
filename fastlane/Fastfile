@@ -41,30 +41,3 @@ platform :android do
     )
   end
 end
-
-platform :ios do
-  desc "Build a signed IPA and upload to TestFlight"
-  lane :release do
-    key = app_store_connect_api_key(
-      key_id: ENV.fetch("ASC_KEY_ID"),
-      issuer_id: ENV.fetch("ASC_ISSUER_ID"),
-      key_content: ENV.fetch("ASC_KEY_P8_BASE64"),
-      is_key_content_base64: true
-    )
-
-    # Signing comes from each project's own config — main app → iOS-signing.local.props,
-    # extension → its csproj. NO -p:Codesign* args: command-line MSBuild props are global
-    # and would override (and break) the extension's own signing. Mirrors the proven
-    # manual deploy command exactly.
-    sh("dotnet", "publish", PROJECT, "-f", "net10.0-ios", "-c", "Release", "-r", "ios-arm64")
-
-    ipa = Dir["#{ROOT}/PrayerApp/bin/Release/net10.0-ios/ios-arm64/publish/*.ipa"].first
-    UI.user_error!("no IPA produced") unless ipa
-
-    # TestFlight "What to Test" notes for this build (mirrors the Android changelog).
-    notes_path = "#{ROOT}/fastlane/metadata/ios/en-US/release_notes.txt"
-    notes = File.exist?(notes_path) ? File.read(notes_path).strip : nil
-
-    upload_to_testflight(api_key: key, ipa: ipa, changelog: notes, skip_waiting_for_build_processing: true)
-  end
-end

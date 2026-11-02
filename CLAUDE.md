@@ -42,11 +42,11 @@ This Mac keeps exactly five iOS simulators, shared with the ios-budget-app repo.
 
 | Name | Device | Runtime | Use |
 |---|---|---|---|
-| `Dev iPhone` | iPhone 17 Pro Max | iOS 27.0 | Hand checks and App Store iPhone screenshots, both repos |
-| `Dev iPad` | iPad Pro 13-inch (M5) | iOS 27.0 | Hand checks and App Store iPad screenshots, both repos |
-| `Test iPhone` | iPhone 17 Pro | iOS 27.0 | ios-budget-app automated tests only |
-| `Test iPad` | iPad (A16) | iOS 27.0 | PracticingPrayer E2E only (`IOS_SIMULATOR` default) |
-| `Dev Duo` | iPhone Duo | iOS 27.1 | Duo hand checks and screenshots |
+| `Dev iPhone` | iPhone 17 Pro Max | iOS 27.2 | Hand checks and App Store iPhone screenshots, both repos |
+| `Dev iPad` | iPad Pro 13-inch (M5) | iOS 27.2 | Hand checks and App Store iPad screenshots, both repos |
+| `Test iPhone` | iPhone 17 Pro | iOS 27.2 | ios-budget-app automated tests only |
+| `Test iPad` | iPad (A16) | iOS 27.2 | PracticingPrayer E2E only (`IOS_SIMULATOR` default) |
+| `Dev Duo` | iPhone Duo | iOS 27.2 | Duo hand checks and screenshots |
 
 - E2E needs an iPad: the iPhone keyboard has no dismiss button, so `DismissKeyboardIfPresent` fails.
 - Shut down any simulator you booted for hand checks when you finish.

@@ -10,6 +10,7 @@ final class ConfidentialSession {
 
     @ObservationIgnored private let authenticator: any DeviceOwnerAuthenticating
     @ObservationIgnored private var inFlight: Task<Bool, Never>?
+    @ObservationIgnored private var verifyInFlight: Task<Bool, Never>?
 
     init(authenticator: any DeviceOwnerAuthenticating) {
         self.authenticator = authenticator
@@ -25,6 +26,19 @@ final class ConfidentialSession {
             return ok
         }
         inFlight = task
+        return await task.value
+    }
+
+    /// Always prompts, even when unlocked: lowering protection or deleting a protected collection needs a fresh
+    /// owner check. It does not change the lock state.
+    func verifyOwner(reason: LocalizedStringResource) async -> Bool {
+        if let verifyInFlight { return await verifyInFlight.value }
+        let task = Task { [self] in
+            let ok = await evaluate(reason: reason)
+            verifyInFlight = nil
+            return ok
+        }
+        verifyInFlight = task
         return await task.value
     }
 

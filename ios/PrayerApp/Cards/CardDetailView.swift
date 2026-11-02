@@ -1,5 +1,6 @@
 import PrayerKit
 import SwiftUI
+import TipKit
 
 struct CardDetailView: View {
     let cardId: Int64
@@ -47,6 +48,7 @@ private struct CardDetailContent: View {
 
     var body: some View {
         List {
+            if model.prayerCount > 0 { addPrayerTipView }
             if !model.activePrayers.isEmpty {
                 Section {
                     ForEach(model.activePrayers, id: \.id) { prayerRow($0) }
@@ -155,13 +157,9 @@ private struct CardDetailContent: View {
             if let id = model.card?.id { prayScope = .cards([id]) }
         }
         .disabled(!model.canPray)
-        Button {
-            isAddingPrayer = true
-            services.onboarding.advance(from: .addPrayer)
-        } label: {
+        Button(action: addPrayer) {
             Label("New Prayer", systemImage: "plus")
         }
-        .onboardingTip(.addPrayer)
         Menu {
             if model.canShowShare { ShareMenuItem(item: model.shareItem) }
             if !model.isSystem {
@@ -225,12 +223,15 @@ private struct CardDetailContent: View {
     @ViewBuilder
     private var emptyState: some View {
         if model.prayerCount == 0 {
-            ContentUnavailableView {
-                Label("No Prayers", systemImage: "hands.and.sparkles")
-            } description: {
-                Text("Add a prayer to this card.")
-            } actions: {
-                Button("New Prayer") { isAddingPrayer = true }
+            VStack {
+                addPrayerTipView.padding(.horizontal)
+                ContentUnavailableView {
+                    Label("No Prayers", systemImage: "hands.and.sparkles")
+                } description: {
+                    Text("Add a prayer to this card.")
+                } actions: {
+                    Button("New Prayer", action: addPrayer)
+                }
             }
         } else if isSearching && model.activePrayers.isEmpty && model.answeredPrayers.isEmpty {
             ContentUnavailableView.search(text: model.searchText)
@@ -238,6 +239,18 @@ private struct CardDetailContent: View {
     }
 
     // MARK: - Helpers
+
+    private func addPrayer() {
+        isAddingPrayer = true
+        services.onboarding.advance(from: .addPrayer)
+    }
+
+    @ViewBuilder
+    private var addPrayerTipView: some View {
+        if let tip = services.onboarding.tips.currentTip as? AddPrayerTip {
+            TipView(tip, arrowEdge: .top)
+        }
+    }
 
     private func perform(_ action: () -> Void) {
         action()

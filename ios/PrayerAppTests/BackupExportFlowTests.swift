@@ -71,3 +71,23 @@ private struct Harness {
     #expect(harness.flow.phase == .idle)
     #expect(harness.flow.showsFailure)
 }
+
+@Test func finishSharingDeletesTheExport() async throws {
+    let harness = try Harness()
+    await harness.flow.backUpNow()
+    guard case .sharing(let url) = harness.flow.phase else {
+        Issue.record("expected .sharing")
+        return
+    }
+    #expect(FileManager.default.fileExists(atPath: url.path))
+    harness.flow.finishSharing()
+    #expect(!FileManager.default.fileExists(atPath: url.path))
+    #expect(harness.flow.phase == .idle)
+}
+
+@Test func shortPassphraseFailsWithoutWritingAFile() async throws {
+    let harness = try Harness(protectCard: true)
+    await harness.flow.protect(passphrase: "short")
+    #expect(harness.flow.showsFailure)
+    #expect(harness.exportedFiles().isEmpty)
+}

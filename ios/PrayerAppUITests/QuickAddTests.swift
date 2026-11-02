@@ -23,14 +23,14 @@ final class QuickAddTests: XCTestCase {
     }
 
     private func openQuickAdd(_ app: XCUIApplication) {
-        let button = app.buttons["Quick Add"]
+        let button = app.buttons["Quick Add"].firstMatch
         XCTAssertTrue(button.waitForExistence(timeout: 15))
         button.tap()
-        XCTAssertTrue(app.buttons["QuickAdd_Cancel"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["QuickAdd_Cancel"].firstMatch.waitForExistence(timeout: 5))
     }
 
     private func unansweredCount(_ app: XCUIApplication) -> Int? {
-        let tile = app.buttons["Unanswered"]
+        let tile = app.buttons["Unanswered"].firstMatch
         guard tile.waitForExistence(timeout: 10) else { return nil }
         return Int(String(describing: tile.value ?? "").filter(\.isNumber))
     }
@@ -48,11 +48,11 @@ final class QuickAddTests: XCTestCase {
         prayerTitle.tap()
         prayerTitle.typeText("UITest Prayer")
 
-        let save = app.buttons["QuickAdd_Confirm"]
+        let save = app.buttons["QuickAdd_Confirm"].firstMatch
         XCTAssertTrue(save.isEnabled)
         save.tap()
 
-        XCTAssertTrue(app.buttons["QuickAdd_Cancel"].waitForNonExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["QuickAdd_Cancel"].firstMatch.waitForNonExistence(timeout: 10))
         let expectation = expectation(
             for: NSPredicate { _, _ in self.unansweredCount(app) == before + 1 },
             evaluatedWith: nil)
@@ -68,11 +68,11 @@ final class QuickAddTests: XCTestCase {
         prayerTitle.tap()
         prayerTitle.typeText("Unsaved")
 
-        app.buttons["QuickAdd_Cancel"].tap()
+        app.buttons["QuickAdd_Cancel"].firstMatch.tap()
         // On iPad the dialog is a popover that omits the cancel-role "Keep Editing" button.
         let discard = app.buttons["Discard Changes"]
         XCTAssertTrue(discard.waitForExistence(timeout: 5))
         discard.tap()
-        XCTAssertTrue(app.buttons["QuickAdd_Cancel"].waitForNonExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["QuickAdd_Cancel"].firstMatch.waitForNonExistence(timeout: 5))
     }
 }

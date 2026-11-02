@@ -95,7 +95,7 @@ Views (XAML)
 - NSubstitute mocks `IDBService`; static `SetDBService()` called per-test constructor
 - Parallelization disabled (`[assembly: CollectionBehavior(DisableTestParallelization = true)]`) — model static `_dbService` is shared state
 - When adding a new non-MAUI service/model, add a matching `<Compile Include>` in `PrayerApp.Tests.csproj`
-- CI: `.github/workflows/ci.yml` runs `Unit Tests` and `Android Build` on push to `master`/`dev`/`feature/**`/`fix/**`/`release/**`/`hotfix/**` and on PRs to `master`/`dev`; `.github/workflows/release.yml` ships to Play and TestFlight
+- CI: `.github/workflows/ci.yml` runs `Unit Tests` and `Android Build` on push to `master`/`dev`/`feature/**`/`fix/**`/`release/**`/`hotfix/**` and on PRs to `master`/`dev`; `.github/workflows/release.yml` ships Android to Play and runs a Release build check of the native iOS app (archive and upload from the Xcode Organizer)
 - Dependabot (`.github/dependabot.yml`) opens weekly grouped minor/patch PRs against `dev` for NuGet, Bundler and GitHub Actions
 - Running the Appium UI test suite is documented in [docs/RUNNING_UITESTS.md](docs/RUNNING_UITESTS.md)
 

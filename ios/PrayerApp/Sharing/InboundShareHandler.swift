@@ -31,6 +31,8 @@ final class InboundShareHandler {
     struct Item: Identifiable, Equatable {
         let id: UUID
         let content: Content
+        /// A parsed title the App Group pickup proposes for the new card; nil for links and files.
+        var cardTitle: String?
     }
 
     private(set) var queue: [Item] = []
@@ -39,8 +41,17 @@ final class InboundShareHandler {
 
     @ObservationIgnored private let readFile: (URL) throws -> Data
 
-    init(readFile: @escaping (URL) throws -> Data = { try Data(contentsOf: $0) }) {
+    init(readFile: @escaping (URL) throws -> Data = InboundShareHandler.readCapped) {
         self.readFile = readFile
+    }
+
+    /// Reads at most `ShareCodec.maxFileBytes` and throws past it, so a hostile file never loads whole.
+    nonisolated static func readCapped(_ url: URL) throws -> Data {
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        let data = try handle.read(upToCount: ShareCodec.maxFileBytes + 1) ?? Data()
+        guard data.count <= ShareCodec.maxFileBytes else { throw CocoaError(.fileReadTooLarge) }
+        return data
     }
 
     func handle(_ url: URL) {
@@ -64,8 +75,8 @@ final class InboundShareHandler {
         handle(url)
     }
 
-    func enqueue(_ payload: SharePayload) {
-        enqueue(.payload(payload))
+    func enqueue(_ payload: SharePayload, cardTitle: String? = nil) {
+        enqueue(.payload(payload), cardTitle: cardTitle)
     }
 
     func dismissHead() {
@@ -89,7 +100,7 @@ final class InboundShareHandler {
         }
     }
 
-    private func enqueue(_ content: Content) {
-        queue.append(Item(id: UUID(), content: content))
+    private func enqueue(_ content: Content, cardTitle: String? = nil) {
+        queue.append(Item(id: UUID(), content: content, cardTitle: cardTitle))
     }
 }

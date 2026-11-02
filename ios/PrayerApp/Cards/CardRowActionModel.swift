@@ -3,14 +3,13 @@ import Observation
 import PrayerKit
 
 enum CardRowAction: Hashable {
-    case pray, share, favorite, unfavorite, edit, moveTo, archive, unarchive, delete
+    case pray, favorite, unfavorite, edit, moveTo, archive, unarchive, delete
 }
 
 extension CardRowAction {
     var title: LocalizedStringResource {
         switch self {
         case .pray: "Pray"
-        case .share: "Share"
         case .favorite: "Favorite"
         case .unfavorite: "Unfavorite"
         case .edit: "Edit"
@@ -24,7 +23,6 @@ extension CardRowAction {
     var systemImage: String {
         switch self {
         case .pray: "hands.and.sparkles"
-        case .share: "square.and.arrow.up"
         case .favorite: "star.fill"
         case .unfavorite: "star.slash"
         case .edit: "pencil"
@@ -64,7 +62,7 @@ final class CardRowActionModel {
     private var archiveAction: CardRowAction { isArchived ? .unarchive : .archive }
 
     var menuActions: [CardRowAction] {
-        isLocked ? [] : [.pray, .share, favoriteAction, .edit, .moveTo, archiveAction, .delete]
+        isLocked ? [] : [.pray, favoriteAction, .edit, .moveTo, archiveAction, .delete]
     }
 
     var canPray: Bool { activePrayerCount > 0 }
@@ -82,29 +80,37 @@ final class CardRowActionModel {
     }
 
     static func perform(
-        _ action: CardRowAction, cardId: Int64, database: PrayerDatabase, preferences: AppPreferences
+        _ action: CardRowAction, cardId: Int64, database: PrayerDatabase, preferences: AppPreferences,
+        isSessionUnlocked: Bool
     ) -> String? {
-        let model = CardDetailModel(cardId: cardId, database: database, preferences: preferences)
+        let model = CardDetailModel(
+            cardId: cardId, database: database, preferences: preferences, isSessionUnlocked: isSessionUnlocked)
         model.load()
         switch action {
         case .favorite, .unfavorite: model.toggleFavorite()
         case .archive: _ = model.archive()
         case .unarchive: model.unarchive()
         case .delete: _ = model.delete()
-        case .pray, .share, .edit, .moveTo: return nil
+        case .pray, .edit, .moveTo: return nil
         }
         return model.errorMessage
     }
 
-    static func move(cardId: Int64, toBox boxId: Int64, database: PrayerDatabase, preferences: AppPreferences) -> String? {
-        let model = CardDetailModel(cardId: cardId, database: database, preferences: preferences)
+    static func move(
+        cardId: Int64, toBox boxId: Int64, database: PrayerDatabase, preferences: AppPreferences, isSessionUnlocked: Bool
+    ) -> String? {
+        let model = CardDetailModel(
+            cardId: cardId, database: database, preferences: preferences, isSessionUnlocked: isSessionUnlocked)
         model.load()
         model.move(toBox: boxId)
         return model.errorMessage
     }
 
-    static func previewTitles(cardId: Int64, database: PrayerDatabase, preferences: AppPreferences) -> [String] {
-        let model = CardDetailModel(cardId: cardId, database: database, preferences: preferences)
+    static func previewTitles(
+        cardId: Int64, database: PrayerDatabase, preferences: AppPreferences, isSessionUnlocked: Bool
+    ) -> [String] {
+        let model = CardDetailModel(
+            cardId: cardId, database: database, preferences: preferences, isSessionUnlocked: isSessionUnlocked)
         model.load()
         return model.activePrayers.prefix(3).map(\.title)
     }

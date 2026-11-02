@@ -1000,6 +1000,9 @@
     "Restore complete" : {
 
     },
+    "Restore complete. Protected cards weren't restored because the passphrase was wrong." : {
+
+    },
     "Restore failed. Please restart the app." : {
 
     },

@@ -41,7 +41,7 @@ final class CardDetailUITests: XCTestCase {
     }
 
     private func openCardsTab(_ app: XCUIApplication) {
-        let tab = app.tabBars.buttons["Cards"].exists ? app.tabBars.buttons["Cards"] : app.buttons["Cards"].firstMatch
+        let tab = app.cardsTab
         XCTAssertTrue(tab.waitForExistence(timeout: 20), "Cards tab missing")
         tab.tap()
     }
@@ -88,7 +88,9 @@ final class CardDetailUITests: XCTestCase {
 
     private func open(_ app: XCUIApplication, card title: String) {
         waitForList(app)
-        let row = element(app, labelStartingWith: title)
+        // The Home tab's "Quick Add" toolbar button shares the system card's label, so look only inside the Cards list.
+        let row = app.descendants(matching: .any)["Shell_Root_cards"].descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", title)).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 10), "\(title) row missing")
         row.tap()
         openedCard = title

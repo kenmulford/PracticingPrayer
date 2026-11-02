@@ -43,10 +43,20 @@ extension Row {
 
     func requiredEnum<E: RawRepresentable>(_ type: E.Type, _ column: String, table: String) throws -> E
     where E.RawValue == Int64 {
-        let raw: Int64 = try decode(forColumn: column)
+        let raw: Int64 = try intOrZero(column)
         guard let value = E(rawValue: raw) else {
             throw RecordDecodingError.unknownEnumValue(table: table, column: column, value: raw)
         }
         return value
+    }
+
+    /// sqlite-net read NULL into a `bool` as false and into an `int` or enum as 0. Columns it added with
+    /// `ALTER TABLE ADD COLUMN` hold NULL on rows that predate them, so these decode NULL the same way.
+    func flag(_ column: String) throws -> Bool {
+        try decode(forColumn: column) as Bool? ?? false
+    }
+
+    func intOrZero<T: FixedWidthInteger & DatabaseValueConvertible & StatementColumnConvertible>(_ column: String) throws -> T {
+        try decode(forColumn: column) as T? ?? 0
     }
 }

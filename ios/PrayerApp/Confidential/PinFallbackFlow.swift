@@ -17,6 +17,7 @@ final class PinFallbackFlow {
     @ObservationIgnored private let tracker: PinAttemptTracker
     @ObservationIgnored private let presenter: (any PinSheetPresenting)?
     @ObservationIgnored private var continuation: CheckedContinuation<Bool, Never>?
+    @ObservationIgnored private var isSubmitting = false
 
     init(record: PinRecord, tracker: PinAttemptTracker, presenter: (any PinSheetPresenting)? = nil) {
         self.record = record
@@ -58,6 +59,10 @@ final class PinFallbackFlow {
     }
 
     func submit(pin: String) async {
+        // The detached verify suspends; a second submit would pass the lockout check before the first records.
+        guard !isSubmitting else { return }
+        isSubmitting = true
+        defer { isSubmitting = false }
         do {
             let state = try tracker.state()
             if tracker.activeLockout(in: state) != nil {

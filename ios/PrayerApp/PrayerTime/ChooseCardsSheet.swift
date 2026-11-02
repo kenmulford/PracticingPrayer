@@ -7,7 +7,7 @@ struct ChooseCardsSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var searchText = ""
-    @State private var state = ScopeLoadState<[PrayerTimeSection]>.loading
+    @State private var loader = ScopeLoader<[PrayerTimeSection]>()
     @State private var selected = Set<Int64>()
 
     init(launcher: PrayerTimeLauncher, onStart: @escaping (PrayerTimeScope) -> Void) {
@@ -17,20 +17,7 @@ struct ChooseCardsSheet: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                switch state {
-                case .loading:
-                    ProgressView()
-                case .failed:
-                    ContentUnavailableView {
-                        Label("Unable to Load", systemImage: "exclamationmark.triangle")
-                    } actions: {
-                        Button("Retry") { Task { await load() } }
-                    }
-                case .loaded(let sections):
-                    list(sections)
-                }
-            }
+            ScopeLoadView(loader: loader, retry: { Task { await load() } }) { list($0) }
             .navigationTitle("Choose Cards")
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $searchText, prompt: "Search Cards")
@@ -88,8 +75,6 @@ struct ChooseCardsSheet: View {
     private func load() async {
         let launcher = launcher
         let search = searchText
-        let result = await Task.detached { try? launcher.eligibleCards(search: search) }.value
-        guard !Task.isCancelled else { return }
-        state = result.map { .loaded($0) } ?? .failed
+        await loader.load { try launcher.eligibleCards(search: search) }
     }
 }

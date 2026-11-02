@@ -102,6 +102,17 @@ private struct Harness {
         _ = await task.value
     }
 
+    @Test func concurrentSubmitsRecordOneAttempt() async throws {
+        let h = try Harness(existingPin: "123456")
+        let task = await h.start()
+        async let first: Void = h.flow.submit(pin: "000000")
+        async let second: Void = h.flow.submit(pin: "000000")
+        _ = await (first, second)
+        #expect(try h.failures() == 1)
+        h.flow.cancel()
+        _ = await task.value
+    }
+
     @Test func cancelLeavesRecordAndCount() async throws {
         let h = try Harness(existingPin: "123456")
         let before = try PinRecord(store: h.store).read()

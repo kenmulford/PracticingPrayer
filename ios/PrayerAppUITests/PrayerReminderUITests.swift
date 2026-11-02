@@ -71,14 +71,17 @@ final class PrayerReminderUITests: XCTestCase {
 
         let toggle = app.switches["PrayerEditor_RemindMe"].firstMatch
         XCTAssertTrue(toggle.waitForExistence(timeout: 10), "Remind Me missing")
-        toggle.tap()
+        let knob = toggle.switches.firstMatch
+        (knob.exists ? knob : toggle).tap()
 
         let repeatMenu = app.buttons["PrayerEditor_Repeat"].firstMatch
         XCTAssertTrue(repeatMenu.waitForExistence(timeout: 10), "Repeat missing")
+        let framesBefore = app.collectionViewFrames()
         repeatMenu.tap()
-        let weekly = app.menuItems.element(boundBy: 2)
+        let menu = try XCTUnwrap(app.openedMenuCollectionView(excluding: framesBefore), "Repeat menu did not open")
+        let weekly = menu.cells.element(boundBy: 2)
         XCTAssertTrue(weekly.waitForExistence(timeout: 5), "Weekly menu row missing")
-        weekly.tap()
+        weekly.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
 
         app.buttons["PrayerEditor_Confirm"].firstMatch.tap()
         let summary = app.staticTexts["PrayerDetail_Reminder"].firstMatch
