@@ -58,9 +58,7 @@ private struct CardDetailContent: View {
             }
             if !model.answeredPrayers.isEmpty {
                 Section {
-                    ForEach(model.answeredPrayers, id: \.id) { prayerRow($0) }
-                } header: {
-                    Text("Answered").accessibilityAddTraits(.isHeader)
+                    AnsweredPrayersDisclosure(prayers: model.answeredPrayers) { prayerRow($0) }
                 }
             }
             if model.isSystem {
@@ -287,33 +285,5 @@ private struct CardDetailContent: View {
         Binding(
             get: { prayerToDelete != nil },
             set: { if !$0 { prayerToDelete = nil } })
-    }
-}
-
-private struct PrayerRow: View {
-    let prayer: PrayerRequestRecord
-
-    private var answeredDate: Date? {
-        prayer.answeredAtTicks.flatMap { try? Date(ticks: $0) }
-    }
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading) {
-                Text(verbatim: prayer.title)
-                if prayer.isAnswered, let answeredDate {
-                    Text(answeredDate.formatted(date: .abbreviated, time: .omitted))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            if prayer.isAnswered {
-                Spacer()
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
-                    .accessibilityLabel("Answered")
-            }
-        }
-        .accessibilityElement(children: .combine)
     }
 }

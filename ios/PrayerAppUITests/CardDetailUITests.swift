@@ -194,6 +194,21 @@ final class CardDetailUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["No Prayers"].waitForExistence(timeout: 5))
     }
 
+    func testAnsweredRowExpandsInPlace() throws {
+        let database = try prepareDatabase([
+            insertCard("DetailAnswered"),
+            insertRequest(for: "DetailAnswered", "DetailAnswered Prayer"),
+            "UPDATE PrayerRequest SET IsAnswered = 1 WHERE Title = 'DetailAnswered Prayer'",
+        ])
+        let app = launch(database: database, arguments: standardArguments(expanded: allSections))
+        open(app, card: "DetailAnswered")
+        let answered = element(app, labelStartingWith: "Answered")
+        XCTAssertTrue(answered.waitForExistence(timeout: 5))
+        XCTAssertFalse(element(app, labelStartingWith: "DetailAnswered Prayer").exists)
+        answered.tap()
+        XCTAssertTrue(element(app, labelStartingWith: "DetailAnswered Prayer").waitForExistence(timeout: 5))
+    }
+
     func testSystemCardMenu() throws {
         let app = launch(database: try prepareDatabase(), arguments: standardArguments(expanded: allSections))
         open(app, card: "Quick Add")
