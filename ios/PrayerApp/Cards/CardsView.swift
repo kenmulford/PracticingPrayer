@@ -13,6 +13,7 @@ struct CardsView: View {
     @State private var selection: CardsRoute?
     @State private var collectionSelection: Int64?
     @State private var listRevision = 0
+    @State private var rootSections = CollectionRootSections()
     @State private var compactColumn = NavigationSplitViewColumn.sidebar
     @State private var isAddingCard = false
     @State private var load: Result<CardList, any Error>?
@@ -128,6 +129,13 @@ struct CardsView: View {
         }
         .onChange(of: isSessionUnlocked) {
             reload()
+            if !isSessionUnlocked, let id = collectionSelection,
+                case .success(let list) = load,
+                let section = list.sections.first(where: { $0.boxId == id }),
+                CollectionProtection.rootState(of: section.box, isSessionUnlocked: false) != .normal
+            {
+                collectionSelection = nil
+            }
             reloadTags()
         }
         .onChange(of: selectedIds) { refreshSelection() }
@@ -182,7 +190,7 @@ struct CardsView: View {
         } else if isNarrowed {
             browsingList(list)
         } else {
-            collectionsList(list)
+            collectionsList()
         }
     }
 
@@ -240,24 +248,35 @@ struct CardsView: View {
         }
     }
 
-    private func collectionsList(_ list: CardList) -> some View {
+    private func collectionsList() -> some View {
         List(selection: $collectionSelection) {
             listTips
             Section {
-                ForEach(list.sections.filter { $0.box?.isSystem != true }, id: \.boxId) { collectionLink($0) }
+                ForEach(rootSections.user, id: \.boxId) { collectionLink($0) }
             }
             Section {
-                ForEach(list.sections.filter { $0.box?.isSystem == true }, id: \.boxId) { collectionLink($0) }
+                ForEach(rootSections.system, id: \.boxId) { collectionLink($0) }
             }
         }
         .listStyle(.insetGrouped)
     }
 
+    @ViewBuilder
     private func collectionLink(_ section: CardSection) -> some View {
-        NavigationLink(value: section.boxId) {
-            CollectionRow(section: section)
+        if CollectionProtection.rootState(of: section.box, isSessionUnlocked: isSessionUnlocked) == .locked {
+            Button {
+                Task { await openProtectedCollection(section) }
+            } label: {
+                LockedCollectionRow(section: section)
+            }
+            .buttonStyle(.plain)
+            .selectionDisabled()
+        } else {
+            NavigationLink(value: section.boxId) {
+                CollectionRow(section: section)
+            }
+            .tag(section.boxId)
         }
-        .tag(section.boxId)
     }
 
     @ViewBuilder
@@ -314,6 +333,13 @@ struct CardsView: View {
         }
     }
 
+    private func openProtectedCollection(_ section: CardSection) async {
+        if await services.confidential.authenticate(reason: "Open protected collection") {
+            collectionSelection = section.boxId
+            compactColumn = .content
+        }
+    }
+
     private var filterSubtitle: LocalizedStringKey {
         let names = TagFilterMenu.selectedNames(selectedTagIds, in: tags).joined(separator: ", ")
         return names.isEmpty ? "" : "Filtered by \(names)"
@@ -360,6 +386,11 @@ struct CardsView: View {
         load = Result {
             try services.database.cardList(
                 filter: CardListFilter(searchText: searchText, tagIds: selectedTagIds), isSessionUnlocked: isSessionUnlocked)
+        }
+        if case .success(let list) = load {
+            rootSections = CollectionProtection.rootSections(list.sections, isSessionUnlocked: isSessionUnlocked)
+        } else {
+            rootSections = CollectionRootSections()
         }
         if let id = collectionSelection, case .success(let list) = load, !list.sections.contains(where: { $0.boxId == id }) {
             collectionSelection = nil
@@ -471,6 +502,22 @@ private struct CollectionRow: View {
         }
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("Collections_Row_\(section.boxId)")
+    }
+}
+
+private struct LockedCollectionRow: View {
+    let section: CardSection
+
+    var body: some View {
+        let name = section.box?.name ?? ""
+        HStack {
+            Label(name, systemImage: "lock.fill")
+            Spacer()
+        }
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(String(localized: "\(name), locked"))
         .accessibilityIdentifier("Collections_Row_\(section.boxId)")
     }
 }
