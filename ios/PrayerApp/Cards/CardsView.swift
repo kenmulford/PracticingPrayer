@@ -11,7 +11,9 @@ struct CardsView: View {
 
     @State private var searchText = ""
     @State private var selection: CardsRoute?
-    @State private var expandedIds: Set<Int64> = []
+    @State private var collectionSelection: Int64?
+    @State private var listRevision = 0
+    @State private var compactColumn = NavigationSplitViewColumn.sidebar
     @State private var isAddingCard = false
     @State private var load: Result<CardList, any Error>?
     @State private var tags: [PrayerTagRecord] = []
@@ -27,12 +29,6 @@ struct CardsView: View {
     @State private var isMoving = false
     @State private var confirmArchive = false
     @State private var confirmDelete = false
-    @State private var cardToDelete: CardListItem?
-    @State private var rowCard: CardListItem?
-    @State private var isEditingRow = false
-    @State private var isMovingRow = false
-    @State private var rowError: String?
-    @State private var prayScope: PrayerTimeScope?
 
     private var isSearching: Bool {
         !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -60,12 +56,12 @@ struct CardsView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(preferredCompactColumn: $compactColumn) {
             sidebar
                 .navigationTitle(isSelecting ? selectionTitle : Text(AppTab.cards.title))
                 .toolbarVisibility(isSelecting ? .hidden : .automatic, for: .tabBar)
                 .navigationBarTitleDisplayMode(.large)
-                .searchable(text: $searchText, prompt: Text("Search Cards"))
+                .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: Text("Search Cards"))
                 .navigationSubtitle(Text(filterSubtitle))
                 .toolbar {
                     CardsToolbar(
@@ -106,35 +102,8 @@ struct CardsView: View {
                 .sheet(isPresented: $isAddingCard, onDismiss: reload) {
                     CardEditorView(card: nil, database: services.database, preferences: services.preferences) { _ in }
                 }
-                .modifier(
-                    CardDeleteConfirmation(
-                        item: $cardToDelete, archivedFolderId: Int64(services.preferences.archivedFolderId)
-                    ) { card in
-                        rowError = CardRowActionModel.perform(
-                            .delete, cardId: card.card.id, database: services.database,
-                            preferences: services.preferences, isSessionUnlocked: isSessionUnlocked)
-                        if rowError == nil {
-                            services.reconcileReminders()
-                            deselect(card.card.id)
-                        }
-                        reload()
-                    }
-                )
-                .sheet(isPresented: $isEditingRow, onDismiss: reload) {
-                    CardEditorView(
-                        card: rowCard?.card, database: services.database, preferences: services.preferences
-                    ) { _ in }
-                }
-                .sheet(isPresented: $isMovingRow) {
-                    MoveToCollectionSheet(
-                        collections: moveTargets, currentBoxId: rowCard?.card.boxId ?? 0, select: moveRowCard)
-                }
-                .prayerTimeStart($prayScope)
-                .alert("Couldn't Update Card", isPresented: rowErrorBinding) {
-                    Button("OK") {}
-                } message: {
-                    Text(rowError ?? "")
-                }
+        } content: {
+            contentColumn
         } detail: {
             NavigationStack(path: $path) {
                 detailRoot
@@ -144,13 +113,19 @@ struct CardsView: View {
             }
         }
         .onAppear {
-            expandedIds = Set(services.preferences.expandedSectionIds.split(separator: ",").compactMap { Int64($0) })
             bannerDismissed = services.preferences.collectionsBannerDismissed
             reloadTags()
         }
         .task(id: CardListFilter(searchText: searchText, tagIds: selectedTagIds)) { reload() }
         .task { await watchTip() }
-        .onChange(of: selection) { path = [] }
+        .onChange(of: selection) {
+            path = []
+            if selection != nil { compactColumn = .detail }
+        }
+        .onChange(of: collectionSelection) {
+            selection = nil
+            path = []
+        }
         .onChange(of: isSessionUnlocked) {
             reload()
             reloadTags()
@@ -204,8 +179,10 @@ struct CardsView: View {
     private func cardList(_ list: CardList) -> some View {
         if isSelecting {
             selectingList(list)
-        } else {
+        } else if isNarrowed {
             browsingList(list)
+        } else {
+            collectionsList(list)
         }
     }
 
@@ -216,7 +193,7 @@ struct CardsView: View {
             set: { selectedIds = $0.union(selectedIds.subtracting(visibleIds)) })
         return List(selection: binding) {
             ForEach(list.sections.filter { !isNarrowed || !$0.cards.isEmpty }, id: \.boxId) { section in
-                Section(isExpanded: expansion(for: section, in: list)) {
+                Section(isExpanded: .constant(true)) {
                     ForEach(section.cards, id: \.card.id) { item in
                         if item.isMasked {
                             CardRow(item: item).selectionDisabled()
@@ -247,8 +224,8 @@ struct CardsView: View {
         }
     }
 
-    private func browsingList(_ list: CardList) -> some View {
-        List(selection: $selection) {
+    private var listTips: some View {
+        Group {
             addCardTipView.selectionDisabled()
             if !bannerDismissed {
                 TipView(tip) { action in
@@ -260,34 +237,71 @@ struct CardsView: View {
                 }
                 .selectionDisabled()
             }
-            ForEach(list.sections.filter { !isNarrowed || !$0.cards.isEmpty }, id: \.boxId) { section in
-                Section(isExpanded: expansion(for: section, in: list)) {
-                    ForEach(section.cards, id: \.card.id) { item in
-                        if item.isMasked {
-                            Button {
-                                Task { await openProtected(item) }
-                            } label: {
-                                CardRow(item: item)
-                            }
-                            .buttonStyle(.plain)
-                            .selectionDisabled()
-                        } else {
-                            NavigationLink(value: CardsRoute.card(id: item.card.id)) {
-                                CardRow(item: item, isHidden: isHidden(item, in: section))
-                            }
-                            .modifier(
-                                CardRowActions(
-                                    item: item, archivedFolderId: Int64(services.preferences.archivedFolderId)
-                                ) { rowAction($0, item) })
-                        }
-                    }
-                } header: {
-                    Text("\(sectionName(section)) · \(section.cards.count)")
-                        .accessibilityAddTraits(.isHeader)
-                }
+        }
+    }
+
+    private func collectionsList(_ list: CardList) -> some View {
+        List(selection: $collectionSelection) {
+            listTips
+            Section {
+                ForEach(list.sections.filter { $0.box?.isSystem != true }, id: \.boxId) { collectionLink($0) }
+            }
+            Section {
+                ForEach(list.sections.filter { $0.box?.isSystem == true }, id: \.boxId) { collectionLink($0) }
             }
         }
-        .listStyle(.sidebar)
+        .listStyle(.insetGrouped)
+    }
+
+    private func collectionLink(_ section: CardSection) -> some View {
+        NavigationLink(value: section.boxId) {
+            CollectionRow(section: section)
+        }
+        .tag(section.boxId)
+    }
+
+    @ViewBuilder
+    private var contentColumn: some View {
+        if let id = collectionSelection {
+            CollectionCardsView(boxId: id, selection: $selection, revision: listRevision, onChange: reload)
+        } else {
+            ContentUnavailableView("Select a Collection", systemImage: "folder")
+        }
+    }
+
+    private func browsingList(_ list: CardList) -> some View {
+        CardRowActionsHost(onChange: reload, onRemoved: deselect) { perform in
+            List(selection: $selection) {
+                listTips
+                ForEach(list.sections.filter { !$0.cards.isEmpty }, id: \.boxId) { section in
+                    Section(isExpanded: .constant(true)) {
+                        ForEach(section.cards, id: \.card.id) { item in
+                            if item.isMasked {
+                                Button {
+                                    Task { await openProtected(item) }
+                                } label: {
+                                    CardRow(item: item)
+                                }
+                                .buttonStyle(.plain)
+                                .selectionDisabled()
+                            } else {
+                                NavigationLink(value: CardsRoute.card(id: item.card.id)) {
+                                    CardRow(item: item, isHidden: isHidden(item, in: section))
+                                }
+                                .modifier(
+                                    CardRowActions(
+                                        item: item, archivedFolderId: Int64(services.preferences.archivedFolderId)
+                                    ) { perform($0, item) })
+                            }
+                        }
+                    } header: {
+                        Text("\(sectionName(section)) · \(section.cards.count)")
+                            .accessibilityAddTraits(.isHeader)
+                    }
+                }
+            }
+            .listStyle(.sidebar)
+        }
     }
 
     private func isHidden(_ item: CardListItem, in section: CardSection) -> Bool {
@@ -307,20 +321,6 @@ struct CardsView: View {
 
     private func sectionName(_ section: CardSection) -> String {
         section.box?.name ?? String(localized: "Loose Cards")
-    }
-
-    private func expansion(for section: CardSection, in list: CardList) -> Binding<Bool> {
-        Binding(
-            get: { isNarrowed || expandedIds.contains(section.boxId) },
-            set: { isExpanded in
-                guard !isNarrowed else { return }
-                if isExpanded { expandedIds.insert(section.boxId) } else { expandedIds.remove(section.boxId) }
-                services.preferences.expandedSectionIds = list.sections.map(\.boxId)
-                    .filter(expandedIds.contains)
-                    .map(String.init)
-                    .joined(separator: ",")
-            }
-        )
     }
 
     @ViewBuilder
@@ -361,6 +361,10 @@ struct CardsView: View {
             try services.database.cardList(
                 filter: CardListFilter(searchText: searchText, tagIds: selectedTagIds), isSessionUnlocked: isSessionUnlocked)
         }
+        if let id = collectionSelection, case .success(let list) = load, !list.sections.contains(where: { $0.boxId == id }) {
+            collectionSelection = nil
+        }
+        listRevision &+= 1
         refreshSelection()
     }
 
@@ -394,47 +398,7 @@ struct CardsView: View {
         isMoving = true
     }
 
-    // Read at presentation time: a @State copy set in the same transaction as the sheet flag reached the sheet empty.
-    private var moveTargets: [CardBoxRecord] {
-        (try? CollectionStore(database: services.database).collections()
-            .filter { !$0.isSystem }
-            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }) ?? []
-    }
-
-    // MARK: - Row actions
-
-    private var rowErrorBinding: Binding<Bool> {
-        Binding(get: { rowError != nil }, set: { if !$0 { rowError = nil } })
-    }
-
-    private func rowAction(_ action: CardRowAction, _ item: CardListItem) {
-        switch action {
-        case .pray:
-            prayScope = .cards([item.card.id])
-        case .edit:
-            rowCard = item
-            isEditingRow = true
-        case .moveTo:
-            rowCard = item
-            isMovingRow = true
-        case .delete:
-            cardToDelete = item
-        case .favorite, .unfavorite, .archive, .unarchive:
-            rowError = CardRowActionModel.perform(
-                action, cardId: item.card.id, database: services.database, preferences: services.preferences,
-                isSessionUnlocked: isSessionUnlocked)
-            if rowError == nil, action == .archive { deselect(item.card.id) }
-            reload()
-        }
-    }
-
-    private func moveRowCard(toBox boxId: Int64) {
-        guard let card = rowCard else { return }
-        rowError = CardRowActionModel.move(
-            cardId: card.card.id, toBox: boxId, database: services.database, preferences: services.preferences,
-            isSessionUnlocked: isSessionUnlocked)
-        reload()
-    }
+    private var moveTargets: [CardBoxRecord] { CardRowActionsHost<EmptyView>.moveTargets(services.database) }
 
     private func moveSelected(toBox boxId: Int64) {
         let name = boxId == 0
@@ -489,5 +453,24 @@ struct CardsView: View {
                 return
             }
         }
+    }
+}
+
+private struct CollectionRow: View {
+    let section: CardSection
+
+    var body: some View {
+        HStack {
+            Label(
+                section.box?.name ?? String(localized: "Loose Cards"),
+                systemImage: section.boxId == 0 ? "tray" : "folder")
+            Spacer()
+            Text(section.cards.count, format: .number)
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+        }
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("Collections_Row_\(section.boxId)")
     }
 }

@@ -53,8 +53,8 @@ final class CardsFilterTests: XCTestCase {
         tab.tap()
     }
 
-    private func standardArguments(expanded: String = "0", extra: [String] = []) -> [String] {
-        ["-ResetTips", "-CollectionsBannerDismissed", "YES", "-ExpandedSectionIds", expanded] + extra
+    private func standardArguments(extra: [String] = []) -> [String] {
+        ["-ResetTips", "-CollectionsBannerDismissed", "YES"] + extra
     }
 
     private func insertCard(_ title: String, favorite: Bool = false, protection: Int = 0, box: String? = nil) -> String {
@@ -103,9 +103,14 @@ final class CardsFilterTests: XCTestCase {
         app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", prefix)).firstMatch
     }
 
+    private func collectionRow(_ app: XCUIApplication, _ name: String) -> XCUIElement {
+        app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH 'Collections_Row_' AND label BEGINSWITH %@", name))
+            .firstMatch
+    }
+
     private func waitForList(_ app: XCUIApplication) {
-        let archived = element(app, labelStartingWith: "Archived · ")
-        XCTAssertTrue(archived.waitForExistence(timeout: 20), "card list did not load")
+        XCTAssertTrue(collectionRow(app, "Archived").waitForExistence(timeout: 20), "collections list did not load")
     }
 
     private func filterButton(_ app: XCUIApplication) -> XCUIElement {
@@ -146,7 +151,7 @@ final class CardsFilterTests: XCTestCase {
         let names = ["TagA \(test)", "TagB \(test)"]
         let app = launch(database: try prepareDatabase(twoTaggedCards(test)), arguments: standardArguments())
         waitForList(app)
-        XCTAssertTrue(element(app, labelStartingWith: "Beta \(test)").exists)
+        XCTAssertTrue(collectionRow(app, "Loose Cards").exists)
         XCTAssertFalse(element(app, labelStartingWith: "Filtered by").exists)
 
         let rows = openMenu(app)
@@ -172,8 +177,7 @@ final class CardsFilterTests: XCTestCase {
         let rows = openMenu(app)
         XCTAssertEqual(rows.count, menuOrder(adding: names).count + 1)
         rows.element(boundBy: 0).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-        XCTAssertTrue(element(app, labelStartingWith: "Beta \(test)").waitForExistence(timeout: 10))
-        XCTAssertTrue(element(app, labelStartingWith: "Alpha \(test)").exists)
+        XCTAssertTrue(collectionRow(app, "Loose Cards").waitForExistence(timeout: 10))
         XCTAssertFalse(element(app, labelStartingWith: "Filtered by").exists)
     }
 
@@ -188,7 +192,7 @@ final class CardsFilterTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["No Matching Cards"].waitForExistence(timeout: 20))
         XCTAssertTrue(filterButton(app).exists)
         app.buttons["Clear Filter"].firstMatch.tap()
-        XCTAssertTrue(element(app, labelStartingWith: "Alpha \(test)").waitForExistence(timeout: 10))
+        XCTAssertTrue(collectionRow(app, "Loose Cards").waitForExistence(timeout: 10))
     }
 
     func testOnlySystemTagKeepsFilterEnabled() throws {
@@ -221,7 +225,8 @@ final class CardsFilterTests: XCTestCase {
             ]),
             arguments: standardArguments())
         waitForList(app)
-        XCTAssertTrue(element(app, labelStartingWith: "Protected").exists)
+        app.openCollection("Loose Cards")
+        XCTAssertTrue(element(app, labelStartingWith: "Protected").waitForExistence(timeout: 10))
         app.terminate()
         app.launchArguments = seeded("7")
         app.launch()
@@ -246,8 +251,7 @@ final class CardsFilterTests: XCTestCase {
         XCTAssertTrue(home.waitForExistence(timeout: 10))
         home.tap()
         openCardsTab(app)
-        XCTAssertTrue(element(app, labelStartingWith: "Beta \(test)").waitForExistence(timeout: 10))
-        XCTAssertTrue(element(app, labelStartingWith: "Alpha \(test)").exists)
+        XCTAssertTrue(collectionRow(app, "Loose Cards").waitForExistence(timeout: 10))
         XCTAssertFalse(element(app, labelStartingWith: "Filtered by").exists)
     }
 

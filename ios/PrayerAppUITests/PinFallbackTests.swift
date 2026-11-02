@@ -21,8 +21,7 @@ final class PinFallbackTests: XCTestCase {
         app.launchEnvironment["CONFIDENTIAL_AUTH_STUB"] = "passcodeNotSet"
         app.launchEnvironment["CONFIDENTIAL_PIN_STORE"] = "memory"
         app.launchArguments = [
-            "-ResetTips", "-CollectionsBannerDismissed", "YES", "-ExpandedSectionIds", "0,1,2,3,4,5,6,7,8",
-            "-ArchivedFolderId", "2",
+            "-ResetTips", "-CollectionsBannerDismissed", "YES", "-ArchivedFolderId", "2",
         ]
         app.launch()
         let tab = app.cardsTab
@@ -40,6 +39,7 @@ final class PinFallbackTests: XCTestCase {
         app.buttons["Locked"].firstMatch.tap()
         app.buttons["CardEditor_Confirm"].firstMatch.tap()
         XCTAssertTrue(app.navigationBars["New Card"].waitForNonExistence(timeout: 10))
+        app.openCollection("Loose Cards")
     }
 
     private func tapMoreItem(_ app: XCUIApplication, _ name: String) {

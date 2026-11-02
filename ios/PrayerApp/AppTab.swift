@@ -17,7 +17,7 @@ extension AppTab {
 
     var title: LocalizedStringResource {
         switch self {
-        case .cards: "Prayer Cards"
+        case .cards: "Collections"
         default: label
         }
     }

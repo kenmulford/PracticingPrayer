@@ -6,6 +6,15 @@ extension XCUIApplication {
         tabBars.buttons["Cards"].exists ? tabBars.buttons["Cards"] : buttons["Cards"].firstMatch
     }
 
+    /// Opens a collection from the Cards root by tapping its row, found by the start of its label.
+    func openCollection(_ name: String) {
+        let row = descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH 'Collections_Row_' AND label BEGINSWITH %@", name))
+            .firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "collection row \(name) missing")
+        row.tap()
+    }
+
     /// Frames of every collection view on screen. Take this before tapping a menu button, then pass it to
     /// `openedMenuCollectionView(excluding:)`.
     func collectionViewFrames() -> [CGRect] {

@@ -20,8 +20,7 @@ final class ConfidentialUnlockTests: XCTestCase {
         app.launchEnvironment["PRAYER_DB_PATH"] = copy.path
         app.launchEnvironment["CONFIDENTIAL_AUTH_STUB"] = authStub
         app.launchArguments = [
-            "-ResetTips", "-CollectionsBannerDismissed", "YES", "-ExpandedSectionIds", "0,1,2,3,4,5,6,7,8",
-            "-ArchivedFolderId", "2",
+            "-ResetTips", "-CollectionsBannerDismissed", "YES", "-ArchivedFolderId", "2",
         ]
         app.launch()
         let tab = app.cardsTab
@@ -39,6 +38,7 @@ final class ConfidentialUnlockTests: XCTestCase {
         app.buttons["Locked"].firstMatch.tap()
         app.buttons["CardEditor_Confirm"].firstMatch.tap()
         XCTAssertTrue(app.navigationBars["New Card"].waitForNonExistence(timeout: 10))
+        app.openCollection("Loose Cards")
     }
 
     private func showConfidential(_ app: XCUIApplication) {
