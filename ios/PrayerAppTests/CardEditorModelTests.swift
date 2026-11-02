@@ -9,7 +9,7 @@ private let fixtureURL = URL(fileURLWithPath: #filePath)
 
 @MainActor
 private func withEditor(
-    cardId: Int64? = 2, archivedFolderId: Int = 2,
+    cardId: Int64? = 2, initialBoxId: Int64 = 0, archivedFolderId: Int = 2,
     _ body: (CardEditorModel, PrayerDatabase) async throws -> Void
 ) async throws {
     let copy = FileManager.default.temporaryDirectory
@@ -24,7 +24,8 @@ private func withEditor(
     defer { try? database.close() }
     let preferences = AppPreferences(defaults: UserDefaults(suiteName: "CardEditorModelTests-\(UUID().uuidString)")!)
     preferences.archivedFolderId = archivedFolderId
-    let model = CardEditorModel(card: try cardRecord(cardId, database), database: database, preferences: preferences)
+    let model = CardEditorModel(
+        card: try cardRecord(cardId, database), initialBoxId: initialBoxId, database: database, preferences: preferences)
     model.load()
     try await body(model, database)
 }
@@ -105,6 +106,34 @@ private func allCards(_ database: PrayerDatabase) throws -> [PrayerCardRecord] {
             #expect(model.save(now: Date(timeIntervalSinceNow: 3600)))
             let after = try #require(try cardRecord(2, database)).updatedAtTicks
             #expect(after == before)
+        }
+    }
+
+    @Test func initialUserCollectionIsSelected() async throws {
+        try await withEditor(cardId: nil) { _, database in
+            let preferences = AppPreferences(defaults: UserDefaults(suiteName: "CardEditorModelTests-\(UUID().uuidString)")!)
+            preferences.archivedFolderId = 2
+            let box = try CollectionStore(database: database).create(name: "Initial Box", now: .now)
+            let model = CardEditorModel(card: nil, initialBoxId: box.id, database: database, preferences: preferences)
+            model.load()
+            #expect(model.boxId == box.id)
+            #expect(!model.isDirty)
+        }
+    }
+
+    @Test(arguments: [Int64(1), Int64(2)])
+    func initialSystemOrArchivedResetsToLoose(initialBoxId: Int64) async throws {
+        try await withEditor(cardId: nil, initialBoxId: initialBoxId) { model, _ in
+            #expect(model.boxId == 0)
+            #expect(!model.isDirty)
+            #expect(model.storedSystemBox == nil)
+        }
+    }
+
+    @Test func existingCardIgnoresInitialBoxId() async throws {
+        try await withEditor(cardId: 2, initialBoxId: 1) { model, _ in
+            #expect(model.boxId == 0)
+            #expect(!model.isDirty)
         }
     }
 

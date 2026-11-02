@@ -22,14 +22,6 @@ struct CardsView: View {
     @State private var seededFilter = false
     // Hidden until the stored preference is read, so a dismissed tip never flashes.
     @State private var bannerDismissed = true
-    @State private var isSelecting = false
-    @State private var selectedIds: Set<Int64> = []
-    @State private var selectedItems: [CardListItem] = []
-    @State private var isWorking = false
-    @State private var bulkError: String?
-    @State private var isMoving = false
-    @State private var confirmArchive = false
-    @State private var confirmDelete = false
     @State private var collectionPrayScope: PrayerTimeScope?
     @State private var collectionEditor: CollectionEditorTarget?
     @State private var prayableCollectionIds: Set<Int64> = []
@@ -45,30 +37,10 @@ struct CardsView: View {
 
     private var isNarrowed: Bool { isSearching || !selectedTagIds.isEmpty }
 
-    private var canSelect: Bool {
-        guard case .success(let list) = load else { return false }
-        return list.sections.contains { $0.cards.contains { !$0.isMasked } }
-    }
-
-    private var mutableItems: [CardListItem] { selectedItems.filter { $0.card.isSystem != true } }
-
-    private var selectState: CardsSelectState {
-        CardsSelectState(
-            isSelecting: isSelecting, canSelect: canSelect, hasSelection: !selectedIds.isEmpty,
-            hasMutable: !mutableItems.isEmpty, isWorking: isWorking,
-            start: { isSelecting = true }, done: endSelecting,
-            moveTo: startMove, archive: { confirmArchive = true }, delete: { confirmDelete = true })
-    }
-
-    private var selectionTitle: Text {
-        selectedIds.isEmpty ? Text("None Selected") : Text("\(selectedIds.count) Selected")
-    }
-
     var body: some View {
         NavigationSplitView(preferredCompactColumn: $compactColumn) {
             sidebar
-                .navigationTitle(isSelecting ? selectionTitle : Text(AppTab.cards.title))
-                .toolbarVisibility(isSelecting ? .hidden : .automatic, for: .tabBar)
+                .navigationTitle(Text(AppTab.cards.title))
                 .navigationBarTitleDisplayMode(.large)
                 .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: Text("Search Cards"))
                 .navigationSubtitle(Text(filterSubtitle))
@@ -79,34 +51,8 @@ struct CardsView: View {
                         addCard: addCard,
                         manageCollections: { selection = .manageCollections },
                         isUnlocked: isSessionUnlocked,
-                        toggleConfidential: services.confidential.toggle,
-                        select: selectState
+                        toggleConfidential: services.confidential.toggle
                     )
-                }
-                .sheet(isPresented: $isMoving) {
-                    MoveToCollectionSheet(collections: moveTargets, currentBoxId: nil, select: moveSelected)
-                }
-                .confirmationDialog("Archive Cards?", isPresented: $confirmArchive, titleVisibility: .visible) {
-                    Button("Archive Cards") { archiveSelected() }
-                    Button("Cancel", role: .cancel) {}
-                } message: {
-                    Text("Archive \(mutableItems.count) cards? You can find them in your Archived Cards collection.")
-                }
-                .confirmationDialog(
-                    Text("Delete \(mutableItems.count) Cards?"), isPresented: $confirmDelete, titleVisibility: .visible
-                ) {
-                    Button("Delete Cards", role: .destructive) { deleteSelected() }
-                    Button("Cancel", role: .cancel) {}
-                } message: {
-                    let prayers = mutableItems.reduce(0) { $0 + ($1.activePrayerCount ?? 0) }
-                    if prayers > 0 {
-                        Text("This also deletes their \(prayers) active prayer requests.")
-                    }
-                }
-                .alert("Couldn't Update Cards", isPresented: errorBinding) {
-                    Button("OK") {}
-                } message: {
-                    Text(bulkError ?? "")
                 }
                 .sheet(isPresented: $isAddingCard, onDismiss: reload) {
                     CardEditorView(card: nil, database: services.database, preferences: services.preferences) { _ in }
@@ -150,7 +96,6 @@ struct CardsView: View {
             }
             reloadTags()
         }
-        .onChange(of: selectedIds) { refreshSelection() }
     }
 
     @ViewBuilder
@@ -197,39 +142,11 @@ struct CardsView: View {
 
     @ViewBuilder
     private func cardList(_ list: CardList) -> some View {
-        if isSelecting {
-            selectingList(list)
-        } else if isNarrowed {
+        if isNarrowed {
             browsingList(list)
         } else {
             collectionsList()
         }
-    }
-
-    private func selectingList(_ list: CardList) -> some View {
-        let visibleIds = Set(list.sections.flatMap { $0.cards.map(\.card.id) })
-        let binding = Binding<Set<Int64>>(
-            get: { selectedIds },
-            set: { selectedIds = $0.union(selectedIds.subtracting(visibleIds)) })
-        return List(selection: binding) {
-            ForEach(list.sections.filter { !isNarrowed || !$0.cards.isEmpty }, id: \.boxId) { section in
-                Section(isExpanded: .constant(true)) {
-                    ForEach(section.cards, id: \.card.id) { item in
-                        if item.isMasked {
-                            CardRow(item: item).selectionDisabled()
-                        } else {
-                            CardRow(item: item, isSelected: selectedIds.contains(item.card.id), isHidden: isHidden(item, in: section))
-                                .tag(item.card.id)
-                        }
-                    }
-                } header: {
-                    Text("\(sectionName(section)) · \(section.cards.count)")
-                        .accessibilityAddTraits(.isHeader)
-                }
-            }
-        }
-        .listStyle(.sidebar)
-        .environment(\.editMode, .constant(.active))
     }
 
     private func addCard() {
@@ -417,67 +334,6 @@ struct CardsView: View {
             ((try? PrayerTimeLauncher(database: services.database).collectionOptions(isSessionUnlocked: isSessionUnlocked)) ?? [])
                 .map(\.id))
         listRevision &+= 1
-        refreshSelection()
-    }
-
-    // MARK: - Select mode
-
-    private var bulk: CardBulkActions {
-        CardBulkActions(database: services.database, preferences: services.preferences)
-    }
-
-    private var errorBinding: Binding<Bool> {
-        Binding(get: { bulkError != nil }, set: { if !$0 { bulkError = nil } })
-    }
-
-    private func refreshSelection() {
-        guard !selectedIds.isEmpty || !selectedItems.isEmpty else { return }
-        let all = (try? services.database.cardList(isSessionUnlocked: isSessionUnlocked))?.sections
-            .flatMap(\.cards).filter { !$0.isMasked && selectedIds.contains($0.card.id) } ?? []
-        selectedItems = all
-        let kept = Set(all.map(\.card.id))
-        if kept != selectedIds { selectedIds = kept }
-    }
-
-    private func endSelecting() {
-        isSelecting = false
-        selectedIds = []
-        selectedItems = []
-        AccessibilityNotification.Announcement(String(localized: "Selection cancelled")).post()
-    }
-
-    private func startMove() {
-        isMoving = true
-    }
-
-    private var moveTargets: [CardBoxRecord] { CardRowActionsHost<EmptyView>.moveTargets(services.database) }
-
-    private func moveSelected(toBox boxId: Int64) {
-        let name = boxId == 0
-            ? String(localized: "Loose Cards") : moveTargets.first { $0.id == boxId }?.name ?? ""
-        finish(bulk.move(selectedIds, toBox: boxId)) { String(localized: "Moved \($0) cards to \(name)") }
-    }
-
-    private func archiveSelected() {
-        finish(bulk.archive(Set(mutableItems.map(\.card.id)))) { String(localized: "Archived \($0) cards") }
-    }
-
-    private func deleteSelected() {
-        finish(bulk.delete(Set(mutableItems.map(\.card.id)))) { String(localized: "Deleted \($0) cards") }
-        services.reconcileReminders()
-    }
-
-    private func finish(_ result: CardBulkResult, announcement: (Int) -> String) {
-        selectedIds.subtract(result.succeeded)
-        if let message = result.errorMessage {
-            bulkError = message
-        } else {
-            isSelecting = false
-            selectedIds = []
-            selectedItems = []
-            AccessibilityNotification.Announcement(announcement(result.succeeded.count)).post()
-        }
-        reload()
     }
 
     private func reloadTags() {
@@ -487,7 +343,6 @@ struct CardsView: View {
         if !seededFilter, let ids = UserDefaults.standard.string(forKey: "CardsFilterTagIds") {
             selectedTagIds = Set(ids.split(separator: ",").compactMap { Int64($0) })
         }
-        if !seededFilter, UserDefaults.standard.bool(forKey: "CardsSelectMode") { isSelecting = true }
         seededFilter = true
         #endif
         selectedTagIds = TagFilterMenu.pruned(selectedTagIds, to: tags)

@@ -58,6 +58,14 @@ final class CollectionCardsTests: XCTestCase {
             + "IsSystem, IsImported, 0, \(boxId), PreArchiveBoxId, SystemKey FROM PrayerCard WHERE Id = 2"
     }
 
+    private func insertRequest(for card: String, _ title: String) -> String {
+        "INSERT INTO PrayerRequest (PrayerCardId, Title, Details, CanNotify, PrayerFrequency, IsAnswered, AnsweredAt, "
+            + "CreatedAt, UpdatedAt, NotifyHour, NotifyMinute, NotifyDayOfWeek, NotifyDayOfMonth, NotifyDate, IsImported) "
+            + "SELECT (SELECT Id FROM PrayerCard WHERE Title = '\(card)'), '\(title)', Details, CanNotify, PrayerFrequency, 0, "
+            + "AnsweredAt, CreatedAt, UpdatedAt, NotifyHour, NotifyMinute, NotifyDayOfWeek, NotifyDayOfMonth, NotifyDate, "
+            + "IsImported FROM PrayerRequest WHERE Id = 5"
+    }
+
     private func element(_ app: XCUIApplication, labelStartingWith prefix: String) -> XCUIElement {
         app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", prefix)).firstMatch
     }
@@ -103,6 +111,65 @@ final class CollectionCardsTests: XCTestCase {
         let app = launch(database: try prepareDatabase([insertBox("A CollectionCardsEmpty")]))
         app.openCollection("A CollectionCardsEmpty")
         XCTAssertTrue(app.staticTexts["No Cards"].waitForExistence(timeout: 10))
+    }
+
+    func testToolbarOrder() throws {
+        let app = launch(database: try prepareDatabase([insertBox("A CollectionCardsToolbar")]))
+        app.openCollection("A CollectionCardsToolbar")
+        let pray = app.buttons["Pray"].firstMatch
+        let more = app.buttons["More"].firstMatch
+        let add = app.buttons["Add Card"].firstMatch
+        XCTAssertTrue(add.waitForExistence(timeout: 10))
+        XCTAssertTrue(pray.exists)
+        XCTAssertTrue(more.exists)
+        XCTAssertLessThan(pray.frame.minX, more.frame.minX)
+        XCTAssertLessThan(more.frame.minX, add.frame.minX)
+    }
+
+    func testPrayStartsCollectionSession() throws {
+        let app = launch(database: try prepareDatabase([
+            insertBox("A CollectionCardsPray"), insertCard("PrayCard", box: "A CollectionCardsPray"),
+            insertRequest(for: "PrayCard", "Pray Request"),
+        ]))
+        app.openCollection("A CollectionCardsPray")
+        let pray = app.buttons["Pray"].firstMatch
+        XCTAssertTrue(pray.waitForExistence(timeout: 10))
+        XCTAssertTrue(pray.isEnabled)
+        pray.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["PrayerSession_Title"].waitForExistence(timeout: 10))
+    }
+
+    func testPrayStartsLooseCardsSession() throws {
+        let app = launch(database: try prepareDatabase([
+            insertCard("LooseCard"), insertRequest(for: "LooseCard", "Loose Request"),
+        ]))
+        app.openCollection("Loose Cards")
+        let pray = app.buttons["Pray"].firstMatch
+        XCTAssertTrue(pray.waitForExistence(timeout: 10))
+        XCTAssertTrue(pray.isEnabled)
+        pray.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["PrayerSession_Title"].waitForExistence(timeout: 10))
+    }
+
+    func testPrayDisabledOnEmptyCollection() throws {
+        let app = launch(database: try prepareDatabase([insertBox("A CollectionCardsNoPray")]))
+        app.openCollection("A CollectionCardsNoPray")
+        let pray = app.buttons["Pray"].firstMatch
+        XCTAssertTrue(pray.waitForExistence(timeout: 10))
+        XCTAssertFalse(pray.isEnabled)
+        XCTAssertTrue(app.buttons["Add Card"].firstMatch.isEnabled)
+    }
+
+    func testAddCardPreselectsCollection() throws {
+        let app = launch(database: try prepareDatabase([insertBox("A CollectionCardsAdd")]))
+        app.openCollection("A CollectionCardsAdd")
+        let add = app.buttons["Add Card"].firstMatch
+        XCTAssertTrue(add.waitForExistence(timeout: 10))
+        add.tap()
+        let picker = app.descendants(matching: .any)["CardEditor_Collection"].firstMatch
+        XCTAssertTrue(picker.waitForExistence(timeout: 10))
+        let text = "\(picker.label) \(picker.value as? String ?? "")"
+        XCTAssertTrue(text.contains("A CollectionCardsAdd"), "collection not preselected: \(text)")
     }
 
     func testLoadFailureShowsTryAgain() throws {

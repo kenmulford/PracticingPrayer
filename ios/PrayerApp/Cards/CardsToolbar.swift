@@ -21,32 +21,72 @@ struct CardsToolbar: ToolbarContent {
     let manageCollections: () -> Void
     let isUnlocked: Bool
     let toggleConfidential: () -> Void
-    let select: CardsSelectState
 
     var body: some ToolbarContent {
         if #available(iOS 27, *) {
-            if select.isSelecting {
-                doneItem
-                ToolbarItemGroup(placement: .bottomBar) { bulkButtons }
-                    .visibilityPriority(.high)
-            } else {
-                ToolbarItemGroup(placement: .topBarTrailing) { filterMenu }
-                    .visibilityPriority(.high)
-                ToolbarItemGroup(placement: .topBarTrailing) {
-                    moreMenu
-                    addButton
-                }
+            ToolbarItemGroup(placement: .topBarTrailing) { filterMenu }
                 .visibilityPriority(.high)
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                moreMenu
+                addButton
             }
+            .visibilityPriority(.high)
         } else {
-            if select.isSelecting {
-                doneItem
-                ToolbarItemGroup(placement: .bottomBar) { bulkButtons }
+            ToolbarItemGroup(placement: .topBarTrailing) { filterMenu }
+            ToolbarItem(placement: .topBarTrailing) { moreMenu }
+            ToolbarItem(placement: .topBarTrailing) { addButton }
+        }
+    }
+
+    private var filterMenu: some View {
+        TagFilterMenu(tags: tags, selection: $selectedTagIds)
+    }
+
+    private var moreMenu: some View {
+        Menu("More", systemImage: "ellipsis.circle") {
+            Button("Manage Collections", systemImage: "folder", action: manageCollections)
+            if isUnlocked {
+                Button("Hide Confidential", systemImage: "lock.open", action: toggleConfidential)
             } else {
-                ToolbarItemGroup(placement: .topBarTrailing) { filterMenu }
-                ToolbarItem(placement: .topBarTrailing) { moreMenu }
-                ToolbarItem(placement: .topBarTrailing) { addButton }
+                Button("Show Confidential", systemImage: "lock", action: toggleConfidential)
             }
+        }
+    }
+
+    private var addButton: some View {
+        Button(action: addCard) {
+            Label("Add Card", systemImage: "plus")
+        }
+    }
+}
+
+struct CollectionCardsToolbar: ToolbarContent {
+    let canPray: Bool
+    let pray: () -> Void
+    let addCard: () -> Void
+    let select: CardsSelectState
+
+    var body: some ToolbarContent {
+        if select.isSelecting {
+            doneItem
+            if #available(iOS 27, *) {
+                ToolbarItemGroup(placement: .bottomBar) { bulkButtons }
+                    .visibilityPriority(.high)
+            } else {
+                ToolbarItemGroup(placement: .bottomBar) { bulkButtons }
+            }
+        } else if #available(iOS 27, *) {
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                prayButton
+                moreMenu
+            }
+            .visibilityPriority(.high)
+            ToolbarItem(placement: .topBarTrailing) { addButton }
+                .visibilityPriority(.high)
+        } else {
+            ToolbarItem(placement: .topBarTrailing) { prayButton }
+            ToolbarItem(placement: .topBarTrailing) { moreMenu }
+            ToolbarItem(placement: .topBarTrailing) { addButton }
         }
     }
 
@@ -66,20 +106,15 @@ struct CardsToolbar: ToolbarContent {
             .disabled(!select.hasMutable || select.isWorking)
     }
 
-    private var filterMenu: some View {
-        TagFilterMenu(tags: tags, selection: $selectedTagIds)
+    private var prayButton: some View {
+        Button("Pray", systemImage: "hands.and.sparkles", action: pray)
+            .disabled(!canPray)
     }
 
     private var moreMenu: some View {
         Menu("More", systemImage: "ellipsis.circle") {
             Button("Select Cards", systemImage: "checkmark.circle", action: select.start)
                 .disabled(!select.canSelect)
-            Button("Manage Collections", systemImage: "folder", action: manageCollections)
-            if isUnlocked {
-                Button("Hide Confidential", systemImage: "lock.open", action: toggleConfidential)
-            } else {
-                Button("Show Confidential", systemImage: "lock", action: toggleConfidential)
-            }
         }
     }
 

@@ -23,14 +23,15 @@ final class CardEditorModel {
     private(set) var storedSystemBox: CardBoxRecord?
     private(set) var prayerCount = 0
 
-    init(card: PrayerCardRecord?, database: PrayerDatabase, preferences: AppPreferences) {
+    init(card: PrayerCardRecord?, initialBoxId: Int64 = 0, database: PrayerDatabase, preferences: AppPreferences) {
         self.database = database
         self.preferences = preferences
         self.original = card
-        self.originalBoxId = card?.boxId ?? 0
+        let startBoxId = card.map { $0.boxId ?? 0 } ?? initialBoxId
+        self.originalBoxId = startBoxId
         self.originalMode = card?.protectionMode ?? .unprotected
         self.title = card?.title ?? ""
-        self.boxId = card?.boxId ?? 0
+        self.boxId = startBoxId
         self.protectionMode = card?.protectionMode ?? .unprotected
     }
 
@@ -68,6 +69,11 @@ final class CardEditorModel {
             collections = all
                 .filter { !$0.isSystem && $0.id != archivedFolderId }
                 .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+            // A new card can only start in a user collection; System and Archived fall back to Loose Cards.
+            if original == nil, boxId != 0, !collections.contains(where: { $0.id == boxId }) {
+                boxId = 0
+                originalBoxId = 0
+            }
             storedSystemBox = all.first { $0.id == originalBoxId && ($0.isSystem || $0.id == archivedFolderId) }
             if let original {
                 prayerCount = try PrayerStore(database: database).prayers(cardId: original.id).count
