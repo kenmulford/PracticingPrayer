@@ -69,7 +69,7 @@ final class CardRowActionModel {
 
     var leadingActions: [CardRowAction] { isLocked ? [] : [favoriteAction] }
 
-    var trailingActions: [CardRowAction] { isLocked ? [] : [.delete, archiveAction] }
+    var trailingActions: [CardRowAction] { isLocked ? [] : [archiveAction, .delete] }
 
     var deleteMessage: String {
         switch activePrayerCount {
