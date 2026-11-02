@@ -338,6 +338,9 @@
     "Close" : {
 
     },
+    "Collapse %@" : {
+
+    },
     "Collection" : {
 
     },
@@ -566,6 +569,9 @@
 
     },
     "Everything in this share is already on %@." : {
+
+    },
+    "Expand %@" : {
 
     },
     "Existing Card" : {

@@ -40,6 +40,8 @@ final class CardRowActionModel {
     private let isFavorite: Bool
     private let isArchived: Bool
     private let isLocked: Bool
+    private let isSystem: Bool
+    private let isMasked: Bool
     private let activePrayerCount: Int
 
     init(title: String, isFavorite: Bool, isArchived: Bool, isSystem: Bool, isMasked: Bool, activePrayerCount: Int) {
@@ -47,6 +49,8 @@ final class CardRowActionModel {
         self.isFavorite = isFavorite
         self.isArchived = isArchived
         self.isLocked = isSystem || isMasked
+        self.isSystem = isSystem
+        self.isMasked = isMasked
         self.activePrayerCount = activePrayerCount
     }
 
@@ -63,6 +67,11 @@ final class CardRowActionModel {
 
     var menuActions: [CardRowAction] {
         isLocked ? [] : [.pray, favoriteAction, .edit, .moveTo, archiveAction, .delete]
+    }
+
+    var barActions: [CardRowAction] {
+        if isMasked { return [] }
+        return isSystem ? [.pray] : [.pray, .edit, favoriteAction]
     }
 
     var canPray: Bool { activePrayerCount > 0 }

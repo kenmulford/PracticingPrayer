@@ -15,6 +15,7 @@ public struct AppPreferences {
         case prayerTimeLandscape = "PrayerTimeLandscape"
         case archivedFolderId = "ArchivedFolderId"
         case expandedSectionIds = "ExpandedSectionIds"
+        case expandedCardIds = "ExpandedCardIds"
         case shareHandoffPrompted = "ShareHandoffPrompted"
         case nativeRemindersMigrated = "NativeRemindersMigrated"
     }
@@ -91,6 +92,11 @@ public struct AppPreferences {
     public var expandedSectionIds: String {
         get { string(.expandedSectionIds, "") }
         nonmutating set { defaults.set(newValue, forKey: Key.expandedSectionIds.rawValue) }
+    }
+
+    public var expandedCardIds: String {
+        get { string(.expandedCardIds, "") }
+        nonmutating set { defaults.set(newValue, forKey: Key.expandedCardIds.rawValue) }
     }
 
     public var shareHandoffPrompted: Bool {

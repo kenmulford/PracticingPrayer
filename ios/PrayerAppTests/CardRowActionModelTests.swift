@@ -56,6 +56,22 @@ private func model(
         #expect(model(count: 1).canPray)
     }
 
+    @Test func barActionsActiveCard() {
+        #expect(model().barActions == [.pray, .edit, .favorite])
+    }
+
+    @Test func barActionsFavoritedCard() {
+        #expect(model(favorite: true).barActions == [.pray, .edit, .unfavorite])
+    }
+
+    @Test func barActionsSystemCard() {
+        #expect(model(system: true).barActions == [.pray])
+    }
+
+    @Test func barActionsMaskedCard() {
+        #expect(model(masked: true).barActions.isEmpty)
+    }
+
     @Test func systemCardHasNoActions() {
         let m = model(system: true)
         #expect(m.menuActions.isEmpty && m.leadingActions.isEmpty && m.trailingActions.isEmpty)

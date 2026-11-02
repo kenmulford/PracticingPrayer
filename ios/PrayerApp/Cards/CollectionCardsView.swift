@@ -21,6 +21,9 @@ struct CollectionCardsView: View {
     @State private var isAddingCard = false
     @State private var canPrayCollection = false
     @State private var seededSelectMode = false
+    @State private var expandedIds: Set<Int64> = []
+    @State private var addPrayerCard: CardListItem?
+    @State private var reloads = 0
 
     init(boxId: Int64, selection: Binding<CardsRoute?>, revision: Int, onChange: @escaping () -> Void) {
         self.boxId = boxId
@@ -80,6 +83,13 @@ struct CollectionCardsView: View {
                     card: nil, initialBoxId: boxId, database: services.database, preferences: services.preferences
                 ) { _ in }
             }
+            .sheet(isPresented: addPrayerBinding, onDismiss: onChange) {
+                if let card = addPrayerCard {
+                    PrayerEditorView(
+                        prayerId: nil, cardId: card.card.id, cardTitle: card.card.title, database: services.database,
+                        isSessionUnlocked: services.confidential.isUnlocked)
+                }
+            }
             .sheet(isPresented: $isMoving) {
                 MoveToCollectionSheet(collections: moveTargets, currentBoxId: nil, select: moveSelected)
             }
@@ -106,7 +116,10 @@ struct CollectionCardsView: View {
                 Text(bulkError ?? "")
             }
             .onChange(of: selectedIds) { refreshSelection() }
-            .task(id: boxId) { reload() }
+            .task(id: boxId) {
+                expandedIds = ExpandedCardIds.parse(services.preferences.expandedCardIds)
+                reload()
+            }
             .onChange(of: isSessionUnlocked) { reload() }
             .onChange(of: selection) { reload() }
             .onChange(of: revision) { reload() }
@@ -144,9 +157,9 @@ struct CollectionCardsView: View {
         _ section: CardSection, perform: @escaping (CardRowAction, CardListItem) -> Void
     ) -> some View {
         List(selection: $selection) {
-            Section {
-                ForEach(section.cards, id: \.card.id) { item in
-                    if item.isMasked {
+            ForEach(section.cards, id: \.card.id) { item in
+                if item.isMasked {
+                    Section {
                         Button {
                             Task { await openProtected(item) }
                         } label: {
@@ -154,15 +167,13 @@ struct CollectionCardsView: View {
                         }
                         .buttonStyle(.plain)
                         .selectionDisabled()
-                    } else {
-                        NavigationLink(value: CardsRoute.card(id: item.card.id)) {
-                            CardRow(item: item, isHidden: isHidden(item, in: section))
-                        }
-                        .modifier(
-                            CardRowActions(
-                                item: item, archivedFolderId: Int64(services.preferences.archivedFolderId)
-                            ) { perform($0, item) })
                     }
+                } else {
+                    CardTile(
+                        item: item, isHidden: isHidden(item, in: section),
+                        isExpanded: expandedIds.contains(item.card.id), reloads: reloads,
+                        toggle: { toggleExpanded(item.card.id) }, perform: { perform($0, item) },
+                        addPrayer: { addPrayerCard = item }, openProtected: { Task { await openProtected(item) } })
                 }
             }
         }
@@ -205,6 +216,7 @@ struct CollectionCardsView: View {
     }
 
     private func reload() {
+        reloads += 1
         load = Result { try services.database.cardList(isSessionUnlocked: isSessionUnlocked) }
         canPrayCollection = ((try? PrayerTimeLauncher(database: services.database)
             .collectionOptions(isSessionUnlocked: isSessionUnlocked)) ?? []).contains { $0.id == boxId }
@@ -230,6 +242,15 @@ struct CollectionCardsView: View {
 
     private var bulk: CardBulkActions {
         CardBulkActions(database: services.database, preferences: services.preferences)
+    }
+
+    private var addPrayerBinding: Binding<Bool> {
+        Binding(get: { addPrayerCard != nil }, set: { if !$0 { addPrayerCard = nil } })
+    }
+
+    private func toggleExpanded(_ id: Int64) {
+        if !expandedIds.insert(id).inserted { expandedIds.remove(id) }
+        services.preferences.expandedCardIds = ExpandedCardIds.format(expandedIds)
     }
 
     private var errorBinding: Binding<Bool> {

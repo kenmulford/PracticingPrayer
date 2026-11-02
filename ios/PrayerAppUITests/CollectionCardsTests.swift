@@ -34,10 +34,11 @@ final class CollectionCardsTests: XCTestCase {
         return copy
     }
 
-    private func launch(database: URL) -> XCUIApplication {
+    private func launch(database: URL, expandedCardIds: String? = "none") -> XCUIApplication {
         let app = XCUIApplication()
         app.launchEnvironment["PRAYER_DB_PATH"] = database.path
         app.launchArguments = ["-ResetTips", "-CollectionsBannerDismissed", "YES"]
+        if let expandedCardIds { app.launchArguments += ["-ExpandedCardIds", expandedCardIds] }
         app.launch()
         let tab = app.cardsTab
         XCTAssertTrue(tab.waitForExistence(timeout: 20), "Cards tab missing")
@@ -50,18 +51,18 @@ final class CollectionCardsTests: XCTestCase {
             + "VALUES ('\(name)', 0, 10, 0, 0, 1, 1)"
     }
 
-    private func insertCard(_ title: String, favorite: Bool = false, box: String? = nil) -> String {
+    private func insertCard(_ title: String, favorite: Bool = false, protection: Int = 0, box: String? = nil) -> String {
         let boxId = box.map { "(SELECT Id FROM CardBox WHERE Name = '\($0)')" } ?? "NULL"
         return "INSERT INTO PrayerCard (Title, CanNotify, PrayerFrequency, IsAnswered, IsFavorite, CreatedAt, UpdatedAt, "
             + "IsSystem, IsImported, ProtectionMode, BoxId, PreArchiveBoxId, SystemKey) "
             + "SELECT '\(title)', CanNotify, PrayerFrequency, IsAnswered, \(favorite ? 1 : 0), CreatedAt, UpdatedAt, "
-            + "IsSystem, IsImported, 0, \(boxId), PreArchiveBoxId, SystemKey FROM PrayerCard WHERE Id = 2"
+            + "IsSystem, IsImported, \(protection), \(boxId), PreArchiveBoxId, SystemKey FROM PrayerCard WHERE Id = 2"
     }
 
-    private func insertRequest(for card: String, _ title: String) -> String {
+    private func insertRequest(for card: String, _ title: String, answered: Bool = false) -> String {
         "INSERT INTO PrayerRequest (PrayerCardId, Title, Details, CanNotify, PrayerFrequency, IsAnswered, AnsweredAt, "
             + "CreatedAt, UpdatedAt, NotifyHour, NotifyMinute, NotifyDayOfWeek, NotifyDayOfMonth, NotifyDate, IsImported) "
-            + "SELECT (SELECT Id FROM PrayerCard WHERE Title = '\(card)'), '\(title)', Details, CanNotify, PrayerFrequency, 0, "
+            + "SELECT (SELECT Id FROM PrayerCard WHERE Title = '\(card)'), '\(title)', Details, CanNotify, PrayerFrequency, \(answered ? 1 : 0), "
             + "AnsweredAt, CreatedAt, UpdatedAt, NotifyHour, NotifyMinute, NotifyDayOfWeek, NotifyDayOfMonth, NotifyDate, "
             + "IsImported FROM PrayerRequest WHERE Id = 5"
     }
@@ -170,6 +171,86 @@ final class CollectionCardsTests: XCTestCase {
         XCTAssertTrue(picker.waitForExistence(timeout: 10))
         let text = "\(picker.label) \(picker.value as? String ?? "")"
         XCTAssertTrue(text.contains("A CollectionCardsAdd"), "collection not preselected: \(text)")
+    }
+
+    // MARK: - Card tiles
+
+    private func tileFixture(_ suffix: String, answered: Bool = false) -> [String] {
+        let box = "A Tile\(suffix)", card = "Tile Card \(suffix)"
+        var statements = [insertBox(box), insertCard(card, box: box), insertRequest(for: card, "Tile Prayer \(suffix)")]
+        if answered { statements.append(insertRequest(for: card, "Tile Answered \(suffix)", answered: true)) }
+        return statements
+    }
+
+    func testTileExpandsAndCollapses() throws {
+        let app = launch(database: try prepareDatabase(tileFixture("Toggle")))
+        app.openCollection("A TileToggle")
+        let expand = app.buttons["Expand Tile Card Toggle"]
+        XCTAssertTrue(expand.waitForExistence(timeout: 10))
+        expand.tap()
+        XCTAssertTrue(app.buttons["Collapse Tile Card Toggle"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Tile Prayer Toggle"].waitForExistence(timeout: 10))
+        app.buttons["Collapse Tile Card Toggle"].tap()
+        XCTAssertTrue(app.buttons["Expand Tile Card Toggle"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["Tile Prayer Toggle"].exists)
+    }
+
+    func testTileHeaderOpensCardDetail() throws {
+        let app = launch(database: try prepareDatabase(tileFixture("Header")))
+        app.openCollection("A TileHeader")
+        let header = element(app, labelStartingWith: "Tile Card Header")
+        XCTAssertTrue(header.waitForExistence(timeout: 10))
+        header.tap()
+        XCTAssertTrue(app.navigationBars["Tile Card Header"].waitForExistence(timeout: 10))
+    }
+
+    func testTileAddPrayerOpensEditor() throws {
+        let app = launch(database: try prepareDatabase(tileFixture("AddPrayer")))
+        app.openCollection("A TileAddPrayer")
+        app.buttons["Expand Tile Card AddPrayer"].tap()
+        let add = app.buttons["Add Prayer"].firstMatch
+        XCTAssertTrue(add.waitForExistence(timeout: 10))
+        add.tap()
+        XCTAssertTrue(app.navigationBars["New Prayer"].waitForExistence(timeout: 10))
+    }
+
+    func testTileExpansionSurvivesRelaunch() throws {
+        let database = try prepareDatabase(tileFixture("Relaunch"))
+        let first = launch(database: database)
+        first.openCollection("A TileRelaunch")
+        first.buttons["Expand Tile Card Relaunch"].tap()
+        XCTAssertTrue(first.buttons["Collapse Tile Card Relaunch"].waitForExistence(timeout: 10))
+        first.terminate()
+        let second = launch(database: database, expandedCardIds: nil)
+        second.openCollection("A TileRelaunch")
+        XCTAssertTrue(second.buttons["Collapse Tile Card Relaunch"].waitForExistence(timeout: 10))
+    }
+
+    func testQuickAddTileBarIsPrayAndShare() throws {
+        let app = launch(database: try prepareDatabase())
+        app.openCollection("System")
+        let expand = element(app, labelStartingWith: "Expand Quick Add")
+        XCTAssertTrue(expand.waitForExistence(timeout: 10))
+        expand.tap()
+        XCTAssertTrue(app.buttons["Share"].firstMatch.waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["Edit"].exists)
+        XCTAssertFalse(app.buttons["Favorite"].exists)
+    }
+
+    func testLockedCardHasNoDisclosure() throws {
+        let box = "A TileLocked", card = "Tile Card Locked"
+        let app = launch(database: try prepareDatabase([insertBox(box), insertCard(card, protection: 1, box: box)]))
+        app.openCollection(box)
+        XCTAssertTrue(element(app, labelStartingWith: "Protected").waitForExistence(timeout: 10))
+        XCTAssertFalse(element(app, labelStartingWith: "Expand").exists)
+    }
+
+    func testTileAnsweredRowCollapsed() throws {
+        let app = launch(database: try prepareDatabase(tileFixture("Answered", answered: true)))
+        app.openCollection("A TileAnswered")
+        app.buttons["Expand Tile Card Answered"].tap()
+        XCTAssertTrue(app.staticTexts["Tile Prayer Answered"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["Tile Answered Answered"].exists)
     }
 
     func testLoadFailureShowsTryAgain() throws {
