@@ -3,14 +3,16 @@ import SwiftUI
 
 struct ChooseCollectionSheet: View {
     let launcher: PrayerTimeLauncher
+    let isSessionUnlocked: Bool
     let onStart: (PrayerTimeScope) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var loader = ScopeLoader<[PrayerTimeOption]>()
     @State private var selected: Int64?
 
-    init(launcher: PrayerTimeLauncher, onStart: @escaping (PrayerTimeScope) -> Void) {
+    init(launcher: PrayerTimeLauncher, isSessionUnlocked: Bool, onStart: @escaping (PrayerTimeScope) -> Void) {
         self.launcher = launcher
+        self.isSessionUnlocked = isSessionUnlocked
         self.onStart = onStart
     }
 
@@ -49,6 +51,7 @@ struct ChooseCollectionSheet: View {
 
     private func load() async {
         let launcher = launcher
-        await loader.load { try launcher.collectionOptions() }
+        let isSessionUnlocked = isSessionUnlocked
+        await loader.load { try launcher.collectionOptions(isSessionUnlocked: isSessionUnlocked) }
     }
 }

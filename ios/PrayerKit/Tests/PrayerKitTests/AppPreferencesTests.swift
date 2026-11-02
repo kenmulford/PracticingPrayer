@@ -23,12 +23,13 @@ import Testing
             #expect(p.prayerTimeLandscape == true)
             #expect(p.archivedFolderId == 0)
             #expect(p.expandedSectionIds == "")
+            #expect(p.expandedCardIds == "")
             #expect(p.shareHandoffPrompted == false)
         }
     }
 
     @Test func writtenValuesRoundTrip() {
-        withStore { _, p in
+        withStore { d, p in
             p.autoModeIntervalSeconds = 45
             p.overdueDayThreshold = 14
             p.onboardingComplete = true
@@ -40,6 +41,7 @@ import Testing
             p.prayerTimeLandscape = false
             p.archivedFolderId = 12
             p.expandedSectionIds = "1,2"
+            p.expandedCardIds = "3,7"
             p.shareHandoffPrompted = true
             #expect(p.autoModeIntervalSeconds == 45)
             #expect(p.overdueDayThreshold == 14)
@@ -52,6 +54,8 @@ import Testing
             #expect(p.prayerTimeLandscape == false)
             #expect(p.archivedFolderId == 12)
             #expect(p.expandedSectionIds == "1,2")
+            #expect(p.expandedCardIds == "3,7")
+            #expect(d.string(forKey: "ExpandedCardIds") == "3,7")
             #expect(p.shareHandoffPrompted == true)
         }
     }

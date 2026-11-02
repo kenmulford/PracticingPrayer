@@ -46,9 +46,8 @@ final class CardEditorTests: XCTestCase {
         tab.tap()
     }
 
-    private func standardArguments(expanded: String, showTip: Bool = false) -> [String] {
-        ["-ResetTips", "-CollectionsBannerDismissed", showTip ? "NO" : "YES", "-ExpandedSectionIds", expanded,
-         "-ArchivedFolderId", "2"]
+    private func standardArguments(showTip: Bool = false) -> [String] {
+        ["-ResetTips", "-CollectionsBannerDismissed", showTip ? "NO" : "YES", "-ArchivedFolderId", "2"]
     }
 
     private func insertCard(_ title: String, favorite: Bool = false, protection: Int = 0, box: String? = nil) -> String {
@@ -77,12 +76,8 @@ final class CardEditorTests: XCTestCase {
         app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", prefix)).firstMatch
     }
 
-    private func header(_ app: XCUIApplication, _ name: String) -> XCUIElement {
-        element(app, labelStartingWith: "\(name) · ")
-    }
-
-    private func open(_ app: XCUIApplication, card title: String) {
-        waitForList(app)
+    private func open(_ app: XCUIApplication, card title: String, in collection: String = "Loose Cards") {
+        waitForList(app, collection: collection)
         let row = element(app, labelStartingWith: title)
         XCTAssertTrue(row.waitForExistence(timeout: 10), "\(title) row missing")
         row.tap()
@@ -99,10 +94,8 @@ final class CardEditorTests: XCTestCase {
         more.tap()
     }
 
-    private let allSections = "0,1,2,3,4,5,6,7,8"
-
-    private func waitForList(_ app: XCUIApplication) {
-        XCTAssertTrue(header(app, "Archived").waitForExistence(timeout: 20), "card list did not load")
+    private func waitForList(_ app: XCUIApplication, collection: String = "Loose Cards") {
+        app.openCollection(collection)
     }
 
     // MARK: - Editor helpers
@@ -128,9 +121,9 @@ final class CardEditorTests: XCTestCase {
     // MARK: - Tests
 
     func testAddCardCreates() throws {
-        let app = launch(database: try prepareDatabase(), arguments: standardArguments(expanded: allSections))
+        let app = launch(database: try prepareDatabase(), arguments: standardArguments())
         waitForList(app)
-        app.buttons["Add Card"].firstMatch.tap()
+        app.chooseFromAddMenu(.newCard)
         XCTAssertTrue(app.navigationBars["New Card"].waitForExistence(timeout: 10))
         let save = app.buttons["CardEditor_Confirm"].firstMatch
         XCTAssertFalse(save.isEnabled, "Save must be disabled until a title is entered")
@@ -144,9 +137,9 @@ final class CardEditorTests: XCTestCase {
     }
 
     func testSaveAndAddAnother() throws {
-        let app = launch(database: try prepareDatabase(), arguments: standardArguments(expanded: allSections))
+        let app = launch(database: try prepareDatabase(), arguments: standardArguments())
         waitForList(app)
-        app.buttons["Add Card"].firstMatch.tap()
+        app.chooseFromAddMenu(.newCard)
         XCTAssertTrue(app.navigationBars["New Card"].waitForExistence(timeout: 10))
         let field = app.textFields["CardEditor_Title"]
         field.tap()
@@ -161,7 +154,7 @@ final class CardEditorTests: XCTestCase {
 
     func testEditShowsValues() throws {
         let database = try prepareDatabase([insertCard("EditorShow")])
-        let app = launch(database: database, arguments: standardArguments(expanded: allSections))
+        let app = launch(database: database, arguments: standardArguments())
         openEditor(app, card: "EditorShow")
         XCTAssertEqual(app.textFields["CardEditor_Title"].value as? String, "EditorShow")
         XCTAssertTrue(app.buttons["Archive Card"].exists)
@@ -175,7 +168,7 @@ final class CardEditorTests: XCTestCase {
             insertCard("EditorTwo"),
             insertRequest(for: "EditorTwo", "Editor Two A"), insertRequest(for: "EditorTwo", "Editor Two B"),
         ])
-        let app = launch(database: database, arguments: standardArguments(expanded: allSections))
+        let app = launch(database: database, arguments: standardArguments())
         let cases = [
             ("EditorZero", "This card has no prayer requests."),
             ("EditorOne", "This also deletes its 1 prayer request."),
@@ -200,7 +193,7 @@ final class CardEditorTests: XCTestCase {
 
     func testDiscardDialog() throws {
         let database = try prepareDatabase([insertCard("EditorDiscard")])
-        let app = launch(database: database, arguments: standardArguments(expanded: allSections))
+        let app = launch(database: database, arguments: standardArguments())
         openEditor(app, card: "EditorDiscard")
         let field = app.textFields["CardEditor_Title"]
         field.tap()

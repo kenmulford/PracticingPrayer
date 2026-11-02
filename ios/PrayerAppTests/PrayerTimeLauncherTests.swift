@@ -102,6 +102,87 @@ private func ids(_ items: [PrayerListItem]) -> Set<Int64> {
         }
     }
 
+    @Test func collectionOptionsMarkLockedCollectionWhileLocked() throws {
+        try withLauncher { launcher, database, cards in
+            let store = PrayerStore(database: database)
+            let collections = CollectionStore(database: database)
+            let box = try collections.create(name: "Locked markLocked", now: now)
+            let card = try cards.create(CardDraft(title: "Secret markLocked", boxId: box.id), now: now)
+            _ = try store.create(PrayerDraft(prayerCardId: card.id, title: "p1"), now: now)
+            _ = try store.create(PrayerDraft(prayerCardId: card.id, title: "p2"), now: now)
+            try collections.setProtection(
+                id: box.id, protectAllCards: true, mode: .lockedVisible, now: now, ownerVerified: true)
+            let locked = try launcher.collectionOptions().first { $0.id == box.id }
+            #expect(locked?.isLocked == true)
+            #expect(locked?.activeCount == 0)
+            let unlocked = try launcher.collectionOptions(isSessionUnlocked: true).first { $0.id == box.id }
+            #expect(unlocked?.isLocked == false)
+            #expect(unlocked?.activeCount == 2)
+            #expect(try launcher.items(for: .collection(box.id)).isEmpty)
+            #expect(try launcher.items(for: .collection(box.id), isSessionUnlocked: true).count == 2)
+        }
+    }
+
+    @Test func collectionOptionsOmitHiddenCollectionWhileLocked() throws {
+        try withLauncher { launcher, database, cards in
+            let store = PrayerStore(database: database)
+            let collections = CollectionStore(database: database)
+            let box = try collections.create(name: "Hidden omitHidden", now: now)
+            let card = try cards.create(CardDraft(title: "Secret omitHidden", boxId: box.id), now: now)
+            _ = try store.create(PrayerDraft(prayerCardId: card.id, title: "p1"), now: now)
+            try collections.setProtection(
+                id: box.id, protectAllCards: true, mode: .hidden, now: now, ownerVerified: true)
+            #expect(!(try launcher.collectionOptions()).contains { $0.id == box.id })
+            let unlocked = try launcher.collectionOptions(isSessionUnlocked: true).first { $0.id == box.id }
+            #expect(unlocked?.activeCount == 1)
+            #expect(unlocked?.isLocked == false)
+        }
+    }
+
+    @Test func collectionOptionsCountOnlyUnmaskedPrayersWhileLocked() throws {
+        try withLauncher { launcher, database, cards in
+            let store = PrayerStore(database: database)
+            let box = try CollectionStore(database: database).create(name: "Mixed countUnmasked", now: now)
+            let open = try cards.create(CardDraft(title: "Open countUnmasked", boxId: box.id), now: now)
+            let secret = try cards.create(
+                CardDraft(title: "Secret countUnmasked", boxId: box.id, protectionMode: .lockedVisible), now: now)
+            _ = try store.create(PrayerDraft(prayerCardId: open.id, title: "o1"), now: now)
+            _ = try store.create(PrayerDraft(prayerCardId: open.id, title: "o2"), now: now)
+            _ = try store.create(PrayerDraft(prayerCardId: secret.id, title: "s1"), now: now)
+            let locked = try launcher.collectionOptions().first { $0.id == box.id }
+            #expect(locked?.activeCount == 2)
+            #expect(locked?.isLocked == false)
+            #expect(try launcher.collectionOptions(isSessionUnlocked: true).first { $0.id == box.id }?.activeCount == 3)
+        }
+    }
+
+    @Test func collectionOptionsIgnoreHiddenCardsWhileLocked() throws {
+        try withLauncher { launcher, database, cards in
+            let store = PrayerStore(database: database)
+            let box = try CollectionStore(database: database).create(name: "Hidden ignoreHidden", now: now)
+            let card = try cards.create(
+                CardDraft(title: "Secret ignoreHidden", boxId: box.id, protectionMode: .hidden), now: now)
+            _ = try store.create(PrayerDraft(prayerCardId: card.id, title: "p1"), now: now)
+            #expect(!(try launcher.collectionOptions()).contains { $0.id == box.id })
+        }
+    }
+
+    @Test func collectionOptionsListLockedCollectionWithNoActivePrayer() throws {
+        try withLauncher { launcher, database, cards in
+            let store = PrayerStore(database: database)
+            let collections = CollectionStore(database: database)
+            let box = try collections.create(name: "Locked noActive", now: now)
+            let card = try cards.create(CardDraft(title: "Secret noActive", boxId: box.id), now: now)
+            let prayer = try store.create(PrayerDraft(prayerCardId: card.id, title: "done"), now: now)
+            try store.markAnswered(id: prayer, now: now)
+            try collections.setProtection(
+                id: box.id, protectAllCards: true, mode: .lockedVisible, now: now, ownerVerified: true)
+            let locked = try launcher.collectionOptions().first { $0.id == box.id }
+            #expect(locked?.isLocked == true)
+            #expect(locked?.activeCount == 0)
+        }
+    }
+
     @Test func collectionScopeReturnsItsActivePrayers() throws {
         try withLauncher { launcher, database, cards in
             let store = PrayerStore(database: database)
@@ -222,6 +303,62 @@ private func ids(_ items: [PrayerListItem]) -> Set<Int64> {
         authenticator.outcome = .failed
         #expect(!ids(try await launcher.items(for: .all, session: session)).contains(prayer))
         #expect(authenticator.calls == 3)
+    }
+
+    @Test func lockedCollectionStartPromptsWithoutActivePrayer() async throws {
+        let (database, copy) = try openFixture()
+        defer {
+            try? database.close()
+            for suffix in ["", "-journal", "-wal", "-shm"] {
+                try? FileManager.default.removeItem(atPath: copy.path + suffix)
+            }
+        }
+        let preferences = AppPreferences(defaults: UserDefaults(suiteName: "PrayerTimeLauncherTests-\(UUID().uuidString)")!)
+        let collections = CollectionStore(database: database)
+        let box = try collections.create(name: "Locked startNoActive", now: now)
+        let card = try CardMutations(database: database, preferences: preferences)
+            .create(CardDraft(title: "Secret startNoActive", boxId: box.id), now: now)
+        let store = PrayerStore(database: database)
+        let prayer = try store.create(PrayerDraft(prayerCardId: card.id, title: "done"), now: now)
+        try store.markAnswered(id: prayer, now: now)
+        try collections.setProtection(
+            id: box.id, protectAllCards: true, mode: .lockedVisible, now: now, ownerVerified: true)
+        let launcher = PrayerTimeLauncher(database: database)
+
+        let allowing = CountingOwnerAuthenticator(.success)
+        await #expect(throws: PrayerTimeLauncherError.noActivePrayers) {
+            try await launcher.items(for: .collection(box.id), session: ConfidentialSession(authenticator: allowing))
+        }
+        #expect(allowing.calls == 1)
+
+        let failing = CountingOwnerAuthenticator(.failed)
+        let items = try await launcher.items(for: .collection(box.id), session: ConfidentialSession(authenticator: failing))
+        #expect(items.isEmpty)
+        #expect(failing.calls == 1)
+    }
+
+    @Test func lockedCollectionStartPromptsAndReturnsProtectedPrayers() async throws {
+        let (database, copy) = try openFixture()
+        defer {
+            try? database.close()
+            for suffix in ["", "-journal", "-wal", "-shm"] {
+                try? FileManager.default.removeItem(atPath: copy.path + suffix)
+            }
+        }
+        let preferences = AppPreferences(defaults: UserDefaults(suiteName: "PrayerTimeLauncherTests-\(UUID().uuidString)")!)
+        let collections = CollectionStore(database: database)
+        let box = try collections.create(name: "Locked startProtected", now: now)
+        let card = try CardMutations(database: database, preferences: preferences)
+            .create(CardDraft(title: "Secret startProtected", boxId: box.id), now: now)
+        let prayer = try PrayerStore(database: database)
+            .create(PrayerDraft(prayerCardId: card.id, title: "secret"), now: now)
+        try collections.setProtection(
+            id: box.id, protectAllCards: true, mode: .lockedVisible, now: now, ownerVerified: true)
+        let authenticator = CountingOwnerAuthenticator(.success)
+        let session = ConfidentialSession(authenticator: authenticator)
+        let items = try await PrayerTimeLauncher(database: database).items(for: .collection(box.id), session: session)
+        #expect(ids(items) == [prayer])
+        #expect(authenticator.calls == 1)
     }
 }
 

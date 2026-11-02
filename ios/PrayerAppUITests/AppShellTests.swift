@@ -2,7 +2,7 @@ import XCTest
 
 final class AppShellTests: XCTestCase {
     private static let tabs = ["Home", "Cards", "Prayers", "Tags", "Settings"]
-    private static let titles = ["Home", "Prayer Cards", "Prayers", "Tags", "Settings"]
+    private static let titles = ["Home", "Collections", "Prayers", "Tags", "Settings"]
     private static let roots = ["home", "cards", "prayers", "tags", "settings"]
 
     private var fixtureCopy: URL?

@@ -19,7 +19,6 @@ final class OnboardingTests: XCTestCase {
         app.launchArguments = [
             "-ResetTips", "-CollectionsBannerDismissed", "YES",
             "-OnboardingStep", step, "-OnboardingComplete", complete ? "YES" : "NO",
-            "-ExpandedSectionIds", "0",
         ]
         app.launch()
         return app
@@ -78,7 +77,7 @@ final class OnboardingTests: XCTestCase {
         // opening the Cards screen, which a sheet that was still up would block.
         app.buttons["Skip Tour"].firstMatch.tap()
         openTab(app, "Cards")
-        XCTAssertTrue(app.navigationBars["Prayer Cards"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.navigationBars["Collections"].waitForExistence(timeout: 10))
         XCTAssertFalse(text(app, Self.addCardTitle).waitForExistence(timeout: 3))
     }
 
@@ -86,20 +85,21 @@ final class OnboardingTests: XCTestCase {
         let app = try launchWithFixture(step: "None", complete: false)
         XCTAssertTrue(text(app, Self.welcomeTitle).waitForExistence(timeout: 15))
         app.buttons["Get Started"].firstMatch.tap()
-        XCTAssertTrue(app.navigationBars["Prayer Cards"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.navigationBars["Collections"].waitForExistence(timeout: 10))
         XCTAssertTrue(text(app, Self.addCardTitle).waitForExistence(timeout: 10))
     }
 
     func testResumeAtAddRequestShowsAddPrayerTip() throws {
         let app = try launchWithFixture(step: "AddRequest", complete: false)
         openTab(app, "Cards")
-        XCTAssertTrue(app.navigationBars["Prayer Cards"].waitForExistence(timeout: 10))
-        app.buttons["Add Card"].firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["Collections"].waitForExistence(timeout: 10))
+        app.chooseFromAddMenu(.newCard)
         let field = app.textFields["CardEditor_Title"]
         XCTAssertTrue(field.waitForExistence(timeout: 10))
         field.tap()
         field.typeText("OnboardingTests Resume Card")
         app.buttons["CardEditor_Confirm"].firstMatch.tap()
+        app.openCollection("Loose Cards")
         let row = app.descendants(matching: .any)
             .matching(NSPredicate(format: "label BEGINSWITH %@", "OnboardingTests Resume Card")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 10))
@@ -116,6 +116,7 @@ final class OnboardingTests: XCTestCase {
         let add = try XCTUnwrap(emptyStateButton(app, "Add Card"))
         add.tap()
         createCard(app, named: "OnboardingTests Empty Card")
+        app.openCollection("Loose Cards")
         let row = app.descendants(matching: .any)
             .matching(NSPredicate(format: "label BEGINSWITH %@", "OnboardingTests Empty Card")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 10))
@@ -129,6 +130,7 @@ final class OnboardingTests: XCTestCase {
         let add = try XCTUnwrap(emptyStateButton(app, "Add Card"))
         add.tap()
         createCard(app, named: "OnboardingTests Overlap Card")
+        app.openCollection("Loose Cards")
         let row = app.descendants(matching: .any)
             .matching(NSPredicate(format: "label BEGINSWITH %@", "OnboardingTests Overlap Card")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 10))
@@ -183,7 +185,7 @@ final class OnboardingTests: XCTestCase {
     func testTakeTheTourAgainShowsAddCardTipOnCards() throws {
         let app = try launchWithFixture(step: "Complete", complete: true)
         openTab(app, "Cards")
-        XCTAssertTrue(app.navigationBars["Prayer Cards"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.navigationBars["Collections"].waitForExistence(timeout: 10))
         XCTAssertFalse(text(app, Self.addCardTitle).waitForExistence(timeout: 3))
         openTab(app, "Settings")
         let row = app.descendants(matching: .any)["settings.row.help"]

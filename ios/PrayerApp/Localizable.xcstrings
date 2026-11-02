@@ -7,6 +7,9 @@
     "%@ marked as answered" : {
 
     },
+    "%@, locked" : {
+
+    },
     "%@ · %lld" : {
 
     },
@@ -335,6 +338,9 @@
     "Close" : {
 
     },
+    "Collapse %@" : {
+
+    },
     "Collection" : {
 
     },
@@ -563,6 +569,9 @@
 
     },
     "Everything in this share is already on %@." : {
+
+    },
+    "Expand %@" : {
 
     },
     "Existing Card" : {
@@ -825,6 +834,9 @@
     "Open protected card" : {
 
     },
+    "Open protected collection" : {
+
+    },
     "Orange" : {
 
     },
@@ -1054,6 +1066,9 @@
     "Select a Prayer" : {
 
     },
+    "Select a Collection" : {
+
+    },
     "Select a Prayer Card" : {
 
     },
@@ -1157,6 +1172,9 @@
 
     },
     "These won't be added." : {
+
+    },
+    "This collection has no active prayers." : {
 
     },
     "This also deletes its %lld prayer requests." : {

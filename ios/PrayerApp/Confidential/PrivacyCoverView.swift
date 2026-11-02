@@ -11,11 +11,12 @@ struct PrivacyCoverView: View {
                 .frame(width: iconSize, height: iconSize)
             Text("Practicing Prayer")
                 .font(.title3.weight(.semibold))
+                .foregroundStyle(.white)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemBackground).ignoresSafeArea())
+        .background(Color("CoverBackground").ignoresSafeArea())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("Practicing Prayer"))
         .accessibilityIdentifier("PrivacyCover_Root")

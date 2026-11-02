@@ -46,9 +46,8 @@ final class CardDetailUITests: XCTestCase {
         tab.tap()
     }
 
-    private func standardArguments(expanded: String, showTip: Bool = false) -> [String] {
-        ["-ResetTips", "-CollectionsBannerDismissed", showTip ? "NO" : "YES", "-ExpandedSectionIds", expanded,
-         "-ArchivedFolderId", "2"]
+    private func standardArguments(showTip: Bool = false) -> [String] {
+        ["-ResetTips", "-CollectionsBannerDismissed", showTip ? "NO" : "YES", "-ArchivedFolderId", "2"]
     }
 
     private func insertBox(_ name: String) -> String {
@@ -82,15 +81,10 @@ final class CardDetailUITests: XCTestCase {
         app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", prefix)).firstMatch
     }
 
-    private func header(_ app: XCUIApplication, _ name: String) -> XCUIElement {
-        element(app, labelStartingWith: "\(name) · ")
-    }
-
-    private func open(_ app: XCUIApplication, card title: String) {
-        waitForList(app)
-        // The Home tab's "Quick Add" toolbar button shares the system card's label, so look only inside the Cards list.
-        let row = app.descendants(matching: .any)["Shell_Root_cards"].descendants(matching: .any)
-            .matching(NSPredicate(format: "label BEGINSWITH %@", title)).firstMatch
+    private func open(_ app: XCUIApplication, card title: String, in collection: String = "Loose Cards") {
+        waitForList(app, collection: collection)
+        // The Home tab's "Quick Add" toolbar button shares the system card's label, so look only at list cells.
+        let row = app.cells.matching(NSPredicate(format: "label BEGINSWITH %@", title)).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 10), "\(title) row missing")
         row.tap()
         openedCard = title
@@ -106,17 +100,15 @@ final class CardDetailUITests: XCTestCase {
         more.tap()
     }
 
-    private let allSections = "0,1,2,3,4,5,6,7,8"
-
-    private func waitForList(_ app: XCUIApplication) {
-        XCTAssertTrue(header(app, "Archived").waitForExistence(timeout: 20), "card list did not load")
+    private func waitForList(_ app: XCUIApplication, collection: String = "Loose Cards") {
+        app.openCollection(collection)
     }
 
     // MARK: - Tests
 
     func testMoreMenuOrder() throws {
         let database = try prepareDatabase([insertCard("DetailMenu")])
-        let app = launch(database: database, arguments: standardArguments(expanded: allSections))
+        let app = launch(database: database, arguments: standardArguments())
         open(app, card: "DetailMenu")
         openMore(app)
         let labels = ["Favorite", "Edit", "Move To…", "Archive", "Delete"]
@@ -129,7 +121,7 @@ final class CardDetailUITests: XCTestCase {
 
     func testMoveToUpdatesSubtitle() throws {
         let database = try prepareDatabase([insertBox("DetailMove Box"), insertCard("DetailMove")])
-        let app = launch(database: database, arguments: standardArguments(expanded: allSections))
+        let app = launch(database: database, arguments: standardArguments())
         open(app, card: "DetailMove")
         openMore(app)
         app.buttons["Move To…"].firstMatch.tap()
@@ -144,7 +136,7 @@ final class CardDetailUITests: XCTestCase {
 
     func testArchiveConfirmsAndPops() throws {
         let database = try prepareDatabase([insertCard("DetailArchive")])
-        let app = launch(database: database, arguments: standardArguments(expanded: allSections))
+        let app = launch(database: database, arguments: standardArguments())
         open(app, card: "DetailArchive")
         openMore(app)
         app.buttons["Archive"].firstMatch.tap()
@@ -155,8 +147,8 @@ final class CardDetailUITests: XCTestCase {
 
     func testUnarchiveStays() throws {
         let database = try prepareDatabase([insertCard("DetailUnarchive", box: "Archived")])
-        let app = launch(database: database, arguments: standardArguments(expanded: allSections))
-        open(app, card: "DetailUnarchive")
+        let app = launch(database: database, arguments: standardArguments())
+        open(app, card: "DetailUnarchive", in: "Archived")
         openMore(app)
         XCTAssertFalse(app.buttons["Archive"].firstMatch.exists)
         app.buttons["Unarchive"].firstMatch.tap()
@@ -171,7 +163,7 @@ final class CardDetailUITests: XCTestCase {
             insertRequest(for: "DetailDelete", "Delete Request One"),
             insertRequest(for: "DetailDelete", "Delete Request Two"),
         ])
-        let app = launch(database: database, arguments: standardArguments(expanded: allSections))
+        let app = launch(database: database, arguments: standardArguments())
         open(app, card: "DetailDelete")
         openMore(app)
         app.buttons["Delete"].firstMatch.tap()
@@ -189,14 +181,29 @@ final class CardDetailUITests: XCTestCase {
 
     func testEmptyState() throws {
         let database = try prepareDatabase([insertCard("DetailEmpty")])
-        let app = launch(database: database, arguments: standardArguments(expanded: allSections))
+        let app = launch(database: database, arguments: standardArguments())
         open(app, card: "DetailEmpty")
         XCTAssertTrue(app.staticTexts["No Prayers"].waitForExistence(timeout: 5))
     }
 
+    func testAnsweredRowExpandsInPlace() throws {
+        let database = try prepareDatabase([
+            insertCard("DetailAnswered"),
+            insertRequest(for: "DetailAnswered", "DetailAnswered Prayer"),
+            "UPDATE PrayerRequest SET IsAnswered = 1 WHERE Title = 'DetailAnswered Prayer'",
+        ])
+        let app = launch(database: database, arguments: standardArguments())
+        open(app, card: "DetailAnswered")
+        let answered = element(app, labelStartingWith: "Answered")
+        XCTAssertTrue(answered.waitForExistence(timeout: 5))
+        XCTAssertFalse(element(app, labelStartingWith: "DetailAnswered Prayer").exists)
+        answered.tap()
+        XCTAssertTrue(element(app, labelStartingWith: "DetailAnswered Prayer").waitForExistence(timeout: 5))
+    }
+
     func testSystemCardMenu() throws {
-        let app = launch(database: try prepareDatabase(), arguments: standardArguments(expanded: allSections))
-        open(app, card: "Quick Add")
+        let app = launch(database: try prepareDatabase(), arguments: standardArguments())
+        open(app, card: "Quick Add", in: "System")
         openMore(app)
         XCTAssertTrue(app.buttons["Move To…"].firstMatch.waitForExistence(timeout: 5))
         for hidden in ["Delete", "Edit", "Archive", "Favorite"] {

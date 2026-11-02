@@ -71,7 +71,7 @@ final class UpgradeGateTests: XCTestCase {
         let tab = app.cardsTab
         XCTAssertTrue(tab.waitForExistence(timeout: 15), "Cards tab missing")
         tab.tap()
-        XCTAssertTrue(app.navigationBars["Prayer Cards"].waitForExistence(timeout: 10), "Cards missing")
+        XCTAssertTrue(app.navigationBars["Collections"].waitForExistence(timeout: 10), "Cards missing")
     }
 
     private func assertNoTips(_ app: XCUIApplication, on screen: String) {

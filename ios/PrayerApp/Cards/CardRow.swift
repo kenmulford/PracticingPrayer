@@ -33,6 +33,7 @@ struct CardRow: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
         .accessibilityAddTraits(isSelected ? .isSelected : [])

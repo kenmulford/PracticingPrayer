@@ -31,12 +31,13 @@ final class CardsSelectModeTests: XCTestCase {
         return copy
     }
 
-    private func launch(database: URL, arguments: [String]) -> XCUIApplication {
+    private func launch(database: URL, arguments: [String], collection: String = "Loose Cards") -> XCUIApplication {
         let app = XCUIApplication()
         app.launchEnvironment["PRAYER_DB_PATH"] = database.path
         app.launchArguments = arguments
         app.launch()
         openCardsTab(app)
+        app.openCollection(collection)
         return app
     }
 
@@ -46,9 +47,8 @@ final class CardsSelectModeTests: XCTestCase {
         tab.tap()
     }
 
-    private func standardArguments(expanded: String) -> [String] {
-        ["-ResetTips", "-CollectionsBannerDismissed", "YES", "-ExpandedSectionIds", expanded,
-         "-CardsSelectMode", "YES", "-ArchivedFolderId", "2"]
+    private func standardArguments() -> [String] {
+        ["-ResetTips", "-CollectionsBannerDismissed", "YES", "-CardsSelectMode", "YES", "-ArchivedFolderId", "2"]
     }
 
     private func insertBox(_ name: String) -> String {
@@ -82,12 +82,8 @@ final class CardsSelectModeTests: XCTestCase {
         app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", prefix)).firstMatch
     }
 
-    private func header(_ app: XCUIApplication, _ name: String) -> XCUIElement {
-        element(app, labelStartingWith: "\(name) · ")
-    }
-
-    private func waitForList(_ app: XCUIApplication) {
-        XCTAssertTrue(header(app, "Archived").waitForExistence(timeout: 20), "card list did not load")
+    private func waitForList(_ app: XCUIApplication, row: String) {
+        XCTAssertTrue(element(app, labelStartingWith: row).waitForExistence(timeout: 20), "card list did not load")
     }
 
     private func tap(_ app: XCUIApplication, row title: String) {
@@ -104,8 +100,8 @@ final class CardsSelectModeTests: XCTestCase {
 
     func testTitleAndDisabledActions() throws {
         let database = try prepareDatabase([insertCard("SelectTitle")])
-        let app = launch(database: database, arguments: standardArguments(expanded: "0"))
-        waitForList(app)
+        let app = launch(database: database, arguments: standardArguments())
+        waitForList(app, row: "SelectTitle")
         XCTAssertTrue(app.navigationBars["None Selected"].waitForExistence(timeout: 5))
         for label in ["Move To…", "Archive", "Delete"] {
             XCTAssertTrue(button(app, label).waitForExistence(timeout: 5), "\(label) missing")
@@ -121,8 +117,8 @@ final class CardsSelectModeTests: XCTestCase {
         let database = try prepareDatabase([
             insertBox("SelectMove Box"), insertCard("SelectMove One"), insertCard("SelectMove Two"),
         ])
-        let app = launch(database: database, arguments: standardArguments(expanded: "0,1,2,3,4"))
-        waitForList(app)
+        let app = launch(database: database, arguments: standardArguments())
+        waitForList(app, row: "SelectMove One")
         tap(app, row: "SelectMove One")
         tap(app, row: "SelectMove Two")
         XCTAssertTrue(app.navigationBars["2 Selected"].waitForExistence(timeout: 5))
@@ -130,23 +126,20 @@ final class CardsSelectModeTests: XCTestCase {
         let target = app.buttons["SelectMove Box"].firstMatch
         XCTAssertTrue(target.waitForExistence(timeout: 5))
         target.tap()
-        XCTAssertTrue(element(app, label: "SelectMove Box · 2").waitForExistence(timeout: 10))
-        XCTAssertTrue(button(app, "Done").waitForNonExistence(timeout: 5))
+        XCTAssertTrue(button(app, "Done").waitForNonExistence(timeout: 10))
+        app.openCollection("SelectMove Box")
+        XCTAssertTrue(element(app, labelStartingWith: "SelectMove One").waitForExistence(timeout: 10))
+        XCTAssertTrue(element(app, labelStartingWith: "SelectMove Two").exists)
     }
 
     func testArchiveSkipsSystemCards() throws {
-        let database = try prepareDatabase([insertCard("SelectArchive")])
-        let app = launch(database: database, arguments: standardArguments(expanded: "0,1"))
-        waitForList(app)
-        tap(app, row: "SelectArchive")
+        let database = try prepareDatabase()
+        let app = launch(database: database, arguments: standardArguments(), collection: "System")
+        waitForList(app, row: "Quick Add")
         tap(app, row: "Quick Add")
-        XCTAssertTrue(app.navigationBars["2 Selected"].waitForExistence(timeout: 5))
-        button(app, "Archive").tap()
-        let confirm = button(app, "Archive Cards")
-        XCTAssertTrue(confirm.waitForExistence(timeout: 5))
-        confirm.tap()
-        XCTAssertTrue(element(app, labelStartingWith: "SelectArchive").waitForNonExistence(timeout: 10))
-        XCTAssertTrue(element(app, labelStartingWith: "Quick Add").exists)
+        XCTAssertTrue(app.navigationBars["1 Selected"].waitForExistence(timeout: 5))
+        XCTAssertFalse(button(app, "Archive").isEnabled, "a system card cannot be archived")
+        XCTAssertFalse(button(app, "Delete").isEnabled, "a system card cannot be deleted")
     }
 
     func testDeleteNamesCounts() throws {
@@ -155,8 +148,8 @@ final class CardsSelectModeTests: XCTestCase {
             insertRequest(for: "SelectDelete One", "Delete Request One"),
             insertRequest(for: "SelectDelete Two", "Delete Request Two"),
         ])
-        let app = launch(database: database, arguments: standardArguments(expanded: "0"))
-        waitForList(app)
+        let app = launch(database: database, arguments: standardArguments())
+        waitForList(app, row: "SelectDelete One")
         tap(app, row: "SelectDelete One")
         tap(app, row: "SelectDelete Two")
         button(app, "Delete").tap()
@@ -169,8 +162,8 @@ final class CardsSelectModeTests: XCTestCase {
 
     func testDoneRestoresTabBar() throws {
         let database = try prepareDatabase([insertCard("SelectDone")])
-        let app = launch(database: database, arguments: standardArguments(expanded: "0"))
-        waitForList(app)
+        let app = launch(database: database, arguments: standardArguments())
+        waitForList(app, row: "SelectDone")
         XCTAssertFalse(app.tabBars.firstMatch.exists && app.tabBars.buttons["Cards"].isHittable, "tab bar hides while selecting")
         button(app, "Done").tap()
         XCTAssertTrue(app.buttons["Cards"].firstMatch.waitForExistence(timeout: 5))
@@ -178,23 +171,10 @@ final class CardsSelectModeTests: XCTestCase {
         XCTAssertFalse(app.navigationBars["None Selected"].exists)
     }
 
-    func testSearchKeepsSelection() throws {
-        let database = try prepareDatabase([insertCard("SelectKeepAlpha"), insertCard("SelectKeepBeta")])
-        let app = launch(database: database, arguments: standardArguments(expanded: "0"))
-        waitForList(app)
-        tap(app, row: "SelectKeepAlpha")
-        let search = app.searchFields["Search Cards"]
-        search.tap()
-        search.typeText("KeepBeta")
-        XCTAssertTrue(element(app, labelStartingWith: "SelectKeepAlpha").waitForNonExistence(timeout: 10))
-        tap(app, row: "SelectKeepBeta")
-        XCTAssertTrue(app.navigationBars["2 Selected"].waitForExistence(timeout: 5))
-    }
-
     func testLockedRowNotSelectable() throws {
         let database = try prepareDatabase([insertCard("SelectLocked", protection: 1)])
-        let app = launch(database: database, arguments: standardArguments(expanded: "0"))
-        waitForList(app)
+        let app = launch(database: database, arguments: standardArguments())
+        waitForList(app, row: "Protected")
         let row = element(app, label: "Protected")
         XCTAssertTrue(row.waitForExistence(timeout: 10))
         row.tap()

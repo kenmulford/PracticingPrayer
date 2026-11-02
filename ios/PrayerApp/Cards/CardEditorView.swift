@@ -13,10 +13,10 @@ struct CardEditorView: View {
     private let onFinish: (CardEditorModel.Outcome) -> Void
 
     init(
-        card: PrayerCardRecord?, database: PrayerDatabase, preferences: AppPreferences,
+        card: PrayerCardRecord?, initialBoxId: Int64 = 0, database: PrayerDatabase, preferences: AppPreferences,
         onFinish: @escaping (CardEditorModel.Outcome) -> Void
     ) {
-        let model = CardEditorModel(card: card, database: database, preferences: preferences)
+        let model = CardEditorModel(card: card, initialBoxId: initialBoxId, database: database, preferences: preferences)
         model.load()
         self.model = model
         self.cardTitle = card?.title ?? ""
@@ -40,6 +40,7 @@ struct CardEditorView: View {
                         }
                     }
                     .pickerStyle(.menu)
+                    .accessibilityIdentifier("CardEditor_Collection")
                 }
                 Section {
                     Picker("Protection", selection: $model.protectionMode) {

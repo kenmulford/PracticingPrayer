@@ -6,6 +6,7 @@ nonisolated struct PrayerTimeOption: Identifiable, Equatable, Sendable {
     let name: String
     let color: String?
     let activeCount: Int
+    let isLocked: Bool
 }
 
 /// CardSection has no public initializer, so filtered sections are rebuilt in this type.
@@ -13,6 +14,14 @@ nonisolated struct PrayerTimeSection: Equatable, Sendable {
     let boxId: Int64
     let box: CardBoxRecord?
     let cards: [CardListItem]
+}
+
+nonisolated enum PrayerTimeLauncherError: LocalizedError {
+    case noActivePrayers
+
+    var errorDescription: String? {
+        String(localized: "This collection has no active prayers.")
+    }
 }
 
 nonisolated struct PrayerTimeLauncher: Sendable {
@@ -67,16 +76,27 @@ nonisolated struct PrayerTimeLauncher: Sendable {
         return try TagStore(database: database).tags().compactMap { summary in
             let count = active.filter { $0.tagIds.contains(summary.tag.id) }.count
             guard count > 0 else { return nil }
-            return PrayerTimeOption(id: summary.tag.id, name: summary.tag.name, color: summary.tag.color, activeCount: count)
+            return PrayerTimeOption(id: summary.tag.id, name: summary.tag.name, color: summary.tag.color, activeCount: count, isLocked: false)
         }
     }
 
-    func collectionOptions() throws -> [PrayerTimeOption] {
-        try eligibleCards(search: "").compactMap { section in
-            guard let box = section.box, !box.isSystem else { return nil }
-            let count = section.cards.reduce(0) { $0 + ($1.activePrayerCount ?? 0) }
-            return PrayerTimeOption(id: box.id, name: box.name, color: nil, activeCount: count)
+    func collectionOptions(isSessionUnlocked: Bool = false) throws -> [PrayerTimeOption] {
+        let list = try database.cardList(filter: CardListFilter(searchText: ""), isSessionUnlocked: isSessionUnlocked)
+        return list.sections.compactMap { section in
+            guard section.box?.systemKey != "archived", let box = section.box, !box.isSystem else { return nil }
+            let userCards = section.cards.filter { $0.card.isSystem != true }
+            let count = userCards.filter { !$0.isMasked }.reduce(0) { $0 + ($1.activePrayerCount ?? 0) }
+            if count > 0 {
+                return PrayerTimeOption(id: box.id, name: box.name, color: nil, activeCount: count, isLocked: false)
+            }
+            // A masked card's prayers are never read here, so a locked collection is listed whether or not it has active prayers.
+            return userCards.contains { $0.isMasked } ? PrayerTimeOption(id: box.id, name: box.name, color: nil, activeCount: 0, isLocked: true) : nil
         }
+    }
+
+    func holdsMaskedUserCard(inCollection id: Int64) throws -> Bool {
+        let list = try database.cardList(filter: CardListFilter(searchText: ""), isSessionUnlocked: false)
+        return list.sections.filter { $0.boxId == id }.flatMap(\.cards).contains { $0.isMasked && $0.card.isSystem != true }
     }
 
     private func activePrayers(of cards: [CardListItem], store: PrayerStore) throws -> [PrayerListItem] {
@@ -91,11 +111,18 @@ extension PrayerTimeLauncher {
     func items(for scope: PrayerTimeScope, session: ConfidentialSession) async throws -> [PrayerListItem] {
         let visible = try items(for: scope, isSessionUnlocked: false)
         let unlocked = try items(for: scope, isSessionUnlocked: true)
-        if Set(visible.map(\.record.id)) == Set(unlocked.map(\.record.id)) { return visible }
+        // A locked session always prompts for a collection holding a masked card, so Start cannot reveal whether it has active prayers.
+        var promptsForMaskedCard = false
+        if case .collection(let id) = scope, !session.isUnlocked {
+            promptsForMaskedCard = try holdsMaskedUserCard(inCollection: id)
+        }
+        if !promptsForMaskedCard, Set(visible.map(\.record.id)) == Set(unlocked.map(\.record.id)) { return visible }
         let reason: LocalizedStringResource = "Start Prayer Time with protected prayers"
         // Locked sessions unlock on success (the prompt doubles as the unlock); unlocked ones re-verify without changing state.
         let allowed = session.isUnlocked ? await session.verifyOwner(reason: reason) : await session.authenticate(reason: reason)
-        return allowed ? unlocked : visible
+        guard allowed else { return visible }
+        if case .collection = scope, unlocked.isEmpty { throw PrayerTimeLauncherError.noActivePrayers }
+        return unlocked
     }
 }
 
@@ -129,10 +156,12 @@ private struct PrayerTimeLauncherModifier: ViewModifier {
                 switch sheet {
                 case .cards: ChooseCardsSheet(launcher: launcher, onStart: choose)
                 case .tags: ChooseTagsSheet(launcher: launcher, onStart: choose)
-                case .collection: ChooseCollectionSheet(launcher: launcher, onStart: choose)
+                case .collection: ChooseCollectionSheet(
+                    launcher: launcher, isSessionUnlocked: services.confidential.isUnlocked, onStart: choose)
                 }
             }
             .onAppear(perform: refresh)
+            .onChange(of: services.confidential.isUnlocked) { refresh() }
             .alert("Couldn't Start Prayer Time", isPresented: errorBinding) {
                 Button("OK") {}
             } message: {
@@ -174,9 +203,10 @@ private struct PrayerTimeLauncherModifier: ViewModifier {
 
     private func refresh() {
         let launcher = launcher
+        let isUnlocked = services.confidential.isUnlocked
         Task {
             let result = await Task.detached {
-                Result { (try launcher.tagOptions().isEmpty == false, try launcher.collectionOptions().isEmpty == false) }
+                Result { (try launcher.tagOptions().isEmpty == false, try launcher.collectionOptions(isSessionUnlocked: isUnlocked).isEmpty == false) }
             }.value
             switch result {
             case .success(let flags): (hasTags, hasCollections) = flags

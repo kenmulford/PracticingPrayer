@@ -68,11 +68,18 @@ struct ScopeOptionRow: View {
                         .foregroundStyle(Color.tag(color))
                         .accessibilityHidden(true)
                 }
+                if option.isLocked {
+                    Image(systemName: "lock.fill")
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                }
                 Text(option.name)
                 Spacer()
-                Text(option.activeCount, format: .number)
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
+                if !option.isLocked {
+                    Text(option.activeCount, format: .number)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
                 if isSelected {
                     Image(systemName: "checkmark")
                         .accessibilityHidden(true)
@@ -81,6 +88,7 @@ struct ScopeOptionRow: View {
         }
         .foregroundStyle(.primary)
         .accessibilityElement(children: .combine)
+        .accessibilityValue(option.isLocked ? Text("Locked") : Text(verbatim: ""))
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }

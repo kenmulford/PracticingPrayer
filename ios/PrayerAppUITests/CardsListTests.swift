@@ -49,8 +49,8 @@ final class CardsListTests: XCTestCase {
         tab.tap()
     }
 
-    private func standardArguments(expanded: String, showTip: Bool = false) -> [String] {
-        ["-ResetTips", "-CollectionsBannerDismissed", showTip ? "NO" : "YES", "-ExpandedSectionIds", expanded]
+    private func standardArguments(showTip: Bool = false) -> [String] {
+        ["-ResetTips", "-CollectionsBannerDismissed", showTip ? "NO" : "YES"]
     }
 
     private func insertBox(_ name: String) -> String {
@@ -84,12 +84,14 @@ final class CardsListTests: XCTestCase {
         app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", prefix)).firstMatch
     }
 
-    private func header(_ app: XCUIApplication, _ name: String) -> XCUIElement {
-        element(app, labelStartingWith: "\(name) · ")
+    private func collectionRow(_ app: XCUIApplication, _ name: String) -> XCUIElement {
+        app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH 'Collections_Row_' AND label BEGINSWITH %@", name))
+            .firstMatch
     }
 
     private func waitForList(_ app: XCUIApplication) {
-        XCTAssertTrue(header(app, "Archived").waitForExistence(timeout: 20), "card list did not load")
+        XCTAssertTrue(collectionRow(app, "Archived").waitForExistence(timeout: 20), "collections list did not load")
     }
 
     // MARK: - Tests
@@ -101,14 +103,15 @@ final class CardsListTests: XCTestCase {
             insertCard("OrderCard Zed", favorite: true, box: "A CardsListOrder"),
             insertCard("OrderCard B", box: "B CardsListOrder"),
         ])
-        let app = launch(database: database, arguments: standardArguments(expanded: "0,1,2,3,4"))
+        let app = launch(database: database, arguments: standardArguments())
         waitForList(app)
 
         let names = ["Loose Cards", "A CardsListOrder", "B CardsListOrder", "System", "Archived"]
-        XCTAssertTrue(names.allSatisfy { header(app, $0).exists })
-        let positions = names.map { header(app, $0).frame.minY }
-        XCTAssertEqual(positions, positions.sorted(), "headers out of order: \(positions)")
+        XCTAssertTrue(names.allSatisfy { collectionRow(app, $0).exists })
+        let positions = names.map { collectionRow(app, $0).frame.minY }
+        XCTAssertEqual(positions, positions.sorted(), "rows out of order: \(positions)")
 
+        app.openCollection("A CardsListOrder")
         let favorite = element(app, labelStartingWith: "OrderCard Zed")
         let plain = element(app, labelStartingWith: "OrderCard Plain")
         XCTAssertTrue(favorite.exists && plain.exists)
@@ -121,28 +124,10 @@ final class CardsListTests: XCTestCase {
             insertRequest(for: "RowCard", "Row Request One"),
             insertRequest(for: "RowCard", "Row Request Two"),
         ])
-        let app = launch(database: database, arguments: standardArguments(expanded: "0"))
+        let app = launch(database: database, arguments: standardArguments())
         waitForList(app)
+        app.openCollection("Loose Cards")
         XCTAssertTrue(element(app, label: "RowCard, Favorite, 2 active prayers").waitForExistence(timeout: 10))
-    }
-
-    func testExpansionPersistsAcrossRelaunch() throws {
-        let database = try prepareDatabase([
-            insertBox("A CardsListExpansion"), insertCard("ExpansionCard", box: "A CardsListExpansion"),
-        ])
-        let app = launch(database: database, arguments: standardArguments(expanded: ""))
-        waitForList(app)
-        XCTAssertFalse(element(app, labelStartingWith: "ExpansionCard").exists)
-        header(app, "A CardsListExpansion").tap()
-        XCTAssertTrue(element(app, labelStartingWith: "ExpansionCard").waitForExistence(timeout: 5))
-
-        app.terminate()
-        app.launchArguments = ["-ResetTips", "-CollectionsBannerDismissed", "YES"]
-        app.launch()
-        openCardsTab(app)
-        waitForList(app)
-        XCTAssertTrue(element(app, labelStartingWith: "ExpansionCard").waitForExistence(timeout: 5))
-        XCTAssertFalse(element(app, labelStartingWith: "General").exists)
     }
 
     func testLockedRowMaskedAndHiddenAbsent() throws {
@@ -151,8 +136,9 @@ final class CardsListTests: XCTestCase {
             insertRequest(for: "LockedCardTitle", "Locked Request"),
             insertCard("HiddenCardTitle", protection: 2),
         ])
-        let app = launch(database: database, arguments: standardArguments(expanded: "0"))
+        let app = launch(database: database, arguments: standardArguments())
         waitForList(app)
+        app.openCollection("Loose Cards")
         XCTAssertTrue(element(app, label: "Protected").waitForExistence(timeout: 10), "masked row shows Protected with no count")
         XCTAssertFalse(element(app, labelStartingWith: "LockedCardTitle").exists)
         XCTAssertFalse(element(app, labelStartingWith: "HiddenCardTitle").exists)
@@ -160,7 +146,7 @@ final class CardsListTests: XCTestCase {
 
     func testSearchNarrowsAndClearRestores() throws {
         let database = try prepareDatabase([insertCard("SearchNeedleCard")])
-        let app = launch(database: database, arguments: standardArguments(expanded: ""))
+        let app = launch(database: database, arguments: standardArguments())
         waitForList(app)
         XCTAssertFalse(element(app, labelStartingWith: "SearchNeedleCard").exists)
 
@@ -171,12 +157,12 @@ final class CardsListTests: XCTestCase {
         XCTAssertFalse(element(app, labelStartingWith: "General").exists)
 
         app.buttons["Clear text"].tap()
-        XCTAssertTrue(header(app, "Archived").waitForExistence(timeout: 5))
+        XCTAssertTrue(collectionRow(app, "Archived").waitForExistence(timeout: 5))
         XCTAssertFalse(element(app, labelStartingWith: "SearchNeedleCard").exists)
     }
 
     func testSearchNoMatchShowsUnavailable() throws {
-        let app = launch(database: try prepareDatabase(), arguments: standardArguments(expanded: ""))
+        let app = launch(database: try prepareDatabase(), arguments: standardArguments())
         waitForList(app)
         let search = app.searchFields["Search Cards"]
         search.tap()
@@ -186,15 +172,33 @@ final class CardsListTests: XCTestCase {
 
     func testEmptyDatabaseShowsNoPrayerCards() throws {
         let database = try prepareDatabase(["DELETE FROM PrayerCard"])
-        let app = launch(database: database, arguments: standardArguments(expanded: ""))
+        let app = launch(database: database, arguments: standardArguments())
         XCTAssertTrue(element(app, label: "No Prayer Cards").waitForExistence(timeout: 20))
-        XCTAssertTrue(app.navigationBars.buttons["Add Card"].exists)
+        XCTAssertTrue(app.navigationBars.buttons["Add"].exists)
+        XCTAssertTrue(app.buttons["Add Card"].exists)
+    }
+
+    func testAddMenuNewCollectionAddsRow() throws {
+        let name = "Collection testAddMenuNewCollectionAddsRow"
+        let app = launch(database: try prepareDatabase(), arguments: standardArguments())
+        waitForList(app)
+        app.chooseFromAddMenu(.newCollection)
+        XCTAssertTrue(app.navigationBars["New Collection"].waitForExistence(timeout: 10))
+        let confirm = app.buttons["CollectionEditor_Confirm"].firstMatch
+        XCTAssertFalse(confirm.isEnabled, "Save must be disabled until a name is entered")
+        let field = app.textFields["CollectionEditor_Name"]
+        field.tap()
+        field.typeText(name)
+        confirm.tap()
+        let row = collectionRow(app, name)
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "new collection row missing")
+        XCTAssertTrue(row.label.hasSuffix("0"), "new collection should show 0 cards, got \(row.label)")
     }
 
     func testLoadFailureShowsTryAgain() throws {
         // Schema upkeep recreates a dropped table on open, so the fault is a row whose date cannot decode.
         let database = try prepareDatabase(["UPDATE PrayerCardTag SET CreatedAt = NULL"])
-        let app = launch(database: database, arguments: standardArguments(expanded: "0"))
+        let app = launch(database: database, arguments: standardArguments())
         XCTAssertTrue(app.staticTexts["Can't Load Prayer Cards"].waitForExistence(timeout: 20))
         XCTAssertTrue(app.buttons["Try Again"].exists)
         XCTAssertFalse(element(app, labelStartingWith: "General").exists)
@@ -202,24 +206,25 @@ final class CardsListTests: XCTestCase {
 
     func testTipShowsOnceAndCloses() throws {
         let database = try prepareDatabase()
-        let app = launch(database: database, arguments: standardArguments(expanded: "", showTip: true))
+        let app = launch(database: database, arguments: standardArguments(showTip: true))
         waitForList(app)
-        let tipTitle = app.staticTexts["Collections"]
-        XCTAssertTrue(tipTitle.waitForExistence(timeout: 10))
-        app.buttons["Close"].firstMatch.tap()
-        XCTAssertTrue(tipTitle.waitForNonExistence(timeout: 10))
+        let close = app.buttons["Close"].firstMatch
+        XCTAssertTrue(close.waitForExistence(timeout: 10))
+        close.tap()
+        XCTAssertTrue(close.waitForNonExistence(timeout: 10))
 
         app.terminate()
-        app.launchArguments = ["-ExpandedSectionIds", ""]
+        app.launchArguments = []
         app.launch()
         openCardsTab(app)
         waitForList(app)
-        XCTAssertFalse(app.staticTexts["Collections"].exists)
+        XCTAssertFalse(app.buttons["Close"].exists)
     }
 
     func testSelectingRowShowsDetailPlaceholder() throws {
-        let app = launch(database: try prepareDatabase(), arguments: standardArguments(expanded: "0"))
+        let app = launch(database: try prepareDatabase(), arguments: standardArguments())
         waitForList(app)
+        app.openCollection("Loose Cards")
         XCTAssertTrue(app.staticTexts["Select a Prayer Card"].waitForExistence(timeout: 5))
         let row = element(app, labelStartingWith: "Fixture Card 1")
         XCTAssertTrue(row.waitForExistence(timeout: 5))

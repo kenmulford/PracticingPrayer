@@ -64,12 +64,8 @@ final class CardRowActionsTests: XCTestCase {
         app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", prefix)).firstMatch
     }
 
-    private func header(_ app: XCUIApplication, _ name: String) -> XCUIElement {
-        element(app, labelStartingWith: "\(name) · ")
-    }
-
-    private func waitForList(_ app: XCUIApplication) {
-        XCTAssertTrue(header(app, "Archived").waitForExistence(timeout: 20), "card list did not load")
+    private func waitForList(_ app: XCUIApplication, collection: String = "Loose Cards") {
+        app.openCollection(collection)
     }
 
     private func tap(_ app: XCUIApplication, row title: String) {
@@ -85,7 +81,7 @@ final class CardRowActionsTests: XCTestCase {
     // MARK: - Tests
 
     private func rowArguments() -> [String] {
-        ["-ResetTips", "-CollectionsBannerDismissed", "YES", "-ExpandedSectionIds", "0,1", "-ArchivedFolderId", "2"]
+        ["-ResetTips", "-CollectionsBannerDismissed", "YES", "-ArchivedFolderId", "2"]
     }
 
     func testLeadingSwipeShowsFavorite() throws {
@@ -120,7 +116,7 @@ final class CardRowActionsTests: XCTestCase {
     func testSystemCardHasNoSwipe() throws {
         let database = try prepareDatabase()
         let app = launch(database: database, arguments: rowArguments())
-        waitForList(app)
+        waitForList(app, collection: "System")
         let row = element(app, labelStartingWith: "Quick Add")
         XCTAssertTrue(row.waitForExistence(timeout: 10))
         row.swipeLeft()

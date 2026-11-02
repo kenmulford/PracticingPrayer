@@ -29,11 +29,17 @@ final class PrayerTimeEntryPointsTests: XCTestCase {
         return copy
     }
 
-    private func insertCard(_ title: String) -> String {
-        "INSERT INTO PrayerCard (Title, CanNotify, PrayerFrequency, IsAnswered, IsFavorite, CreatedAt, UpdatedAt, "
+    private func insertCollection(_ name: String) -> String {
+        "INSERT INTO CardBox (Name, IsSystem, SortOrder, ProtectAllCards, CardProtectionMode, CreatedAt, UpdatedAt) "
+            + "VALUES ('\(name)', 0, 10, 0, 0, 1, 1)"
+    }
+
+    private func insertCard(_ title: String, box: String? = nil) -> String {
+        let boxId = box.map { "(SELECT Id FROM CardBox WHERE Name = '\($0)')" } ?? "NULL"
+        return "INSERT INTO PrayerCard (Title, CanNotify, PrayerFrequency, IsAnswered, IsFavorite, CreatedAt, UpdatedAt, "
             + "IsSystem, IsImported, ProtectionMode, BoxId, PreArchiveBoxId, SystemKey) "
             + "SELECT '\(title)', CanNotify, PrayerFrequency, IsAnswered, 0, CreatedAt, UpdatedAt, "
-            + "IsSystem, IsImported, 0, NULL, PreArchiveBoxId, SystemKey FROM PrayerCard WHERE Id = 2"
+            + "IsSystem, IsImported, 0, \(boxId), PreArchiveBoxId, SystemKey FROM PrayerCard WHERE Id = 2"
     }
 
     private func insertRequest(for card: String, _ title: String) -> String {
@@ -53,17 +59,45 @@ final class PrayerTimeEntryPointsTests: XCTestCase {
         let database = try prepareDatabase([insertCard(card), insertRequest(for: card, "Pray request")])
         let app = XCUIApplication()
         app.launchEnvironment["PRAYER_DB_PATH"] = database.path
-        app.launchArguments = ["-ExpandedSectionIds", "0"]
         app.launch()
         let tab = app.cardsTab
         XCTAssertTrue(tab.waitForExistence(timeout: 20), "Cards tab missing")
         tab.tap()
+        app.openCollection("Loose Cards")
         let row = element(app, labelStartingWith: card)
         XCTAssertTrue(row.waitForExistence(timeout: 20), "card row missing")
         row.tap()
         let pray = app.buttons["Pray"].firstMatch
         XCTAssertTrue(pray.waitForExistence(timeout: 10), "Pray button missing")
         pray.tap()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["PrayerSession_Title"].waitForExistence(timeout: 10),
+            "session did not open")
+    }
+
+    func testCollectionRowMenuStartsPrayerTime() throws {
+        let collection = "Menu Collection testCollectionRowMenuStartsPrayerTime"
+        let card = "Menu Card testCollectionRowMenuStartsPrayerTime"
+        let database = try prepareDatabase([
+            insertCollection(collection), insertCard(card, box: collection),
+            insertRequest(for: card, "Menu request testCollectionRowMenuStartsPrayerTime"),
+        ])
+        let app = XCUIApplication()
+        app.launchEnvironment["PRAYER_DB_PATH"] = database.path
+        app.launch()
+        let tab = app.cardsTab
+        XCTAssertTrue(tab.waitForExistence(timeout: 20), "Cards tab missing")
+        tab.tap()
+        let row = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH 'Collections_Row_' AND label BEGINSWITH %@", collection))
+            .firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 20), "collection row missing")
+        let framesBefore = app.collectionViewFrames()
+        row.press(forDuration: 1.0)
+        let menu = try XCTUnwrap(app.openedMenuCollectionView(excluding: framesBefore), "Row menu did not open")
+        let prayerTime = menu.cells.element(boundBy: 0)
+        XCTAssertTrue(prayerTime.waitForExistence(timeout: 5), "Prayer Time menu row missing")
+        prayerTime.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         XCTAssertTrue(
             app.descendants(matching: .any)["PrayerSession_Title"].waitForExistence(timeout: 10),
             "session did not open")

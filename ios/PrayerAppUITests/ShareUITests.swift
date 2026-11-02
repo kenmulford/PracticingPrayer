@@ -32,7 +32,7 @@ final class ShareUITests: XCTestCase {
     private func launch(database: URL, tab name: String) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchEnvironment["PRAYER_DB_PATH"] = database.path
-        app.launchArguments = ["-ResetTips", "-CollectionsBannerDismissed", "YES", "-ExpandedSectionIds", "0"]
+        app.launchArguments = ["-ResetTips", "-CollectionsBannerDismissed", "YES"]
         app.launch()
         let tab = app.tabBars.buttons[name].exists ? app.tabBars.buttons[name] : app.buttons[name].firstMatch
         XCTAssertTrue(tab.waitForExistence(timeout: 20), "\(name) tab missing")
@@ -76,6 +76,7 @@ final class ShareUITests: XCTestCase {
                 insertCard("Card ShareMore"), insertRequest(for: "Card ShareMore", "Share More Prayer"),
             ]),
             tab: "Cards")
+        app.openCollection("Loose Cards")
         let element = row(app, "Card ShareMore")
         XCTAssertTrue(element.waitForExistence(timeout: 20), "card row missing")
         element.tap()
@@ -87,6 +88,7 @@ final class ShareUITests: XCTestCase {
 
     func testEmptyCardShareIsDisabled() throws {
         let app = launch(database: try prepareDatabase([insertCard("Card ShareEmpty")]), tab: "Cards")
+        app.openCollection("Loose Cards")
         let element = row(app, "Card ShareEmpty")
         XCTAssertTrue(element.waitForExistence(timeout: 20), "card row missing")
         element.tap()
