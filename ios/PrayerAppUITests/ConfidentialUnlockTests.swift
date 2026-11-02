@@ -67,4 +67,23 @@ final class ConfidentialUnlockTests: XCTestCase {
         XCTAssertFalse(app.staticTexts["ConfidentialUnlockCancel"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.staticTexts["Protected"].firstMatch.exists)
     }
+
+    func testTapTrailingAreaOfLockedRowOpensCardDetail() throws {
+        let app = try launch(authStub: "success")
+        createLockedCard(app, title: "ConfidentialUnlockTapTrailing")
+        let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Protected, locked")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        row.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+        XCTAssertTrue(app.navigationBars["ConfidentialUnlockTapTrailing"].waitForExistence(timeout: 10))
+    }
+
+    func testCancelTapTrailingAreaKeepsRowProtected() throws {
+        let app = try launch(authStub: "cancel")
+        createLockedCard(app, title: "ConfidentialUnlockTapCancel")
+        let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Protected, locked")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        row.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+        XCTAssertFalse(app.navigationBars["ConfidentialUnlockTapCancel"].waitForExistence(timeout: 3))
+        XCTAssertTrue(row.exists)
+    }
 }
