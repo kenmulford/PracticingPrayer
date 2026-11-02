@@ -1,6 +1,8 @@
 PRODUCT_BUNDLE_IDENTIFIER = com.multithreadedllc.prayercards
+// MARKETING_VERSION is bumped by hand. CURRENT_PROJECT_VERSION stays 1: the Organizer's
+// "Manage version and build number" sets each upload's build number (.project/conventions.md#Versioning).
 MARKETING_VERSION = 2.0.0
-CURRENT_PROJECT_VERSION = 1001
+CURRENT_PROJECT_VERSION = 1
 IPHONEOS_DEPLOYMENT_TARGET = 26.0
 SDKROOT = iphoneos
 SUPPORTED_PLATFORMS = iphoneos iphonesimulator
