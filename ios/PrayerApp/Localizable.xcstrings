@@ -1,16 +1,19 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "" : {
+
+    },
     "%@ %lld of %lld" : {
 
     },
     "%@ marked as answered" : {
 
     },
-    "%@, locked" : {
+    "%@ · %lld" : {
 
     },
-    "%@ · %lld" : {
+    "%@, locked" : {
 
     },
     "%lld Selected" : {
@@ -151,6 +154,9 @@
 
     },
     "Answered" : {
+
+    },
+    "Answered %@" : {
 
     },
     "Answered On" : {
@@ -326,7 +332,7 @@
     "Choose Cards…" : {
 
     },
-    "Choose a passphrase to encrypt your confidential cards in this backup. You'll need it to restore them later \u2014 we can't recover it for you." : {
+    "Choose a passphrase to encrypt your confidential cards in this backup. You'll need it to restore them later — we can't recover it for you." : {
 
     },
     "Choose what to pray for" : {
@@ -374,7 +380,13 @@
     "Couldn't Delete Tag" : {
 
     },
+    "Couldn't Mark Answered" : {
+
+    },
     "Couldn't Save" : {
+
+    },
+    "Couldn't Share" : {
 
     },
     "Couldn't Start Prayer Time" : {
@@ -384,9 +396,6 @@
 
     },
     "Couldn't Update Cards" : {
-
-    },
-    "Couldn't Share" : {
 
     },
     "Couldn't Update Prayer" : {
@@ -526,9 +535,6 @@
     "Details" : {
 
     },
-    "Developer" : {
-
-    },
     "Diagnostic Log" : {
 
     },
@@ -571,10 +577,10 @@
     "Everything in this share is already on %@." : {
 
     },
-    "Expand %@" : {
+    "Existing Card" : {
 
     },
-    "Existing Card" : {
+    "Expand %@" : {
 
     },
     "Export your prayer data to a file you can restore on another device." : {
@@ -592,7 +598,7 @@
     "Get Started" : {
 
     },
-    "Give it a name \u2014 a person, a topic, or a place." : {
+    "Give it a name — a person, a topic, or a place." : {
 
     },
     "Go to Settings → Backup & Restore → Back Up Now. This creates a file you can save or share. To restore, use \"Restore from Backup\" on the same screen." : {
@@ -904,16 +910,10 @@
     "Prayed" : {
 
     },
-    "Prayer" : {
-
-    },
     "Prayer %lld" : {
 
     },
     "Prayer %lld of %lld. %@" : {
-
-    },
-    "Prayer Cards" : {
 
     },
     "Prayer Not Found" : {
@@ -1039,6 +1039,9 @@
     "Save" : {
 
     },
+    "Save ${sharedText} to Practicing Prayer" : {
+
+    },
     "Save and Add Another" : {
 
     },
@@ -1063,10 +1066,10 @@
     "Select Cards" : {
 
     },
-    "Select a Prayer" : {
+    "Select a Collection" : {
 
     },
-    "Select a Collection" : {
+    "Select a Prayer" : {
 
     },
     "Select a Prayer Card" : {
@@ -1135,10 +1138,10 @@
     "Take the Tour Again" : {
 
     },
-    "Tap the link you received to open it." : {
+    "Tap the Prayer Cards tab, then tap \"Add Card\" in the top right. Give your card a name — a person, topic, or place — then tap Save, or Save + to save it and start another card in the same collection." : {
 
     },
-    "Tap the Prayer Cards tab, then tap \"Add Card\" in the top right. Give your card a name \u2014 a person, topic, or place \u2014 then tap Save, or Save + to save it and start another card in the same collection." : {
+    "Tap the link you received to open it." : {
 
     },
     "Teal" : {
@@ -1168,13 +1171,13 @@
     "The star marks a card as a favorite. Swipe a card to the right in the Cards list, or touch and hold the card and choose Favorite. Favorited cards sort to the top of their collection so they're always easy to find." : {
 
     },
+    "There are no active prayers to pray for." : {
+
+    },
     "There's no text to save. Try again with a longer selection." : {
 
     },
     "These won't be added." : {
-
-    },
-    "There are no active prayers to pray for." : {
 
     },
     "This also deletes its %lld prayer requests." : {

@@ -1,17 +1,20 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "Add a prayer to ${applicationName}" : {
-
-    },
-    "New prayer card in ${applicationName}" : {
-
-    },
     "Save to ${applicationName}" : {
-
-    },
-    "Save to Prayer" : {
-
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringSet" : {
+            "state" : "new",
+            "values" : [
+              "Save to ${applicationName}",
+              "New prayer card in ${applicationName}",
+              "Add a prayer to ${applicationName}"
+            ]
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

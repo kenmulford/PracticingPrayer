@@ -12,7 +12,7 @@ struct ConfirmImportHarness: View {
     var body: some View {
         Group {
             if services.phase == .failed {
-                Text("Harness could not open the database")
+                Text(verbatim: "Harness could not open the database")
             } else {
                 Color.clear
             }
