@@ -59,7 +59,7 @@ struct AppSettingsView: View {
             Section {
                 DeveloperSettingsRows()
             } header: {
-                Text("Developer").accessibilityAddTraits(.isHeader)
+                Text(verbatim: "Developer").accessibilityAddTraits(.isHeader)
             }
             #endif
         }
