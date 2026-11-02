@@ -123,7 +123,7 @@ final class CardEditorTests: XCTestCase {
     func testAddCardCreates() throws {
         let app = launch(database: try prepareDatabase(), arguments: standardArguments())
         waitForList(app)
-        app.buttons["Add Card"].firstMatch.tap()
+        app.chooseFromAddMenu(.newCard)
         XCTAssertTrue(app.navigationBars["New Card"].waitForExistence(timeout: 10))
         let save = app.buttons["CardEditor_Confirm"].firstMatch
         XCTAssertFalse(save.isEnabled, "Save must be disabled until a title is entered")
@@ -139,7 +139,7 @@ final class CardEditorTests: XCTestCase {
     func testSaveAndAddAnother() throws {
         let app = launch(database: try prepareDatabase(), arguments: standardArguments())
         waitForList(app)
-        app.buttons["Add Card"].firstMatch.tap()
+        app.chooseFromAddMenu(.newCard)
         XCTAssertTrue(app.navigationBars["New Card"].waitForExistence(timeout: 10))
         let field = app.textFields["CardEditor_Title"]
         field.tap()

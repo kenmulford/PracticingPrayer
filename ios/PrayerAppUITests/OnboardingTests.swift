@@ -93,7 +93,7 @@ final class OnboardingTests: XCTestCase {
         let app = try launchWithFixture(step: "AddRequest", complete: false)
         openTab(app, "Cards")
         XCTAssertTrue(app.navigationBars["Collections"].waitForExistence(timeout: 10))
-        app.buttons["Add Card"].firstMatch.tap()
+        app.chooseFromAddMenu(.newCard)
         let field = app.textFields["CardEditor_Title"]
         XCTAssertTrue(field.waitForExistence(timeout: 10))
         field.tap()

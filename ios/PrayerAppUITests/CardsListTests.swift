@@ -174,7 +174,25 @@ final class CardsListTests: XCTestCase {
         let database = try prepareDatabase(["DELETE FROM PrayerCard"])
         let app = launch(database: database, arguments: standardArguments())
         XCTAssertTrue(element(app, label: "No Prayer Cards").waitForExistence(timeout: 20))
-        XCTAssertTrue(app.navigationBars.buttons["Add Card"].exists)
+        XCTAssertTrue(app.navigationBars.buttons["Add"].exists)
+        XCTAssertTrue(app.buttons["Add Card"].exists)
+    }
+
+    func testAddMenuNewCollectionAddsRow() throws {
+        let name = "Collection testAddMenuNewCollectionAddsRow"
+        let app = launch(database: try prepareDatabase(), arguments: standardArguments())
+        waitForList(app)
+        app.chooseFromAddMenu(.newCollection)
+        XCTAssertTrue(app.navigationBars["New Collection"].waitForExistence(timeout: 10))
+        let confirm = app.buttons["CollectionEditor_Confirm"].firstMatch
+        XCTAssertFalse(confirm.isEnabled, "Save must be disabled until a name is entered")
+        let field = app.textFields["CollectionEditor_Name"]
+        field.tap()
+        field.typeText(name)
+        confirm.tap()
+        let row = collectionRow(app, name)
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "new collection row missing")
+        XCTAssertTrue(row.label.hasSuffix("0"), "new collection should show 0 cards, got \(row.label)")
     }
 
     func testLoadFailureShowsTryAgain() throws {

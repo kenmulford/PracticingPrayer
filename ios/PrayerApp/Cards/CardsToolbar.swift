@@ -18,23 +18,24 @@ struct CardsToolbar: ToolbarContent {
     let tags: [PrayerTagRecord]
     @Binding var selectedTagIds: Set<Int64>
     let addCard: () -> Void
+    let addCollection: () -> Void
     let manageCollections: () -> Void
     let isUnlocked: Bool
     let toggleConfidential: () -> Void
 
     var body: some ToolbarContent {
         if #available(iOS 27, *) {
-            ToolbarItemGroup(placement: .topBarTrailing) { filterMenu }
-                .visibilityPriority(.high)
             ToolbarItemGroup(placement: .topBarTrailing) {
+                filterMenu
                 moreMenu
-                addButton
             }
             .visibilityPriority(.high)
+            ToolbarItem(placement: .topBarTrailing) { addMenu }
+                .visibilityPriority(.high)
         } else {
             ToolbarItemGroup(placement: .topBarTrailing) { filterMenu }
             ToolbarItem(placement: .topBarTrailing) { moreMenu }
-            ToolbarItem(placement: .topBarTrailing) { addButton }
+            ToolbarItem(placement: .topBarTrailing) { addMenu }
         }
     }
 
@@ -53,10 +54,12 @@ struct CardsToolbar: ToolbarContent {
         }
     }
 
-    private var addButton: some View {
-        Button(action: addCard) {
-            Label("Add Card", systemImage: "plus")
+    private var addMenu: some View {
+        Menu("Add", systemImage: "plus") {
+            Button("New Card", systemImage: "rectangle.stack.badge.plus", action: addCard)
+            Button("New Collection", systemImage: "folder.badge.plus", action: addCollection)
         }
+        .accessibilityIdentifier("Cards_Add")
     }
 }
 

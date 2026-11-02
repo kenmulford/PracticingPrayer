@@ -59,7 +59,7 @@ final class ConfidentialUnlockTests: XCTestCase {
     }
 
     private func createLockedCard(_ app: XCUIApplication, title: String) {
-        app.buttons["Add Card"].firstMatch.tap()
+        app.chooseFromAddMenu(.newCard)
         XCTAssertTrue(app.navigationBars["New Card"].waitForExistence(timeout: 10))
         let field = app.textFields["CardEditor_Title"]
         field.tap()

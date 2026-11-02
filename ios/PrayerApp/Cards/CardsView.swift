@@ -27,8 +27,8 @@ struct CardsView: View {
     @State private var prayableCollectionIds: Set<Int64> = []
 
     private struct CollectionEditorTarget: Identifiable {
-        let record: CardBoxRecord
-        var id: Int64 { record.id }
+        let record: CardBoxRecord?
+        var id: Int64 { record?.id ?? 0 }
     }
 
     private var isSearching: Bool {
@@ -49,6 +49,7 @@ struct CardsView: View {
                         tags: tags,
                         selectedTagIds: $selectedTagIds,
                         addCard: addCard,
+                        addCollection: addCollection,
                         manageCollections: { selection = .manageCollections },
                         isUnlocked: isSessionUnlocked,
                         toggleConfidential: services.confidential.toggle
@@ -152,6 +153,10 @@ struct CardsView: View {
     private func addCard() {
         isAddingCard = true
         services.onboarding.advance(from: .addCard)
+    }
+
+    private func addCollection() {
+        collectionEditor = CollectionEditorTarget(record: nil)
     }
 
     @ViewBuilder
