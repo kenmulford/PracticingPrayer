@@ -1159,6 +1159,9 @@
     "These won't be added." : {
 
     },
+    "This collection has no active prayers." : {
+
+    },
     "This also deletes its %lld prayer requests." : {
 
     },
